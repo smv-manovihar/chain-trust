@@ -1,0 +1,205 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  /* Grid Pattern */
+  .bg-grid-pattern {
+    background-size: 40px 40px;
+    background-image: linear-gradient(
+        to right,
+        hsl(var(--border) / 0.3) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px);
+    mask-image: radial-gradient(
+      ellipse 60% 50% at 50% 0%,
+      #000 70%,
+      transparent 100%
+    );
+  }
+
+  /* PharmaSecure Animations */
+  .animate-shake {
+    animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  }
+  .animate-pulse-fast {
+    animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes shake {
+    20%,
+    80% {
+      transform: translate3d(2px, 0, 0);
+    }
+    30%,
+    50%,
+    70% {
+      transform: translate3d(-4px, 0, 0);
+    }
+    40%,
+    60% {
+      transform: translate3d(4px, 0, 0);
+    }
+  }
+
+  @keyframes dot-glow {
+    0%,
+    100% {
+      opacity: 0.4;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.5);
+    }
+  }
+}
+
+@layer base {
+  :root {
+    /* --- LIGHT MODE: "Fresh Clinical" --- */
+
+    /* Background: White with a very faint Blue-Green tint */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+
+    /* Cards: Pure White */
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Primary: Vibrant Royal Blue (Trust & Tech) */
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 98%;
+
+    /* Secondary: Soft Mint Green (Freshness) */
+    --secondary: 152 60% 94%;
+    --secondary-foreground: 221 83% 53%; /* Blue text on Green bg */
+
+    /* Muted: Cool Blue-Grey */
+    --muted: 215 25% 90%;
+    --muted-foreground: 215 16% 47%;
+
+    /* Accent: Cyan/Turquoise (for hover/active states) */
+    --accent: 180 50% 94%;
+    --accent-foreground: 180 100% 25%;
+
+    /* Destructive: Coral Red */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    /* Success: Vibrant Emerald (Verification) */
+    --success: 150 100% 35%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning: Amber-Orange */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Borders: Soft Blue-Grey */
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+
+    /* Ring: Focus rings match the Primary Blue */
+    --ring: 221 83% 53%;
+
+    /* ROUNDED DESIGN: Increased radius */
+    --radius: 2rem;
+  }
+
+  .dark {
+    /* --- DARK MODE: "Deep Ocean" --- */
+
+    /* Background: Deep Marine Blue */
+    --background: 224 71% 4%;
+    --foreground: 210 40% 98%;
+
+    /* Cards: Dark Slate/Blue */
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    /* Primary: Luminous Azure Blue */
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
+
+    /* Secondary: Deep Emerald/Teal */
+    --secondary: 160 50% 15%;
+    --secondary-foreground: 160 60% 80%;
+
+    /* Muted: Navy Slate */
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    /* Accent: Deep Cyan */
+    --accent: 180 50% 15%;
+    --accent-foreground: 180 80% 80%;
+
+    /* Destructive: Muted Coral */
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 85% 90%;
+
+    /* Success: Neon Green */
+    --success: 150 80% 45%;
+    --success-foreground: 222 47% 11%;
+
+    /* Warning: Amber */
+    --warning: 48 96% 53%;
+    --warning-foreground: 222 47% 11%;
+
+    /* Borders: Navy Blue */
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
+  }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
