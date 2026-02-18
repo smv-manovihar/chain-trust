@@ -50,7 +50,7 @@ export function BrandLogo({
           currentSize.container,
         )}
       >
-        <span className={cn("font-bold", currentSize.text)}>P</span>
+        <span className={cn("font-bold", currentSize.text)}>C</span>
       </div>
       {withText && (
         <span
@@ -59,7 +59,7 @@ export function BrandLogo({
             currentSize.title,
           )}
         >
-          PharmaSecure
+          ChainTrust
         </span>
       )}
     </Link>

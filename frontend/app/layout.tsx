@@ -3,10 +3,9 @@ import type { Metadata, Viewport } from "next";
 import { Geist, JetBrains_Mono } from "next/font/google";
 
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeProvider } from "@/components/layout/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/auth-context";
-import { GoogleOAuthProvider } from "@react-oauth/google";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 const jetBrainsMono = JetBrains_Mono({
@@ -15,14 +14,14 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PharmaSecure - Trust in Every Dose",
+  title: "ChainTrust - Trust in Every Dose",
   description:
     "Blockchain-powered pharmaceutical verification system for authentic product tracking and counterfeit detection",
   keywords:
     "pharmacy, blockchain, verification, counterfeit, medicine, pharmaceutical",
-  creator: "PharmaSecure",
+  creator: "ChainTrust",
   openGraph: {
-    title: "PharmaSecure",
+    title: "ChainTrust",
     description: "Blockchain-powered pharmaceutical verification system",
     type: "website",
   },
@@ -49,15 +48,17 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geist.variable} ${jetBrainsMono.variable}`}
     >
-      <body className="font-sans antialiased">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <GoogleOAuthProvider
-            clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
-          >
+      <body className="font-sans antialiased relative">
+        {/* Background Grid - z-0 to be above body background but below content */}
+        <div className="fixed inset-0 bg-grid-pattern-global pointer-events-none z-0" />
+
+        {/* Content - z-10 to sit above grid */}
+        <div className="relative z-10">
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <AuthProvider>{children}</AuthProvider>
-          </GoogleOAuthProvider>
-          <Toaster />
-        </ThemeProvider>
+            <Toaster />
+          </ThemeProvider>
+        </div>
       </body>
     </html>
   );

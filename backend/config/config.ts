@@ -4,7 +4,7 @@ dotenv.config();
 
 export const PORT = process.env.PORT || 5000;
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'pharma_secure_secret';
+export const JWT_SECRET = process.env.JWT_SECRET || 'chain_trust_secret';
 
 export const JWT_REFRESH_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
 export const JWT_ACCESS_EXPIRATION = '15m';
@@ -17,7 +17,7 @@ export const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
 export const EMAIL_PORT = Number(process.env.EMAIL_PORT) || 587;
 export const EMAIL_USER = process.env.EMAIL_USER;
 export const EMAIL_PASS = process.env.EMAIL_PASS;
-export const EMAIL_FROM = process.env.EMAIL_FROM || 'noreply@pharmasecure.com';
+export const EMAIL_FROM = process.env.EMAIL_FROM || 'noreply@chaintrust.com';
 export const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Email verification settings

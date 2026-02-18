@@ -1,4 +1,4 @@
-import { ManufacturerSidebar } from "@/components/manufacturer-sidebar";
+import { ManufacturerSidebar } from "@/components/layout/manufacturer-sidebar";
 
 export default function ManufacturerLayout({
   children,

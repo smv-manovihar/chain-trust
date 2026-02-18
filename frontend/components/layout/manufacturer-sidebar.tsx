@@ -1,7 +1,5 @@
 "use client";
 
-"use client";
-
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -15,11 +13,12 @@ import {
   Boxes,
   ChevronLeft,
   ChevronRight,
+  MapPin,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button } from "./ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
+import { Button } from "../ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -89,6 +88,11 @@ export function ManufacturerSidebar({ className }: SidebarProps) {
       label: "Configuration",
       items: [
         {
+          label: "Track Product",
+          href: "/manufacturer/track",
+          icon: MapPin,
+        },
+        {
           label: "Settings",
           href: "/manufacturer/settings",
           icon: Settings,
@@ -106,10 +110,10 @@ export function ManufacturerSidebar({ className }: SidebarProps) {
         )}
       >
         <div className="flex h-8 w-8 items-center justify-center rounded bg-primary text-primary-foreground font-bold shrink-0">
-          P
+          C
         </div>
         {!isCollapsed && (
-          <span className="font-bold text-lg tracking-tight">PharmaSecure</span>
+          <span className="font-bold text-lg tracking-tight">ChainTrust</span>
         )}
       </div>
 

@@ -1,6 +1,6 @@
 /**
  * QR Code Generation and Validation Utilities
- * For PharmaSecure pharmaceutical verification system
+ * For ChainTrust pharmaceutical verification system
  */
 
 export interface QRData {

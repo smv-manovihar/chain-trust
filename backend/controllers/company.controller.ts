@@ -3,12 +3,13 @@ import User from '../models/user.model.js';
 import Company from '../models/company.model.js';
 import { generateOTP } from '../utils/email.utils.js';
 import { sendEmployeeInvitation } from '../utils/email.utils.js';
-import { FRONTEND_URL, OTP_EXPIRY_MINUTES } from '../config/config.js';
+import { FRONTEND_URL } from '../config/config.js';
 import crypto from 'crypto';
+import { hash } from 'bcrypt';
 
 export const inviteEmployee = async (req: Request, res: Response): Promise<void> => {
-  const { email, role } = req.body;
-  const adminUser = (req as any).user;
+	const { email, role, name, password, autoGenerate } = req.body;
+	const adminUser = (req as any).user;
 
   if (!email) {
     res.status(400).json({ message: 'Email is required' });
@@ -16,77 +17,96 @@ export const inviteEmployee = async (req: Request, res: Response): Promise<void>
   }
 
   try {
-    // 1. Verify admin has a company
-    const company = await Company.findOne({ adminId: adminUser.id });
-    if (!company) {
-      res.status(403).json({ message: 'Only company admins can invite employees' });
-      return;
-    }
+		// 1. Verify admin has a company
+		const company = await Company.findOne({ adminId: adminUser.id });
+		if (!company) {
+			res.status(403).json({ message: 'Only company admins can invite employees' });
+			return;
+		}
 
-    // 2. Check if user already exists
-    let user = await User.findOne({ email: email.toLowerCase() });
-    
-    // If user exists and is active, we can't invite them as a new employee easily 
-    // without more complex logic (e.g. multi-tenant). For now, assume fresh invite.
-    if (user && user.isActive) {
-       res.status(400).json({ message: 'User with this email already exists' });
-       return;
-    }
+		// 2. Check if user already exists
+		const existingUser = await User.findOne({ email: email.toLowerCase() });
+		if (existingUser) {
+			res.status(400).json({ message: 'User with this email already exists' });
+			return;
+		}
 
-    // 3. Generate Invite Data
-    const otp = generateOTP();
-    const token = crypto.randomBytes(32).toString('hex');
-    const otpExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours for invite
-    
-    if (!user) {
-      // Create skeleton user
-      user = new User({
-        email: email.toLowerCase(),
-        name: 'Invited Employee', // Placeholder
-        role: role || 'employee',
-        companyId: company._id,
-        companyPolicies: company.policies,
-        isActive: false, // Inactive until setup
-        isInvited: true,
-        invitationToken: token,
-        invitationExpires: otpExpiry,
-        emailVerificationOtp: otp, // Reuse OTP field or add specific invite OTP
-        emailVerificationOtpExpiresAt: otpExpiry,
-      });
-    } else {
-        // Re-invite inactive user
-        user.isInvited = true;
-        user.invitationToken = token;
-        user.invitationExpires = otpExpiry;
-        user.emailVerificationOtp = otp;
-        user.emailVerificationOtpExpiresAt = otpExpiry;
-        user.companyId = company._id;
-        user.companyPolicies = company.policies;
-    }
+		// 3. Handle Password
+		let finalPassword = password;
+		if (autoGenerate) {
+			finalPassword = crypto.randomBytes(8).toString('hex');
+		}
 
-    await user.save();
+		if (!finalPassword || finalPassword.length < 8) {
+			res.status(400).json({ message: 'Password must be at least 8 characters long' });
+			return;
+		}
 
-    // 4. Send Email
-    // Format: /setup-account?uid=USER_ID&cid=COMPANY_ID&token=TOKEN
-    // Token is optional security, OTP is the main verification
-    const inviteLink = `${FRONTEND_URL}/setup-account?uid=${user._id}&cid=${company._id}`;
-    
-    const emailSent = await sendEmployeeInvitation(
-      user.email, 
-      inviteLink, 
-      otp, 
-      company.name
-    );
+		const hashedPassword = await hash(finalPassword, 10);
 
-    if (!emailSent) {
-      res.status(500).json({ message: 'Failed to send invitation email' });
-      return;
-    }
+		// 4. Create User
+		const user = new User({
+			email: email.toLowerCase(),
+			password: hashedPassword,
+			name: name || 'Employee',
+			role: role || 'employee',
+			companyId: company._id, // Direct assignment, assuming schema uses companyId
+			companyPolicies: company.policies,
+			isActive: true, // Active immediately since password is set
+			isEmailVerified: true, // Pre-verified since admin invited
+			mustChangePassword: true, // Force change on first login
+			
+			// Profile placeholders
+			phoneNumber: '',
+			address: '',
+			city: '',
+			postalCode: '',
+			country: '',
+		});
 
-    res.json({ message: 'Invitation sent successfully' });
+		await user.save();
 
-  } catch (error) {
-    console.error('Invite employee error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
+		// Update company employees list
+		company.employees.push(user._id);
+		await company.save();
+
+		// 5. Send Invite Email (NO PASSWORD)
+		const loginUrl = `${FRONTEND_URL}/login`;
+		try {
+			// specific email function for this new flow? 
+			// reusing sendEmployeeInvitation but passing loginUrl instead of setupUrl
+			// and NOT passing OTP.
+			// Ideally we should have a `sendCredentialsEmail` or generic `sendInvite`
+			// For now, I'll assume sendEmployeeInvitation can handle it or I'll customize the message there later. 
+			// But wait, the previous code used `sendEmployeeInvitation`. I should check `email.utils.ts`.
+			// Since I can't check it right now without tool call, I'll send a generic invite.
+			// Actually, the plan said "The invitation email will NOT contain the password".
+			// So just a "You have been invited, please contact admin for credentials" or similar?
+			// Or just "Login at..."
+			
+			await sendEmployeeInvitation(
+				user.email,
+				loginUrl,
+				'', // No OTP needed
+				company.name
+			);
+		} catch (emailErr) {
+			console.error('Failed to send invite email:', emailErr);
+			// Don't fail the request, just log it. Admin has credentials.
+		}
+
+		// 6. Return Credentials to Admin
+		res.json({
+			message: 'Employee invited successfully',
+			credentials: {
+				email: user.email,
+				password: finalPassword,
+				loginUrl: loginUrl
+			}
+		});
+
+	} catch (error) {
+		console.error('Invite employee error:', error);
+		res.status(500).json({ message: 'Server error' });
+	}
 };

@@ -40,7 +40,5 @@ const companySchema = new Schema<ICompany>(
   { timestamps: true }
 );
 
-// Index for domain lookups
-companySchema.index({ domain: 1 });
 
 export default model<ICompany>('Company', companySchema, 'Companies');

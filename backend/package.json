@@ -1,5 +1,5 @@
 {
-  "name": "pharma-secure-backend",
+  "name": "chain-trust-backend",
   "version": "1.0.0",
   "description": "",
   "main": "index.ts",
@@ -28,7 +28,8 @@
     "nodemailer": "^7.0.5",
     "nodemon": "^3.1.10",
     "swagger-autogen": "^2.23.7",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "web3": "^4.16.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
@@ -40,6 +41,7 @@
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^7.0.9",
     "cross-env": "^10.0.0",
+    "ganache": "^7.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

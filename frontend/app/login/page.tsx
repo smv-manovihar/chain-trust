@@ -8,10 +8,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AuthLayout } from "@/components/auth-layout";
+import { AuthLayout } from "@/components/layout/auth-layout";
 import { FcGoogle } from "react-icons/fc";
 import { AlertCircle, Loader2 } from "lucide-react";
-import EmailVerificationModal from "@/components/email-verification/email-verification-modal";
+import EmailVerificationModal from "@/components/email-verification/email-verification-dialog";
 import { useAuth } from "@/contexts/auth-context";
 import {
   Form,

@@ -41,6 +41,7 @@ interface PublicUser {
 	hasPassword: boolean;
 	lastActivity: Date;
 	isEmailVerified: boolean;
+	mustChangePassword: boolean;
 	avatar: string | null;
 }
 
@@ -52,6 +53,7 @@ const publicUser = (u: IUser): PublicUser => ({
 	hasPassword: !!u.password,
 	lastActivity: u.lastActivity,
 	isEmailVerified: u.isEmailVerified,
+	mustChangePassword: u.mustChangePassword,
 	avatar: u.avatar,
 });
 
@@ -318,7 +320,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
 };
 
 export const registerUser = async (req: Request, res: Response): Promise<void> => {
-	const { email, password, name, role, phone_number, address, city, postal_code, country, company_name, website } = req.body;
+	const { email, password, name, role, phoneNumber, address, city, postalCode, country, companyName, website } = req.body;
 
 	if (!email || !password || !name) {
 		res.status(400).json({ message: 'Email, password, and name are required' });
@@ -377,12 +379,12 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
 			role: role || 'customer',
 			
 			// Profile fields
-			phone_number,
+			phoneNumber,
 			address,
 			city,
-			postal_code,
+			postalCode,
 			country,
-			company_name,
+			companyName,
 			website,
 
 			emailVerificationToken: verificationToken,
@@ -794,7 +796,7 @@ export const checkEmailVerificationStatus = async (req: Request, res: Response):
 };
 
 export const setupAccount = async (req: Request, res: Response): Promise<void> => {
-	const { userId, companyId, otp, password, name, phone_number, address, city, postal_code, country } = req.body;
+	const { userId, companyId, otp, password, name, phoneNumber, address, city, postalCode, country } = req.body;
 
 	if (!userId || !companyId || !otp || !password) {
 		res.status(400).json({ message: 'Missing required fields' });
@@ -828,10 +830,10 @@ export const setupAccount = async (req: Request, res: Response): Promise<void> =
 
 		user.password = hashedPassword;
 		user.name = name || user.name;
-		user.phone_number = phone_number;
+		user.phoneNumber = phoneNumber;
 		user.address = address;
 		user.city = city;
-		user.postal_code = postal_code;
+		user.postalCode = postalCode;
 		user.country = country;
 		
 		user.isActive = true;
@@ -887,6 +889,77 @@ export const updateUserRole = async (req: Request, res: Response): Promise<void>
 		});
 	} catch (error) {
 		console.error('Update role error:', error);
+		res.status(500).json({ message: 'Server error' });
+	}
+};
+
+export const updateProfile = async (req: Request, res: Response): Promise<void> => {
+	const { phoneNumber, address, city, postalCode, country, companyName, website } = req.body;
+	const userId = (req as any).user.id;
+
+	try {
+		const user = await User.findById(userId);
+		if (!user) {
+			res.status(404).json({ message: 'User not found' });
+			return;
+		}
+
+		if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
+		if (address !== undefined) user.address = address;
+		if (city !== undefined) user.city = city;
+		if (postalCode !== undefined) user.postalCode = postalCode;
+		if (country !== undefined) user.country = country;
+		if (companyName !== undefined) user.companyName = companyName;
+		if (website !== undefined) user.website = website;
+
+		await user.save();
+
+		res.json({
+			message: 'Profile updated successfully',
+			user: publicUser(user),
+		});
+	} catch (error) {
+		console.error('Update profile error:', error);
+		res.status(500).json({ message: 'Server error' });
+	}
+};
+
+export const changePassword = async (req: Request, res: Response): Promise<void> => {
+	const { currentPassword, newPassword } = req.body;
+	const userId = (req as any).user.id;
+
+	if (!newPassword || newPassword.length < 8) {
+		res.status(400).json({ message: 'New password must be at least 8 characters long' });
+		return;
+	}
+
+	try {
+		const user = await User.findById(userId);
+		if (!user) {
+			res.status(404).json({ message: 'User not found' });
+			return;
+		}
+
+		if (!user.password) {
+			res.status(400).json({ message: 'User has no password set (OAuth user)' });
+			return;
+		}
+
+		const ok = await compare(currentPassword, user.password);
+		if (!ok) {
+			res.status(401).json({ message: 'Incorrect current password' });
+			return;
+		}
+
+		const hashed = await hash(newPassword, 10);
+		user.password = hashed;
+		user.mustChangePassword = false; // Clear the flag
+		
+		await user.save();
+
+		res.json({ message: 'Password changed successfully' });
+	} catch (error) {
+		console.error('Change password error:', error);
 		res.status(500).json({ message: 'Server error' });
 	}
 };

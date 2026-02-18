@@ -63,6 +63,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const data = await apiLogin(email, password);
       setUser(data.user);
+
+      if (data.user.mustChangePassword) {
+        return "/auth/force-change-password";
+      }
+
       return (
         data.redirectUrl ||
         (data.user.role === "manufacturer" ? "/manufacturer" : "/customer-home")

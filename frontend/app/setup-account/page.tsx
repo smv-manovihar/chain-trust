@@ -39,10 +39,10 @@ const setupSchema = z
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string(),
     name: z.string().min(2, "Name is required"),
-    phone_number: z.string().optional(),
+    phoneNumber: z.string().optional(),
     address: z.string().optional(),
     city: z.string().optional(),
-    postal_code: z.string().optional(),
+    postalCode: z.string().optional(),
     country: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -72,10 +72,10 @@ function SetupAccountForm() {
       password: "",
       confirmPassword: "",
       name: "",
-      phone_number: "",
+      phoneNumber: "",
       address: "",
       city: "",
-      postal_code: "",
+      postalCode: "",
       country: "",
     },
   });
@@ -106,17 +106,17 @@ function SetupAccountForm() {
         otp: data.otp,
         password: data.password,
         name: data.name,
-        phone_number: data.phone_number,
+        phoneNumber: data.phoneNumber,
         address: data.address,
         city: data.city,
-        postal_code: data.postal_code,
+        postalCode: data.postalCode,
         country: data.country,
       });
 
       await refreshUser();
 
       toast.success("Account Setup Complete", {
-        description: "Welcome to PharmaSecure!",
+        description: "Welcome to ChainTrust!",
       });
 
       router.push("/manufacturer"); // Or determine dashboard based on role? Usually employees go to manufacturer dashboard.
@@ -293,7 +293,7 @@ function SetupAccountForm() {
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <FormField
                         control={form.control}
-                        name="phone_number"
+                        name="phoneNumber"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Phone Number</FormLabel>

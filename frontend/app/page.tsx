@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Header } from "@/components/header";
+import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { TextAnimate } from "@/components/ui/text-animate";
 import { motion, Variants } from "motion/react";
@@ -90,12 +90,12 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen bg-background font-sans selection:bg-primary/20">
+    <div className="min-h-screen font-sans selection:bg-primary/20">
       <Header />
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex flex-col justify-center pt-20 pb-32 overflow-hidden">
-        <div className="absolute inset-0 bg-grid-pattern opacity-[0.05] z-0 pointer-events-none" />
+        {/* Global grid pattern is now in layout */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-primary/10 blur-[120px] rounded-full z-0 pointer-events-none" />
 
         <motion.div
@@ -128,7 +128,7 @@ export default function Home() {
             delay={0.6}
             once={true}
           >
-            PharmaSecure provides immutable blockchain tracking from manufacture
+            ChainTrust provides immutable blockchain tracking from manufacture
             to patient. Stop counterfeits, ensure compliance, and build trust in
             every dose.
           </TextAnimate>
@@ -289,7 +289,7 @@ export default function Home() {
       <footer className="border-t border-border py-12 bg-background relative z-10">
         <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center text-sm text-muted-foreground gap-4">
           <p>
-            &copy; {new Date().getFullYear()} PharmaSecure. All rights reserved.
+            &copy; {new Date().getFullYear()} ChainTrust. All rights reserved.
           </p>
         </div>
       </footer>

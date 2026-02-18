@@ -38,9 +38,9 @@ export function Header() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 font-bold text-xl">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-            <span className="text-sm">P</span>
+            <span className="text-sm">C</span>
           </div>
-          <span className="text-foreground tracking-tight">PharmaSecure</span>
+          <span className="text-foreground tracking-tight">ChainTrust</span>
         </Link>
 
         {/* Navigation */}

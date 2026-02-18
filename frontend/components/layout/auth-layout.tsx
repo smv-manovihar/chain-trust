@@ -1,6 +1,6 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { BrandLogo } from "@/components/brand-logo";
+import { BrandLogo } from "@/components/layout/brand-logo";
 import { Card } from "@/components/ui/card";
 
 interface AuthLayoutProps {
@@ -13,13 +13,12 @@ interface AuthLayoutProps {
 export function AuthLayout({
   children,
   image,
-  title = "PharmaSecure",
+  title = "ChainTrust",
   subtitle = "Secure Pharmaceutical Supply Chain",
 }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-background relative overflow-hidden p-4 md:p-8">
-      {/* Background Decor */}
-      <div className="absolute inset-0 bg-grid-pattern z-0 pointer-events-none" />
+    <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden p-4 md:p-8">
+      {/* Background Decor - Global grid is now in layout.tsx */}
       <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-[-20%] left-[-10%] w-[600px] h-[600px] bg-accent/5 rounded-full blur-3xl pointer-events-none" />
 
@@ -43,7 +42,7 @@ export function AuthLayout({
 
           <div className="relative z-10 flex items-center gap-2 text-sm text-muted-foreground mt-12 font-medium">
             <div className="h-1 w-1 rounded-full bg-primary" />©{" "}
-            {new Date().getFullYear()} PharmaSecure
+            {new Date().getFullYear()} ChainTrust
           </div>
         </div>
 

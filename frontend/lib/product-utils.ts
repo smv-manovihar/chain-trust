@@ -1,6 +1,6 @@
 /**
  * Product Management Utilities
- * For PharmaSecure pharmaceutical product handling
+ * For ChainTrust pharmaceutical product handling
  */
 
 export interface Product {

@@ -41,7 +41,7 @@ export default function ManufacturerSettingsPage() {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="companyName">Company Name</Label>
-                <Input id="companyName" defaultValue="PharmaSecure Inc." />
+                <Input id="companyName" defaultValue="ChainTrust Inc." />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="licenseNumber">License Number</Label>
@@ -54,7 +54,7 @@ export default function ManufacturerSettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Contact Email</Label>
-                <Input id="email" defaultValue="admin@pharmasecure.com" />
+                <Input id="email" defaultValue="admin@chaintrust.com" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>

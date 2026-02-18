@@ -1,6 +1,6 @@
 /**
  * Blockchain Verification Utilities
- * For PharmaSecure pharmaceutical verification system
+ * For ChainTrust pharmaceutical verification system
  */
 
 export interface BlockchainRecord {
@@ -203,7 +203,7 @@ export function calculateTrustScore(record: BlockchainRecord): number {
 export function generateVerificationCertificate(record: BlockchainRecord): string {
   const lines = [
     '='.repeat(60),
-    'PHARMASECURE VERIFICATION CERTIFICATE',
+    'CHAINTRUST VERIFICATION CERTIFICATE',
     '='.repeat(60),
     '',
     `Product: ${record.productName}`,

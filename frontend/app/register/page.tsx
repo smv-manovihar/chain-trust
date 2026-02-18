@@ -18,7 +18,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
-import { AuthLayout } from "@/components/auth-layout";
+import { AuthLayout } from "@/components/layout/auth-layout";
 import {
   Form,
   FormControl,
@@ -27,7 +27,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import EmailVerificationModal from "@/components/email-verification/email-verification-modal";
+import EmailVerificationModal from "@/components/email-verification/email-verification-dialog";
 
 // Schema definition
 const registerSchema = z
@@ -37,14 +37,14 @@ const registerSchema = z
     password: z.string().min(6, "Password must be at least 6 characters"),
     confirmPassword: z.string(),
     role: z.enum(["customer", "manufacturer"]),
-    phone_number: z.string().min(10, "Phone number must be at least 10 digits"),
+    phoneNumber: z.string().min(10, "Phone number must be at least 10 digits"),
     // Address fields - optional for customer, required for manufacturer
     address: z.string().optional(),
     city: z.string().optional(),
-    postal_code: z.string().optional(),
+    postalCode: z.string().optional(),
     country: z.string().optional(),
     // Manufacturer specific fields
-    company_name: z.string().optional(),
+    companyName: z.string().optional(),
     industry_registration: z.string().optional(),
     website: z.string().optional().or(z.literal("")),
   })
@@ -66,11 +66,11 @@ const registerSchema = z
           message: "City is required",
           path: ["city"],
         });
-      if (!data.postal_code)
+      if (!data.postalCode)
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Postal Code is required",
-          path: ["postal_code"],
+          path: ["postalCode"],
         });
       if (!data.country)
         ctx.addIssue({
@@ -78,11 +78,11 @@ const registerSchema = z
           message: "Country is required",
           path: ["country"],
         });
-      if (!data.company_name)
+      if (!data.companyName)
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Company Name is required",
-          path: ["company_name"],
+          path: ["companyName"],
         });
       if (!data.industry_registration)
         ctx.addIssue({
@@ -118,12 +118,12 @@ export default function RegisterPage() {
       email: "",
       password: "",
       confirmPassword: "",
-      phone_number: "",
+      phoneNumber: "",
       address: "",
       city: "",
       country: "",
-      postal_code: "",
-      company_name: "",
+      postalCode: "",
+      companyName: "",
       industry_registration: "",
       website: "",
     },
@@ -146,9 +146,9 @@ export default function RegisterPage() {
         "role",
       ];
     } else if (step === 2) {
-      fieldsToValidate = ["phone_number"];
+      fieldsToValidate = ["phoneNumber"];
       if (role === "manufacturer") {
-        fieldsToValidate.push("address", "city", "postal_code", "country");
+        fieldsToValidate.push("address", "city", "postalCode", "country");
       }
     }
 
@@ -178,15 +178,15 @@ export default function RegisterPage() {
         email: data.email,
         password: data.password,
         role: data.role,
-        phone_number: data.phone_number,
+        phoneNumber: data.phoneNumber,
         address: data.address,
         city: data.city,
         country: data.country,
-        postal_code: data.postal_code,
+        postalCode: data.postalCode,
       };
 
       if (data.role === "manufacturer") {
-        payload.company_name = data.company_name;
+        payload.companyName = data.companyName;
         payload.industry_registration = data.industry_registration;
         payload.website = data.website;
       }
@@ -354,7 +354,7 @@ export default function RegisterPage() {
             <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
               <FormField
                 control={form.control}
-                name="phone_number"
+                name="phoneNumber"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Phone Number</FormLabel>
@@ -400,7 +400,7 @@ export default function RegisterPage() {
                 />
                 <FormField
                   control={form.control}
-                  name="postal_code"
+                  name="postalCode"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
@@ -445,7 +445,7 @@ export default function RegisterPage() {
 
               <FormField
                 control={form.control}
-                name="company_name"
+                name="companyName"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Company Name</FormLabel>

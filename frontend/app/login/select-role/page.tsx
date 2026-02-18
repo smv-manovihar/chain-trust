@@ -4,20 +4,21 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateRole } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { AuthLayout } from "@/components/layout/auth-layout";
 import { useAuth } from "@/contexts/auth-context";
-import { User, Building2, ArrowRight } from "lucide-react";
+import {
+  User,
+  Building2,
+  ArrowRight,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { motion } from "motion/react"; // Use motion/react as per project convention
 
 export default function SelectRolePage() {
   const router = useRouter();
-  const { refreshUser, user } = useAuth();
+  const { refreshUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState<
     "customer" | "manufacturer" | null
@@ -45,83 +46,115 @@ export default function SelectRolePage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-2xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold">
-            Welcome to PharmaSecure
-          </CardTitle>
-          <CardDescription className="text-lg mt-2">
-            How would you like to use the platform?
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <AuthLayout
+      title="Choose Your Path"
+      subtitle="Select how you'll interact with the ChainTrust ecosystem to get started."
+    >
+      <div className="flex flex-col space-y-2 text-center mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Welcome to ChainTrust
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Select your account type to continue
+        </p>
+      </div>
+
+      <div className="grid gap-4">
+        {/* Customer Option */}
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className={cn(
+            "relative cursor-pointer rounded-xl border-2 p-4 transition-all duration-200 hover:border-primary/50",
+            selectedRole === "customer"
+              ? "border-primary bg-primary/5 shadow-md"
+              : "border-muted bg-card hover:bg-muted/30",
+          )}
+          onClick={() => setSelectedRole("customer")}
+        >
+          <div className="flex items-start gap-4">
             <div
               className={cn(
-                "cursor-pointer rounded-lg border-2 p-6 transition-all hover:border-primary",
+                "rounded-lg p-3 transition-colors",
                 selectedRole === "customer"
-                  ? "border-primary bg-primary/5 shadow-md"
-                  : "border-gray-200",
+                  ? "bg-primary/20 text-primary"
+                  : "bg-muted text-muted-foreground",
               )}
-              onClick={() => setSelectedRole("customer")}
             >
-              <div className="flex flex-col items-center space-y-4 text-center">
-                <div className="rounded-full bg-blue-100 p-4">
-                  <User className="h-8 w-8 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold">Customer</h3>
-                  <p className="mt-2 text-sm text-gray-500">
-                    I want to verify medicines and report issues.
-                  </p>
-                </div>
-              </div>
+              <User className="h-6 w-6" />
             </div>
+            <div className="flex-1 space-y-1">
+              <h3 className="font-semibold leading-none tracking-tight">
+                Consumer
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Verify medicines and report issues.
+              </p>
+            </div>
+            {selectedRole === "customer" && (
+              <div className="absolute top-4 right-4 text-primary animate-in fade-in zoom-in">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+            )}
+          </div>
+        </motion.div>
 
+        {/* Manufacturer Option */}
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className={cn(
+            "relative cursor-pointer rounded-xl border-2 p-4 transition-all duration-200 hover:border-primary/50",
+            selectedRole === "manufacturer"
+              ? "border-primary bg-primary/5 shadow-md"
+              : "border-muted bg-card hover:bg-muted/30",
+          )}
+          onClick={() => setSelectedRole("manufacturer")}
+        >
+          <div className="flex items-start gap-4">
             <div
               className={cn(
-                "cursor-pointer rounded-lg border-2 p-6 transition-all hover:border-primary",
+                "rounded-lg p-3 transition-colors",
                 selectedRole === "manufacturer"
-                  ? "border-primary bg-primary/5 shadow-md"
-                  : "border-gray-200",
+                  ? "bg-primary/20 text-primary"
+                  : "bg-muted text-muted-foreground",
               )}
-              onClick={() => setSelectedRole("manufacturer")}
             >
-              <div className="flex flex-col items-center space-y-4 text-center">
-                <div className="rounded-full bg-purple-100 p-4">
-                  <Building2 className="h-8 w-8 text-purple-600" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold">Manufacturer</h3>
-                  <p className="mt-2 text-sm text-gray-500">
-                    I represent a pharmaceutical company.
-                  </p>
-                </div>
-              </div>
+              <Building2 className="h-6 w-6" />
             </div>
-          </div>
-
-          <Button
-            className="w-full text-lg h-12"
-            size="lg"
-            disabled={!selectedRole || isLoading}
-            onClick={handleSelect}
-          >
-            {isLoading ? (
-              "Setting up..."
-            ) : (
-              <>
-                Continue as{" "}
-                {selectedRole
-                  ? selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)
-                  : "..."}
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </>
+            <div className="flex-1 space-y-1">
+              <h3 className="font-semibold leading-none tracking-tight">
+                Manufacturer
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Manage products and supply chain.
+              </p>
+            </div>
+            {selectedRole === "manufacturer" && (
+              <div className="absolute top-4 right-4 text-primary animate-in fade-in zoom-in">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
             )}
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+          </div>
+        </motion.div>
+      </div>
+
+      <Button
+        className="w-full mt-8 h-12 text-base shadow-lg shadow-primary/20"
+        size="lg"
+        disabled={!selectedRole || isLoading}
+        onClick={handleSelect}
+      >
+        {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+        {isLoading ? (
+          "Setting up..."
+        ) : (
+          <>
+            Continue
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </>
+        )}
+      </Button>
+    </AuthLayout>
   );
 }

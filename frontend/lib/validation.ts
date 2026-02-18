@@ -1,6 +1,6 @@
 /**
  * Form Validation Utilities
- * For PharmaSecure pharmaceutical verification system
+ * For ChainTrust pharmaceutical verification system
  */
 
 export interface ValidationError {

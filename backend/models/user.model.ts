@@ -13,12 +13,12 @@ export interface IUser extends Document {
 	lastActivity: Date;
 
 	// Profile details
-	phone_number?: string;
+	phoneNumber?: string;
 	address?: string;
 	city?: string;
-	postal_code?: string;
+	postalCode?: string;
 	country?: string;
-	company_name?: string;
+	companyName?: string;
 	website?: string;
 
 	// Company association
@@ -42,6 +42,9 @@ export interface IUser extends Document {
 	resetPasswordExpiresAt: Date | null;
 	resetPasswordOtp: string | null;
 	resetPasswordOtpExpiresAt: Date | null;
+
+	// Password Change Requirement
+	mustChangePassword: boolean;
 
 	createdAt: Date;
 	updatedAt: Date;
@@ -70,12 +73,12 @@ const userSchema = new Schema<IUser>(
 		lastActivity: { type: Date, default: Date.now },
 
 		// Profile details
-		phone_number: { type: String, trim: true },
+		phoneNumber: { type: String, trim: true },
 		address: { type: String, trim: true },
 		city: { type: String, trim: true },
-		postal_code: { type: String, trim: true },
+		postalCode: { type: String, trim: true },
 		country: { type: String, trim: true },
-		company_name: { type: String, trim: true },
+		companyName: { type: String, trim: true },
 		website: { type: String, trim: true },
 
 		// Company association
@@ -99,6 +102,9 @@ const userSchema = new Schema<IUser>(
 		resetPasswordExpiresAt: { type: Date, default: null },
 		resetPasswordOtp: { type: String, default: null },
 		resetPasswordOtpExpiresAt: { type: Date, default: null },
+
+		// Force password change
+		mustChangePassword: { type: Boolean, default: false },
 	},
 	{ timestamps: true },
 );

@@ -21,11 +21,11 @@ export const sendEmailVerification = async (
 	const mailOptions = {
 		from: EMAIL_FROM,
 		to: email,
-		subject: 'PharmaSecure - Verify Your Email Address',
+		subject: 'ChainTrust - Verify Your Email Address',
 		html: `
 			<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
 				<div style="background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-					<h1 style="margin: 0; font-size: 28px;">PharmaSecure</h1>
+					<h1 style="margin: 0; font-size: 28px;">ChainTrust</h1>
 					<p style="margin: 10px 0 0 0; opacity: 0.9;">Email Verification</p>
 				</div>
 
@@ -33,7 +33,7 @@ export const sendEmailVerification = async (
 					<h2 style="color: #333; margin-bottom: 20px;">Hello ${name}!</h2>
 
 					<p style="color: #666; line-height: 1.6; margin-bottom: 25px;">
-						Thank you for registering with PharmaSecure! To complete your account verification,
+						Thank you for registering with ChainTrust! To complete your account verification,
 						you can use either of the following methods:
 					</p>
 
@@ -68,7 +68,7 @@ export const sendEmailVerification = async (
 					</div>
 
 					<p style="color: #666; line-height: 1.6; margin-bottom: 25px;">
-						If you didn't create an account with PharmaSecure, please ignore this email.
+						If you didn't create an account with ChainTrust, please ignore this email.
 					</p>
 
 					<div style="text-align: center; margin-top: 30px;">
@@ -98,11 +98,11 @@ export const sendPasswordResetOTP = async (
 	const mailOptions = {
 		from: EMAIL_FROM,
 		to: email,
-		subject: 'PharmaSecure - Password Reset OTP',
+		subject: 'ChainTrust - Password Reset OTP',
 		html: `
 			<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
 				<div style="background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-					<h1 style="margin: 0; font-size: 28px;">PharmaSecure</h1>
+					<h1 style="margin: 0; font-size: 28px;">ChainTrust</h1>
 					<p style="margin: 10px 0 0 0; opacity: 0.9;">Password Reset</p>
 				</div>
 
@@ -150,11 +150,11 @@ export const sendEmployeeInvitation = async (
 	const mailOptions = {
 		from: EMAIL_FROM,
 		to: email,
-		subject: `Invitation to join ${companyName} on PharmaSecure`,
+		subject: `Invitation to join ${companyName} on ChainTrust`,
 		html: `
 			<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
 				<div style="background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-					<h1 style="margin: 0; font-size: 28px;">PharmaSecure</h1>
+					<h1 style="margin: 0; font-size: 28px;">ChainTrust</h1>
 					<p style="margin: 10px 0 0 0; opacity: 0.9;">Employee Invitation</p>
 				</div>
 
@@ -162,7 +162,7 @@ export const sendEmployeeInvitation = async (
 					<h2 style="color: #333; margin-bottom: 20px;">You've been invited!</h2>
 
 					<p style="color: #666; line-height: 1.6; margin-bottom: 25px;">
-						You have been invited to join <strong>${companyName}</strong> on PharmaSecure. 
+						You have been invited to join <strong>${companyName}</strong> on ChainTrust. 
 						To accept this invitation and set up your account, please use the OTP or link below within the next 24 hours.
 					</p>
 
@@ -221,11 +221,11 @@ export const sendExpiryAlert = async (
 	const mailOptions = {
 		from: EMAIL_FROM,
 		to: email,
-		subject: 'PharmaSecure - Product Expiry Alert',
+		subject: 'ChainTrust - Product Expiry Alert',
 		html: `
 			<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
 				<div style="background: linear-gradient(135deg, #ef4444 0%, #f43f5e 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-					<h1 style="margin: 0; font-size: 28px;">PharmaSecure</h1>
+					<h1 style="margin: 0; font-size: 28px;">ChainTrust</h1>
 					<p style="margin: 10px 0 0 0; opacity: 0.9;">Product Expiry Alert</p>
 				</div>
 
