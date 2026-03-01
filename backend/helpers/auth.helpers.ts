@@ -89,9 +89,11 @@ export const generateAccessAndRefreshTokens = async (
 			throw new Error('User not found');
 		}
 
-		const accessToken = jwt.sign({ id: userId.toString() }, JWT_SECRET, {
-			expiresIn: JWT_ACCESS_EXPIRATION,
-		});
+		const accessToken = jwt.sign(
+			{ id: userId.toString(), role: user.role }, 
+			JWT_SECRET, 
+			{ expiresIn: JWT_ACCESS_EXPIRATION }
+		);
 
 		let refreshTokenRecord: IRefreshToken | null = null;
 		const deviceInfo = generateDeviceInfo(req);
@@ -202,8 +204,8 @@ export const attachTokens = (accessToken: string, refreshToken: string, res: Res
 	return { accessToken, refreshToken };
 };
 
-export const attachToken = (userId: string, res: Response): string => {
-	const token = jwt.sign({ id: userId }, JWT_SECRET, {
+export const attachToken = (userId: string, role: string, res: Response): string => {
+	const token = jwt.sign({ id: userId, role }, JWT_SECRET, {
 		expiresIn: JWT_ACCESS_EXPIRATION,
 	});
 

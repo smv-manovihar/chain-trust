@@ -13,7 +13,7 @@ import {
   login as apiLogin,
   register as apiRegister,
   User,
-} from "@/lib/api";
+} from "@/api";
 
 interface AuthContextType {
   user: User | null;

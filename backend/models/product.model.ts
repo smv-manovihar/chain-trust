@@ -10,6 +10,7 @@ export interface IProduct extends Document {
 	manufactureDate: Date;
 	expiryDate?: Date;
 	description: string;
+	isRecalled: boolean;
 	
 	// Blockchain fields
 	isOnBlockchain: boolean;
@@ -17,16 +18,6 @@ export interface IProduct extends Document {
 	saltValue: string; // The salt used for verification
 	createdAt: Date;
 	updatedAt: Date;
-
-	// Tracking
-	timeline: {
-		status: string;
-		date: Date;
-		location: string;
-		description?: string;
-		updatedBy?: string;
-		txHash?: string;
-	}[];
 }
 
 const productSchema = new Schema<IProduct>(
@@ -72,6 +63,10 @@ const productSchema = new Schema<IProduct>(
 			type: String,
 			trim: true,
 		},
+		isRecalled: {
+			type: Boolean,
+			default: false,
+		},
 		isOnBlockchain: {
 			type: Boolean,
 			default: false,
@@ -84,16 +79,6 @@ const productSchema = new Schema<IProduct>(
 			type: String,
 			trim: true,
 		},
-		timeline: [
-			{
-				status: { type: String, required: true },
-				date: { type: Date, default: Date.now },
-				location: { type: String, required: true },
-				description: String,
-				updatedBy: String,
-				txHash: String,
-			},
-		],
 	},
 	{
 		timestamps: true,

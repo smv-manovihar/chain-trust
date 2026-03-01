@@ -5,31 +5,24 @@ contract ChainTrust {
     
     // Custom Errors for gas efficiency
     error NotAuthorized(address caller);
-    error ProductAlreadyExists(uint256 productId);
-    error ProductNotFound(uint256 productId);
+    error ProductAlreadyExists(string productId);
+    error ProductNotFound(string productId);
     error InvalidInput(string parameter);
     error UnauthorizedManufacturer(address manufacturer);
-    error UnauthorizedDistributor(address distributor);
 
-    struct TrackingEvent {
-        uint256 timestamp;
-        string location;
-        string status;
-        address updatedBy;
-    }
-    
     struct Product {
-        uint256 productId;
+        string productId;
         string name;
         string category;
         string brand;
         uint256 manufactureDate;
-        uint256 batchNumber;
+        string batchNumber;
         uint256 price;
         uint256 expiryDate;
         bool exists;
         string saltValue;
         address creator;
+        bool isRecalled;
     }
 
     address public owner;
@@ -37,23 +30,18 @@ contract ChainTrust {
     
     // Access Control Mappings
     mapping(address => bool) public isManufacturer;
-    mapping(address => bool) public isDistributor;
 
     // Product mappings
-    mapping(uint256 => Product) public products;
-    mapping(uint256 => bool) public productExists;
-    mapping(string => uint256) public productIndex; // salt -> productId
+    mapping(string => Product) public products;
+    mapping(string => bool) public productExists;
+    mapping(string => string) public productIndex; // salt -> productId
     
-    // History mapping
-    mapping(uint256 => TrackingEvent[]) public productHistory;
-
     // Image mapping
-    mapping(uint256 => string[]) public productImages;
+    mapping(string => string[]) public productImages;
 
-    event ProductAdded(uint256 productId, address creator);
-    event ProductUpdated(uint256 productId, string status);
-    event ProductRemoved(uint256 productId);
-    event TrackingEventAdded(uint256 productId, string status, string location, address updater);
+    event ProductAdded(string productId, address creator);
+    event ProductRecalled(string productId, address caller);
+    event ProductRemoved(string productId);
     event RoleGranted(address indexed account, string role);
     event RoleRevoked(address indexed account, string role);
 
@@ -64,12 +52,6 @@ contract ChainTrust {
 
     modifier onlyManufacturer() {
         if (!isManufacturer[msg.sender] && msg.sender != owner) revert UnauthorizedManufacturer(msg.sender);
-        _;
-    }
-
-    modifier onlyAuthorizedUpdater(uint256 _productId) {
-        if (!isManufacturer[msg.sender] && !isDistributor[msg.sender] && msg.sender != owner) 
-            revert NotAuthorized(msg.sender);
         _;
     }
 
@@ -84,14 +66,8 @@ contract ChainTrust {
         emit RoleGranted(_account, "MANUFACTURER");
     }
 
-    function authorizeDistributor(address _account) external onlyOwner {
-        isDistributor[_account] = true;
-        emit RoleGranted(_account, "DISTRIBUTOR");
-    }
-
     function revokeRole(address _account) external onlyOwner {
         isManufacturer[_account] = false;
-        isDistributor[_account] = false;
         emit RoleRevoked(_account, "ALL");
     }
 
@@ -99,9 +75,9 @@ contract ChainTrust {
         string memory _name,
         string memory _category,
         string memory _brand,
-        uint256 _productId,
+        string memory _productId,
         uint256 _manufactureDate,
-        uint256 _batchNumber,
+        string memory _batchNumber,
         uint256 _price,
         uint256 _expiryDate,
         string memory _salt,
@@ -110,6 +86,7 @@ contract ChainTrust {
         if (productExists[_productId]) revert ProductAlreadyExists(_productId);
         if (bytes(_name).length == 0) revert InvalidInput("name");
         if (bytes(_salt).length == 0) revert InvalidInput("salt");
+        if (bytes(_productId).length == 0) revert InvalidInput("productId");
         
         products[_productId] = Product(
             _productId,
@@ -122,7 +99,8 @@ contract ChainTrust {
             _expiryDate,
             true,
             _salt,
-            msg.sender
+            msg.sender,
+            false // isRecalled
         );
         
         productExists[_productId] = true;
@@ -134,9 +112,6 @@ contract ChainTrust {
             productImages[_productId].push(_imageUrls[i]);
         }
 
-        // Add first tracking event
-        _addInternalTrackingEvent(_productId, "Manufactured", "Factory");
-
         emit ProductAdded(_productId, msg.sender);
     }
 
@@ -144,15 +119,16 @@ contract ChainTrust {
         string memory _name,
         string memory _category,
         string memory _brand,
-        uint256 _productId,
+        string memory _productId,
         uint256 _manufactureDate,
-        uint256 _batchNumber,
+        string memory _batchNumber,
         uint256 _price,
         string memory _salt,
         string[] memory _imageUrls
     ) external onlyManufacturer {
         if (productExists[_productId]) revert ProductAlreadyExists(_productId);
         if (bytes(_name).length == 0) revert InvalidInput("name");
+        if (bytes(_productId).length == 0) revert InvalidInput("productId");
         
         products[_productId] = Product(
             _productId,
@@ -165,7 +141,8 @@ contract ChainTrust {
             0, 
             true,
             _salt,
-            msg.sender
+            msg.sender,
+            false
         );
         
         productExists[_productId] = true;
@@ -176,47 +153,32 @@ contract ChainTrust {
             productImages[_productId].push(_imageUrls[i]);
         }
 
-        _addInternalTrackingEvent(_productId, "Manufactured", "Factory");
-
         emit ProductAdded(_productId, msg.sender);
     }
 
-    function addTrackingEvent(
-        uint256 _productId,
-        string memory _status,
-        string memory _location
-    ) external onlyAuthorizedUpdater(_productId) {
+    function recallProduct(string memory _saltValue) external onlyManufacturer {
+        string memory _productId = productIndex[_saltValue];
         if (!productExists[_productId]) revert ProductNotFound(_productId);
-        if (bytes(_status).length == 0) revert InvalidInput("status");
         
-        _addInternalTrackingEvent(_productId, _status, _location);
-        
-        emit ProductUpdated(_productId, _status);
-    }
+        // Ensure that the recaller is the creator or the owner
+        if (products[_productId].creator != msg.sender && msg.sender != owner) {
+             revert NotAuthorized(msg.sender);
+        }
 
-    function _addInternalTrackingEvent(uint256 _productId, string memory _status, string memory _location) internal {
-        TrackingEvent memory newEvent = TrackingEvent({
-            timestamp: block.timestamp,
-            location: _location,
-            status: _status,
-            updatedBy: msg.sender
-        });
-        productHistory[_productId].push(newEvent);
-        emit TrackingEventAdded(_productId, _status, _location, msg.sender);
+        products[_productId].isRecalled = true;
+        emit ProductRecalled(_productId, msg.sender);
     }
 
     function getFullProductBySalt(string memory _saltValue) external view returns (
         Product memory product,
-        string[] memory images,
-        TrackingEvent[] memory history
+        string[] memory images
     ) {
-        uint256 _productId = productIndex[_saltValue];
+        string memory _productId = productIndex[_saltValue];
         if (!productExists[_productId]) revert ProductNotFound(_productId);
         
         return (
             products[_productId],
-            productImages[_productId],
-            productHistory[_productId]
+            productImages[_productId]
         );
     }
     
@@ -225,18 +187,19 @@ contract ChainTrust {
         string memory category,
         string memory brand,
         uint256 manufactureDate,
-        uint256 batchNumber,
+        string memory batchNumber,
         uint256 price,
-        uint256 expiryDate
+        uint256 expiryDate,
+        bool isRecalled
     ) {
-        uint256 _productId = productIndex[_saltValue];
+        string memory _productId = productIndex[_saltValue];
         if (!productExists[_productId]) revert ProductNotFound(_productId);
         
         Product memory p = products[_productId];
-        return (p.name, p.category, p.brand, p.manufactureDate, p.batchNumber, p.price, p.expiryDate);
+        return (p.name, p.category, p.brand, p.manufactureDate, p.batchNumber, p.price, p.expiryDate, p.isRecalled);
     }
 
-    function removeProduct(uint256 _productId) external onlyOwner {
+    function removeProduct(string memory _productId) external onlyOwner {
         if (!productExists[_productId]) revert ProductNotFound(_productId);
         productExists[_productId] = false;
         productCount--;

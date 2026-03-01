@@ -4,29 +4,79 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Edit2, Trash2, Eye } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Edit2,
+  Trash2,
+  Eye,
+  Loader2,
+  AlertTriangle,
+} from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { getAllProductsFromBlockchain } from "@/lib/blockchain-utils";
+import {
+  getAllProductsFromBlockchain,
+  recallProductOnChain,
+} from "@/lib/blockchain-utils";
+import { requestExecutionAccounts } from "@/api/web3-client";
 
 export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [recallingId, setRecallingId] = useState<string | null>(null);
+
+  const loadProducts = async () => {
+    setLoading(true);
+    try {
+      const data = await getAllProductsFromBlockchain();
+      setProducts(data);
+    } catch (error) {
+      console.error("Error loading products:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadProducts() {
-      try {
-        const data = await getAllProductsFromBlockchain();
-        setProducts(data);
-      } catch (error) {
-        console.error("Error loading products:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadProducts();
   }, []);
+
+  const handleRecall = async (saltValue: string) => {
+    if (
+      !confirm(
+        "Are you sure you want to RECALL this batch? This action is IRREVERSIBLE built on the blockchain.",
+      )
+    )
+      return;
+
+    setRecallingId(saltValue);
+    try {
+      const accounts = await requestExecutionAccounts();
+      if (!accounts || accounts.length === 0)
+        throw new Error("No Web3 account found");
+
+      const deployer = accounts[0];
+      await recallProductOnChain(saltValue, deployer);
+
+      // Sync backend
+      await fetch(process.env.NEXT_PUBLIC_API_URL + "/api/products/recall", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saltValue }),
+      });
+
+      // Refresh products from blockchain
+      await loadProducts();
+      alert("Product successfully recalled on the blockchain.");
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Failed to recall product");
+    } finally {
+      setRecallingId(null);
+    }
+  };
 
   const filteredProducts = products.filter(
     (p) =>
@@ -160,8 +210,16 @@ export default function ProductsPage() {
                         </p>
                       </td>
                       <td className="py-4 px-6">
-                        <Badge className="bg-accent text-accent-foreground">
-                          Active
+                        <Badge
+                          className={
+                            product.status === "recalled"
+                              ? "bg-red-500 text-white"
+                              : "bg-accent text-accent-foreground"
+                          }
+                        >
+                          {product.status === "recalled"
+                            ? "Recalled"
+                            : "Active"}
                         </Badge>
                       </td>
                       <td className="py-4 px-6">
@@ -183,9 +241,21 @@ export default function ProductsPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-8 w-8 p-0 hover:text-destructive"
+                            className="h-8 w-8 p-0 hover:text-red-500"
+                            title="Recall Product"
+                            disabled={
+                              product.status === "recalled" ||
+                              recallingId === product.sku
+                            }
+                            onClick={() => handleRecall(product.sku)}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            {recallingId === product.sku ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-red-500" />
+                            ) : (
+                              <AlertTriangle
+                                className={`h-4 w-4 ${product.status === "recalled" ? "text-gray-400" : "text-red-500"}`}
+                              />
+                            )}
                           </Button>
                         </div>
                       </td>

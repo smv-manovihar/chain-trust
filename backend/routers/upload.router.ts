@@ -3,7 +3,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import multer from 'multer';
 import crypto from 'crypto';
 import path from 'path';
-import { authenticateJWT as protect } from '../middlewares/auth.middleware.js';
+import { authenticateJWT as protect, checkRole } from '../middlewares/auth.middleware.js';
 import {
 	S3_ENDPOINT,
 	S3_REGION,
@@ -44,7 +44,9 @@ const upload = multer({
 	},
 });
 
-router.post('/', protect, upload.array('images', 5), async (req, res) => {
+const checkManufacturer = checkRole(['manufacturer', 'employee']);
+
+router.post('/', protect, checkManufacturer, upload.array('images', 5), async (req, res) => {
 	try {
 		if (!req.files || (req.files as Express.Multer.File[]).length === 0) {
 			return res.status(400).json({ message: 'No files uploaded' });

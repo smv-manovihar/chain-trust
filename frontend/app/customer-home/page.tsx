@@ -166,9 +166,9 @@ export default function CustomerHomePage() {
                     "Every product is registered on immutable blockchain, preventing tampering",
                 },
                 {
-                  title: "Real-Time Tracking",
+                  title: "Direct from Manufacturer",
                   description:
-                    "Track your medicine from factory to pharmacy with complete supply chain visibility",
+                    "Ensure your medicine came from the factory with complete transparency",
                 },
                 {
                   title: "Instant Verification",

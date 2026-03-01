@@ -64,8 +64,8 @@ export default function Home() {
     },
     {
       icon: Globe2,
-      title: "Global Traceability",
-      desc: "Track shipment location and condition across borders in real-time with IoT integration.",
+      title: "Global Visibility",
+      desc: "Instant insight into global product authenticity to protect your brand reputation.",
     },
     {
       icon: Lock,
@@ -245,8 +245,8 @@ export default function Home() {
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-12">
             {isAuthenticated
-              ? "Access your verification tools, track shipments, and manage your pharmaceutical supply chain."
-              : "Join the network of trusted manufacturers and distributors building the future of pharma safety."}
+              ? "Access your verification tools and manage your pharmaceutical products."
+              : "Join the network of trusted manufacturers building the future of pharma safety."}
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             {isLoading ? (

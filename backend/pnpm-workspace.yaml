@@ -3,4 +3,6 @@ ignoredBuiltDependencies:
 
 onlyBuiltDependencies:
   - bcrypt
+  - bufferutil
   - esbuild
+  - utf-8-validate

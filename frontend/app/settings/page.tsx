@@ -12,7 +12,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
-import { updateProfile, changePassword } from "@/lib/api";
+import { updateProfile, changePassword } from "@/api";
 import {
   Form,
   FormControl,

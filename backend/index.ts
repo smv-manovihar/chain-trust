@@ -10,8 +10,8 @@ import companyRouter from './routers/company.router.js';
 import authRouter from './routers/auth.router.js';
 import alertRouter from './routers/alert.router.js';
 import productRouter from './routers/product.router.js';
-import trackingRouter from './routers/tracking.router.js';
 import uploadRouter from './routers/upload.router.js';
+import userRouter from './routers/user.router.js';
 import { startCronJobs } from './jobs/cron.js';
 
 // Initialize Express
@@ -43,7 +43,7 @@ app.use(cookieParser());
 
 // Request logging
 app.use((req, _res, next) => {
-	console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+	console.log(`${new Date().toISOString().replace('T', '-').replace('Z', '')} - ${req.method} ${req.url}`);
 	next();
 });
 
@@ -70,8 +70,8 @@ app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/company', authLimiter, companyRouter);
 app.use('/api/alerts', alertRouter);
 app.use('/api/products', productRouter);
-app.use('/api/track', trackingRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api/users', userRouter);
 
 // 404 handler
 app.use((_req, res) => {

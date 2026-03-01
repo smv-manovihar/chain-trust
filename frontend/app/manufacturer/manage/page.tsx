@@ -57,8 +57,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
-import SideBar from "@/components/manufacturer-sidebar";
-import { inviteEmployee } from "@/lib/api";
+import { ManufacturerSidebar } from "@/components/layout/manufacturer-sidebar";
+import { inviteEmployee } from "@/api";
 
 // Mock data for initial UI dev
 const mockEmployees = [
@@ -194,7 +194,7 @@ Forces password change on first login: Yes
 
   return (
     <div className="flex h-screen bg-gray-50/50">
-      <SideBar />
+      <ManufacturerSidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-y-auto p-6 md:p-8">

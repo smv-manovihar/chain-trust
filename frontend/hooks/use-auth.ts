@@ -1,6 +1,6 @@
 'use client';
 import { useAuth as useAuthContext } from '@/contexts/auth-context';
-import type { User } from '@/lib/api';
+import { User } from "@/api";
 
 export type { User };
 

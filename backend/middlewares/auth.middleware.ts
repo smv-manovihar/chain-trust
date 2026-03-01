@@ -82,3 +82,26 @@ export const authenticateJWTOptional = async (req: Request, _res: Response, next
 		next();
 	}
 };
+
+export const checkRole = (roles: string[]) => {
+	return (req: Request, res: Response, next: NextFunction): void => {
+		const user = (req as any).user;
+		if (!user) {
+			res.status(401).json({ 
+				code: 'UNAUTHORIZED',
+				message: 'User authentication required' 
+			});
+			return;
+		}
+		
+		if (!roles.includes(user.role)) {
+			res.status(403).json({ 
+				code: 'FORBIDDEN',
+				message: 'Insufficient permissions for this action' 
+			});
+			return;
+		}
+		
+		next();
+	};
+};

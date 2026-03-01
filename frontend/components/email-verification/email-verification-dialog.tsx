@@ -15,7 +15,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { verifyEmailWithOTP, resendVerificationEmail } from "@/lib/api";
+import { verifyEmailWithOTP, resendVerificationEmail } from "@/api";
 import { useAuth } from "@/contexts/auth-context";
 import { Mail, RefreshCw, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";

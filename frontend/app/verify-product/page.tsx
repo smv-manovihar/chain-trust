@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,24 +11,18 @@ import {
   Package,
   Building2,
   Calendar,
-  MapPin,
   Hash,
   ShieldCheck,
   Clock,
   QrCode,
   Loader2,
   XCircle,
+  Bell,
+  BookmarkPlus,
 } from "lucide-react";
 import { verifyOnBlockchain, VerificationResult } from "@/lib/blockchain-utils";
-
-// Define types for API response
-interface TimelineEvent {
-  status: string;
-  date: string;
-  location: string;
-  description?: string;
-  txHash?: string;
-}
+import { AIChatEmbed } from "@/components/chat/AIChatEmbed";
+import api from "@/api/client";
 
 interface ProductData {
   name: string;
@@ -38,23 +33,24 @@ interface ProductData {
   images?: string[];
 }
 
-export default function VerifyProductPage() {
+function VerifyContent() {
+  const searchParams = useSearchParams();
   const [scanned, setScanned] = useState(false);
   const [qrInput, setQrInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [product, setProduct] = useState<ProductData | null>(null);
-  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
 
-  const handleScan = async () => {
-    if (!qrInput) return;
+  const handleScan = async (overrideSalt?: string) => {
+    const saltToVerify = overrideSalt || qrInput;
+    if (!saltToVerify) return;
 
     setLoading(true);
     setError("");
     setProduct(null);
 
     try {
-      const result: VerificationResult = await verifyOnBlockchain(qrInput);
+      const result: VerificationResult = await verifyOnBlockchain(saltToVerify);
 
       if (!result.isValid || !result.record) {
         throw new Error(
@@ -70,25 +66,24 @@ export default function VerifyProductPage() {
         images: result.record.images || [],
       } as any);
 
-      const timelineEvents = result.record.supplyChainEvents.map(
-        (event: any) => ({
-          status:
-            event.status.charAt(0).toUpperCase() +
-            event.status.slice(1).replace("-", " "),
-          date: new Date(event.timestamp).toISOString(),
-          location: event.location,
-          description: `Updated by: ${event.updatedBy}`,
-        }),
-      );
-
-      setTimeline(timelineEvents);
+      setQrInput(saltToVerify);
       setScanned(true);
     } catch (err: any) {
       setError(err.message || "Failed to verify product via Blockchain");
+      // Could ping backend heatmap endpoint here on fail:
+      // fetch('/api/alerts/suspicious-scan', { ... })
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const defaultSalt = searchParams.get("salt");
+    if (defaultSalt && !scanned && !loading) {
+      setQrInput(defaultSalt);
+      handleScan(defaultSalt);
+    }
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -154,7 +149,7 @@ export default function VerifyProductPage() {
                       value={qrInput}
                       onChange={(e) => setQrInput(e.target.value)}
                     />
-                    <Button onClick={handleScan} disabled={loading}>
+                    <Button onClick={() => handleScan()} disabled={loading}>
                       {loading ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
@@ -218,9 +213,45 @@ export default function VerifyProductPage() {
                     <p className="text-xs font-medium text-muted-foreground">
                       Product Name
                     </p>
-                    <p className="text-lg font-semibold text-foreground">
-                      {product?.name}
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-lg font-semibold text-foreground">
+                        {product?.name}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            await api.post("/users/cabinet/add", product);
+                            alert("Product saved to your Personal Cabinet!");
+                          } catch (err: any) {
+                            // Fallback to local storage if not logged in or error
+                            const saved = JSON.parse(
+                              localStorage.getItem("cabinet") || "[]",
+                            );
+                            if (
+                              !saved.find(
+                                (p: any) => p.productId === product?.productId,
+                              )
+                            ) {
+                              saved.push(product);
+                              localStorage.setItem(
+                                "cabinet",
+                                JSON.stringify(saved),
+                              );
+                              alert(
+                                "Product saved to your Personal Cabinet (Local)!",
+                              );
+                            } else {
+                              alert("Product already in your Cabinet.");
+                            }
+                          }
+                        }}
+                      >
+                        <BookmarkPlus className="h-4 w-4 mr-2" />
+                        Save to Cabinet
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-muted-foreground">
@@ -249,13 +280,27 @@ export default function VerifyProductPage() {
                     <p className="text-xs font-medium text-muted-foreground">
                       Expires
                     </p>
-                    <div className="flex items-center gap-2 text-foreground">
-                      <Clock className="h-4 w-4" />
-                      <p className="font-semibold">
-                        {product?.expiryDate
-                          ? new Date(product.expiryDate).toLocaleDateString()
-                          : "N/A"}
-                      </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-foreground">
+                        <Clock className="h-4 w-4" />
+                        <p className="font-semibold">
+                          {product?.expiryDate
+                            ? new Date(product.expiryDate).toLocaleDateString()
+                            : "N/A"}
+                        </p>
+                      </div>
+                      {product?.expiryDate && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() =>
+                            alert("Expiry alert email configured!")
+                          }
+                        >
+                          <Bell className="h-4 w-4 mr-2" />
+                          Set Alert
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -281,51 +326,6 @@ export default function VerifyProductPage() {
               </Card>
             )}
 
-            {/* Supply Chain Timeline */}
-            <Card className="p-6 border border-border space-y-6">
-              <h2 className="text-xl font-semibold text-foreground">
-                Supply Chain Journey
-              </h2>
-
-              {timeline.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  No tracking history available yet.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {timeline.map((step, index) => (
-                    <div key={index} className="flex gap-4">
-                      <div className="flex flex-col items-center">
-                        <div className="h-10 w-10 rounded-full bg-accent flex items-center justify-center text-accent-foreground font-semibold flex-shrink-0">
-                          {index + 1}
-                        </div>
-                        {index < timeline.length - 1 && (
-                          <div className="h-12 w-1 bg-accent/20 mt-2" />
-                        )}
-                      </div>
-                      <div className="pt-1 pb-4">
-                        <p className="font-semibold text-foreground">
-                          {step.status}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(step.date).toLocaleString()}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
-                          <MapPin className="h-3 w-3" />
-                          <span>{step.location}</span>
-                        </div>
-                        {step.description && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {step.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-
             {/* Safety Notice */}
             <Card className="p-6 border border-border bg-muted/30 space-y-4">
               <div className="flex items-start gap-3">
@@ -333,15 +333,34 @@ export default function VerifyProductPage() {
                 <div className="space-y-2">
                   <h3 className="font-semibold text-foreground">Safe to Use</h3>
                   <p className="text-sm text-muted-foreground">
-                    This product's history is being tracked. Verify that the
-                    timeline matches your purchase.
+                    This product has been verified on the blockchain.
                   </p>
                 </div>
               </div>
             </Card>
+
+            {/* AI Assistant Embed */}
+            <AIChatEmbed
+              productContext={product}
+              currentPage="Verify Product"
+            />
           </div>
         )}
       </main>
     </div>
+  );
+}
+
+export default function VerifyProductPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <VerifyContent />
+    </Suspense>
   );
 }

@@ -1,7 +1,5 @@
 import { Request, Response } from 'express';
-import crypto from 'crypto';
 import Product from '../models/product.model.js';
-import { addProductToBlockchain } from '../utils/blockchain.utils.js';
 
 export const createProduct = async (req: Request, res: Response) => {
 	try {
@@ -15,11 +13,13 @@ export const createProduct = async (req: Request, res: Response) => {
 			manufactureDate,
 			expiryDate,
 			description,
+			saltValue,
+			blockchainHash
 		} = req.body;
 
 		// 1. Validation
-		if (!name || !productId || !price || !category || !batchNumber || !manufactureDate) {
-			return res.status(400).json({ message: 'Missing required fields' });
+		if (!name || !productId || !price || !category || !batchNumber || !manufactureDate || !saltValue || !blockchainHash) {
+			return res.status(400).json({ message: 'Missing required fields including blockchain data' });
 		}
 
 		// Check if product ID already exists
@@ -27,11 +27,6 @@ export const createProduct = async (req: Request, res: Response) => {
 		if (existingProduct) {
 			return res.status(400).json({ message: 'Product ID already exists' });
 		}
-
-		// 2. Generate Salt
-		// Salt logic from frontend: productId + '-' + brand + '-' + name
-		const rawSalt = `${productId}-${brand}-${name}`;
-		const saltValue = crypto.createHash('sha256').update(rawSalt).digest('hex');
 
 		// 3. Prepare Data
 		const productData = {
@@ -47,26 +42,11 @@ export const createProduct = async (req: Request, res: Response) => {
 			description,
 		};
 
-		// 4. Add to Blockchain
-		let transactionHash = '';
-		try {
-			console.log('Initiating blockchain transaction for:', productId);
-			transactionHash = await addProductToBlockchain(productData);
-			console.log('Blockchain transaction successful:', transactionHash);
-		} catch (bcError: any) {
-			console.error('Blockchain error:', bcError);
-			// Decide: Fail request or save to DB with 'pending' status?
-			// For now, fail request to ensure consistency.
-			return res
-				.status(500)
-				.json({ message: 'Failed to add product to blockchain', error: bcError.message });
-		}
-
 		// 5. Save to MongoDB
 		const newProduct = new Product({
 			...productData,
 			isOnBlockchain: true,
-			blockchainHash: transactionHash,
+			blockchainHash: blockchainHash,
 		});
 
 		await newProduct.save();
@@ -74,10 +54,33 @@ export const createProduct = async (req: Request, res: Response) => {
 		res.status(201).json({
 			message: 'Product created successfully',
 			product: newProduct,
-			transactionHash,
-		});
-	} catch (error) {
+			transactionHash: blockchainHash,
+		});	} catch (error) {
 		console.error('Create product error:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+};
+
+export const recallProduct = async (req: Request, res: Response) => {
+	try {
+		const { saltValue } = req.body;
+
+		if (!saltValue) {
+			return res.status(400).json({ message: 'saltValue is required' });
+		}
+
+		const product = await Product.findOne({ saltValue });
+
+		if (!product) {
+			return res.status(404).json({ message: 'Product not found' });
+		}
+
+		product.isRecalled = true;
+		await product.save();
+
+		res.status(200).json({ message: 'Product successfully recalled', product });
+	} catch (error) {
+		console.error('Recall product error:', error);
 		res.status(500).json({ message: 'Internal server error' });
 	}
 };

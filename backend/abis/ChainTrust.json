@@ -29,9 +29,9 @@
   {
     "inputs": [
       {
-        "internalType": "uint256",
+        "internalType": "string",
         "name": "productId",
-        "type": "uint256"
+        "type": "string"
       }
     ],
     "name": "ProductAlreadyExists",
@@ -40,23 +40,12 @@
   {
     "inputs": [
       {
-        "internalType": "uint256",
+        "internalType": "string",
         "name": "productId",
-        "type": "uint256"
+        "type": "string"
       }
     ],
     "name": "ProductNotFound",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "distributor",
-        "type": "address"
-      }
-    ],
-    "name": "UnauthorizedDistributor",
     "type": "error"
   },
   {
@@ -75,9 +64,9 @@
     "inputs": [
       {
         "indexed": false,
-        "internalType": "uint256",
+        "internalType": "string",
         "name": "productId",
-        "type": "uint256"
+        "type": "string"
       },
       {
         "indexed": false,
@@ -94,12 +83,18 @@
     "inputs": [
       {
         "indexed": false,
-        "internalType": "uint256",
+        "internalType": "string",
         "name": "productId",
-        "type": "uint256"
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "caller",
+        "type": "address"
       }
     ],
-    "name": "ProductRemoved",
+    "name": "ProductRecalled",
     "type": "event"
   },
   {
@@ -107,18 +102,12 @@
     "inputs": [
       {
         "indexed": false,
-        "internalType": "uint256",
-        "name": "productId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
         "internalType": "string",
-        "name": "status",
+        "name": "productId",
         "type": "string"
       }
     ],
-    "name": "ProductUpdated",
+    "name": "ProductRemoved",
     "type": "event"
   },
   {
@@ -160,37 +149,6 @@
     "type": "event"
   },
   {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "productId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "status",
-        "type": "string"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "location",
-        "type": "string"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "updater",
-        "type": "address"
-      }
-    ],
-    "name": "TrackingEventAdded",
-    "type": "event"
-  },
-  {
     "inputs": [
       {
         "internalType": "string",
@@ -208,9 +166,9 @@
         "type": "string"
       },
       {
-        "internalType": "uint256",
+        "internalType": "string",
         "name": "_productId",
-        "type": "uint256"
+        "type": "string"
       },
       {
         "internalType": "uint256",
@@ -218,9 +176,9 @@
         "type": "uint256"
       },
       {
-        "internalType": "uint256",
+        "internalType": "string",
         "name": "_batchNumber",
-        "type": "uint256"
+        "type": "string"
       },
       {
         "internalType": "uint256",
@@ -266,9 +224,9 @@
         "type": "string"
       },
       {
-        "internalType": "uint256",
+        "internalType": "string",
         "name": "_productId",
-        "type": "uint256"
+        "type": "string"
       },
       {
         "internalType": "uint256",
@@ -276,9 +234,9 @@
         "type": "uint256"
       },
       {
-        "internalType": "uint256",
+        "internalType": "string",
         "name": "_batchNumber",
-        "type": "uint256"
+        "type": "string"
       },
       {
         "internalType": "uint256",
@@ -297,42 +255,6 @@
       }
     ],
     "name": "addProductWithoutExpiry",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_productId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "string",
-        "name": "_status",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "_location",
-        "type": "string"
-      }
-    ],
-    "name": "addTrackingEvent",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_account",
-        "type": "address"
-      }
-    ],
-    "name": "authorizeDistributor",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -363,9 +285,9 @@
       {
         "components": [
           {
-            "internalType": "uint256",
+            "internalType": "string",
             "name": "productId",
-            "type": "uint256"
+            "type": "string"
           },
           {
             "internalType": "string",
@@ -388,9 +310,9 @@
             "type": "uint256"
           },
           {
-            "internalType": "uint256",
+            "internalType": "string",
             "name": "batchNumber",
-            "type": "uint256"
+            "type": "string"
           },
           {
             "internalType": "uint256",
@@ -416,6 +338,11 @@
             "internalType": "address",
             "name": "creator",
             "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "isRecalled",
+            "type": "bool"
           }
         ],
         "internalType": "struct ChainTrust.Product",
@@ -426,33 +353,6 @@
         "internalType": "string[]",
         "name": "images",
         "type": "string[]"
-      },
-      {
-        "components": [
-          {
-            "internalType": "uint256",
-            "name": "timestamp",
-            "type": "uint256"
-          },
-          {
-            "internalType": "string",
-            "name": "location",
-            "type": "string"
-          },
-          {
-            "internalType": "string",
-            "name": "status",
-            "type": "string"
-          },
-          {
-            "internalType": "address",
-            "name": "updatedBy",
-            "type": "address"
-          }
-        ],
-        "internalType": "struct ChainTrust.TrackingEvent[]",
-        "name": "history",
-        "type": "tuple[]"
       }
     ],
     "stateMutability": "view",
@@ -489,9 +389,9 @@
         "type": "uint256"
       },
       {
-        "internalType": "uint256",
+        "internalType": "string",
         "name": "batchNumber",
-        "type": "uint256"
+        "type": "string"
       },
       {
         "internalType": "uint256",
@@ -502,24 +402,10 @@
         "internalType": "uint256",
         "name": "expiryDate",
         "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "isDistributor",
-    "outputs": [
+      },
       {
         "internalType": "bool",
-        "name": "",
+        "name": "isRecalled",
         "type": "bool"
       }
     ],
@@ -574,9 +460,9 @@
   {
     "inputs": [
       {
-        "internalType": "uint256",
+        "internalType": "string",
         "name": "",
-        "type": "uint256"
+        "type": "string"
       }
     ],
     "name": "productExists",
@@ -593,48 +479,9 @@
   {
     "inputs": [
       {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "productHistory",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "timestamp",
-        "type": "uint256"
-      },
-      {
         "internalType": "string",
-        "name": "location",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "status",
-        "type": "string"
-      },
-      {
-        "internalType": "address",
-        "name": "updatedBy",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
         "name": "",
-        "type": "uint256"
+        "type": "string"
       },
       {
         "internalType": "uint256",
@@ -664,9 +511,9 @@
     "name": "productIndex",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "string",
         "name": "",
-        "type": "uint256"
+        "type": "string"
       }
     ],
     "stateMutability": "view",
@@ -675,17 +522,17 @@
   {
     "inputs": [
       {
-        "internalType": "uint256",
+        "internalType": "string",
         "name": "",
-        "type": "uint256"
+        "type": "string"
       }
     ],
     "name": "products",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "string",
         "name": "productId",
-        "type": "uint256"
+        "type": "string"
       },
       {
         "internalType": "string",
@@ -708,9 +555,9 @@
         "type": "uint256"
       },
       {
-        "internalType": "uint256",
+        "internalType": "string",
         "name": "batchNumber",
-        "type": "uint256"
+        "type": "string"
       },
       {
         "internalType": "uint256",
@@ -736,6 +583,11 @@
         "internalType": "address",
         "name": "creator",
         "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "isRecalled",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -744,9 +596,22 @@
   {
     "inputs": [
       {
-        "internalType": "uint256",
+        "internalType": "string",
+        "name": "_saltValue",
+        "type": "string"
+      }
+    ],
+    "name": "recallProduct",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
         "name": "_productId",
-        "type": "uint256"
+        "type": "string"
       }
     ],
     "name": "removeProduct",

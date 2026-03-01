@@ -17,7 +17,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getContract, requestExecutionAccounts } from "@/lib/web3-client";
+import { getContract, requestExecutionAccounts } from "@/api/web3-client";
 import { uploadImages } from "@/api/upload.api";
 
 export default function AddProductPage() {
@@ -82,36 +82,55 @@ export default function AddProductPage() {
       const uploadedUrls = await uploadImages(selectedFiles);
 
       // 2. Interact with Smart Contract
-      const contract = getContract();
-      if (!contract) throw new Error("Could not initialize Web3 connection.");
-
       const accounts = await requestExecutionAccounts();
       if (!accounts || accounts.length === 0)
         throw new Error("No MetaMask accounts found or access denied.");
       const deployer = accounts[0];
 
       // Convert variables for Smart Contract types
-      // Using a random large integer for productId to fit uint256
       const numericProductId = Math.floor(
         Math.random() * 1000000000000,
       ).toString();
       const numericBatchNum = batchId.replace(/\D/g, ""); // strip non-numeric
       const nowMs = Math.floor(Date.now() / 1000);
-      const saltValue = `${batchId}-${Date.now()}`;
 
-      await contract.methods
-        .addProductWithoutExpiry(
-          productName,
-          "Pharmaceutical", // category
-          manufacturerName, // brand
-          numericProductId, // _productId
-          nowMs, // _manufactureDate
-          numericBatchNum, // _batchNumber
-          0, // _price
-          saltValue, // _salt
-          uploadedUrls, // _imageUrls
-        )
-        .send({ from: deployer, gas: "5000000" });
+      const { generateSalt, addProductOnChain } =
+        await import("@/api/web3-client");
+      const saltValue = await generateSalt(numericProductId, manufacturerName);
+
+      const txResult: any = await addProductOnChain(
+        {
+          name: productName,
+          category: "Pharmaceutical",
+          brand: manufacturerName,
+          productId: numericProductId,
+          manufactureDate: nowMs,
+          batchNumber: numericBatchNum,
+          price: 0,
+          saltValue: saltValue,
+          imageUrls: uploadedUrls,
+        },
+        deployer,
+      );
+
+      // 3. Send to Backend
+      const txHash = txResult.transactionHash || txResult.blockHash;
+      await fetch(process.env.NEXT_PUBLIC_API_URL + "/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: productName,
+          brand: manufacturerName,
+          productId: numericProductId,
+          price: 0,
+          category: "Pharmaceutical",
+          batchNumber: numericBatchNum,
+          manufactureDate: new Date(nowMs * 1000).toISOString(),
+          description: "",
+          saltValue,
+          blockchainHash: txHash,
+        }),
+      });
 
       setSuccess(true);
       setCurrentStep(totalSteps + 1); // Success state

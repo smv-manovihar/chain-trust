@@ -2,9 +2,37 @@
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, BarChart3, PieChart, Activity } from "lucide-react";
+import {
+  TrendingUp,
+  BarChart3,
+  PieChart,
+  Activity,
+  AlertTriangle,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 
 export default function AnalyticsPage() {
+  const [suspiciousScans, setSuspiciousScans] = useState<any[]>([]);
+  const [scansLoading, setScansLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchScans = async () => {
+      try {
+        const res = await fetch(
+          process.env.NEXT_PUBLIC_API_URL + "/api/alerts/suspicious-scan",
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSuspiciousScans(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch scans", err);
+      } finally {
+        setScansLoading(false);
+      }
+    };
+    fetchScans();
+  }, []);
   return (
     <>
       {/* Header */}
@@ -125,89 +153,70 @@ export default function AnalyticsPage() {
           </Card>
         </div>
 
-        {/* Supply Chain Status */}
+        {/* Suspicious Scans */}
         <Card className="p-6 border border-border">
           <h2 className="text-lg font-semibold text-foreground mb-4">
-            Supply Chain Node Performance
+            Recent Suspicious Scans
           </h2>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 font-medium text-foreground">
-                    Node Location
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-foreground">
-                    Status
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-foreground">
-                    Throughput
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-foreground">
-                    Avg Verification Time
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-foreground">
-                    Uptime
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  {
-                    location: "North America Hub",
-                    status: "Active",
-                    throughput: "2.4K/day",
-                    time: "1.2s",
-                    uptime: "99.9%",
-                  },
-                  {
-                    location: "Europe Distribution",
-                    status: "Active",
-                    throughput: "1.8K/day",
-                    time: "1.5s",
-                    uptime: "99.8%",
-                  },
-                  {
-                    location: "Asia Pacific Center",
-                    status: "Active",
-                    throughput: "2.1K/day",
-                    time: "1.3s",
-                    uptime: "99.7%",
-                  },
-                  {
-                    location: "Latin America Node",
-                    status: "Active",
-                    throughput: "980/day",
-                    time: "1.8s",
-                    uptime: "99.5%",
-                  },
-                ].map((node, i) => (
-                  <tr
-                    key={i}
-                    className="border-b border-border hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="py-3 px-4 text-foreground">
-                      {node.location}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="inline-flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-accent" />
-                        <span className="text-foreground">{node.status}</span>
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground">
-                      {node.throughput}
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground">
-                      {node.time}
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground font-mono">
-                      {node.uptime}
-                    </td>
+            {scansLoading ? (
+              <p className="text-sm text-muted-foreground p-4 text-center">
+                Loading scan data...
+              </p>
+            ) : suspiciousScans.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-4 text-center">
+                No suspicious scans logged yet.
+              </p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 px-4 font-medium text-foreground">
+                      Time
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-foreground">
+                      Salt Value
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-foreground">
+                      Targeted Brand ID
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-foreground">
+                      Location / IP
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-foreground">
+                      Severity
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {suspiciousScans.map((scan: any, i: number) => (
+                    <tr
+                      key={i}
+                      className="border-b border-border hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="py-3 px-4 text-muted-foreground">
+                        {new Date(scan.createdAt).toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-xs text-foreground">
+                        {scan.saltValue}
+                      </td>
+                      <td className="py-3 px-4 text-accent">
+                        {scan.brandId || "N/A"}
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">
+                        {scan.location || scan.ipAddress || "Unknown"}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                          <span className="text-red-500 font-medium">High</span>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </Card>
       </div>

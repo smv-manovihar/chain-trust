@@ -1,7 +1,7 @@
 {
   "swagger": "2.0",
   "info": {
-    "title": "JustFlow API",
+    "title": "ChainTrust API",
     "description": "Auto-generated API docs",
     "version": "1.0.0"
   },

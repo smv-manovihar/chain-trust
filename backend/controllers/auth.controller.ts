@@ -80,7 +80,7 @@ export const googleAuth = async (_req: Request, res: Response): Promise<void> =>
 		res.redirect(url);
 	} catch (err) {
 		console.error('Google auth error:', err);
-		res.redirect(`${FRONTEND_URL}/auth/login?error=google_auth_failed`);
+		res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
 	}
 };
 
@@ -88,7 +88,7 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
 	const { code } = req.query;
 
 	if (!code) {
-		res.redirect(`${FRONTEND_URL}/auth/login?error=no_code`);
+		res.redirect(`${FRONTEND_URL}/login?error=no_code`);
 		return;
 	}
 
@@ -128,7 +128,7 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
 		if (user) {
 			if (user.provider !== 'google' || user.providerId !== userInfo.sub) {
 				res.redirect(
-					`${FRONTEND_URL}/auth/register?error=provider_mismatch`,
+					`${FRONTEND_URL}/register?error=provider_mismatch`,
 				);
 				return;
 			}
@@ -187,7 +187,7 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
 
 	} catch (err) {
 		console.error('Google callback error:', err);
-		res.redirect(`${FRONTEND_URL}/auth/login?error=server_error`);
+		res.redirect(`${FRONTEND_URL}/login?error=server_error`);
 	}
 };
 

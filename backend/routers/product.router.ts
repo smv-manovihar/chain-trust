@@ -1,12 +1,12 @@
 import express, { Router } from 'express';
-import { createProduct } from '../controllers/product.controller.js';
-// Add auth middleware if needed, e.g. verifyToken
-// import { verifyToken } from '../middlewares/auth.middleware.js'; 
+import { createProduct, recallProduct } from '../controllers/product.controller.js';
+import { authenticateJWT, checkRole } from '../middlewares/auth.middleware.js';
 
 const router: Router = express.Router();
+const checkManufacturer = checkRole(['manufacturer', 'employee']);
 
 // Route to create a new product
-// Protected logic (e.g. only company can add) should be added here
-router.post('/', createProduct);
+router.post('/', authenticateJWT, checkManufacturer, createProduct);
+router.post('/recall', authenticateJWT, checkManufacturer, recallProduct);
 
 export default router;

@@ -44,18 +44,24 @@ export function Header() {
         </Link>
 
         {/* Navigation */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden md:flex items-center gap-6">
           <Link
-            href="/#features"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            href="/verify-product"
+            className="text-sm font-medium hover:text-primary transition-colors"
           >
-            Features
+            Verify Product
           </Link>
           <Link
-            href="/#how-it-works"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            href="/cabinet"
+            className="text-sm font-medium hover:text-primary transition-colors"
           >
-            How It Works
+            Personal Cabinet
+          </Link>
+          <Link
+            href="/manufacturer"
+            className="text-sm font-medium hover:text-primary transition-colors"
+          >
+            Manufacturer
           </Link>
         </nav>
 
@@ -70,9 +76,18 @@ export function Header() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <User className="h-4 w-4" />
-                    </div>
+                    {user.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={user.name}
+                        className="h-7 w-7 rounded-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <User className="h-4 w-4" />
+                      </div>
+                    )}
                     <span className="max-w-[100px] truncate">{user.name}</span>
                   </Button>
                 </DropdownMenuTrigger>
@@ -94,6 +109,13 @@ export function Header() {
                       onSelect={() => router.push(getDashboardLink())}
                     >
                       Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      onSelect={() => router.push("/settings")}
+                    >
+                      <User className="mr-2 h-4 w-4" />
+                      Profile
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />

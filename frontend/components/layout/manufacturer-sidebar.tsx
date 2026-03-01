@@ -1,19 +1,15 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Package,
-  QrCode,
   Settings,
   LogOut,
   Menu,
-  Truck,
   BarChart3,
   Boxes,
   ChevronLeft,
   ChevronRight,
-  MapPin,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -21,6 +17,7 @@ import { Button } from "../ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/auth-context";
+import { cn } from "@/lib/utils";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
 
@@ -70,23 +67,8 @@ export function ManufacturerSidebar({ className }: SidebarProps) {
       ],
     },
     {
-      label: "Logistics",
-      items: [
-        {
-          label: "Supply Chain",
-          href: "/manufacturer/supply-chain",
-          icon: Truck,
-        },
-      ],
-    },
-    {
       label: "Configuration",
       items: [
-        {
-          label: "Track Product",
-          href: "/manufacturer/track",
-          icon: MapPin,
-        },
         {
           label: "Settings",
           href: "/manufacturer/settings",
