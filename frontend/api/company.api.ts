@@ -1,4 +1,4 @@
-import client from '../client';
+import client from './client';
 import { AuthResponse, InviteEmployeeData } from './types';
 
 export async function inviteEmployee(data: InviteEmployeeData): Promise<AuthResponse> {

@@ -5,35 +5,46 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  ChevronRight,
-  ChevronLeft,
-  Upload,
   Check,
   Package,
   Calendar,
-  FileText,
+  Image as ImageIcon,
   Save,
+  ChevronRight,
+  ChevronLeft,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getContract, requestExecutionAccounts } from "@/lib/web3-client";
+import { uploadImages } from "@/api/upload.api";
 
 export default function AddProductPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
 
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+
+  // Form State
+  const [productName, setProductName] = useState("");
+  const [manufacturerName, setManufacturerName] = useState(""); // ideally from user context
+  const [quantity, setQuantity] = useState("");
+  const [batchId, setBatchId] = useState(
+    `BATCH-${Math.floor(Math.random() * 100000)}`,
+  );
+
+  // Image State
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+
   const steps = [
     { number: 1, title: "Basic Info", icon: Package },
     { number: 2, title: "Batch Details", icon: Calendar },
-    { number: 3, title: "Documentation", icon: FileText },
-    { number: 4, title: "Review", icon: Check },
+    { number: 3, title: "Product Images", icon: ImageIcon },
+    { number: 4, title: "Review & Mint", icon: Check },
   ];
 
   const handleNext = () => {
@@ -44,15 +55,111 @@ export default function AddProductPage() {
     if (currentStep > 1) setCurrentStep(currentStep - 1);
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files).slice(0, 5); // Max 5 images
+      setSelectedFiles(files);
+
+      // Cleanup old previews
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+
+      const newPreviews = files.map((file) => URL.createObjectURL(file));
+      setPreviewUrls(newPreviews);
+    }
+  };
+
+  const handleRegisterBatch = async () => {
+    if (!productName || !manufacturerName) {
+      setError("Please fill all required fields before submitting.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      // 1. Upload images to Backend
+      const uploadedUrls = await uploadImages(selectedFiles);
+
+      // 2. Interact with Smart Contract
+      const contract = getContract();
+      if (!contract) throw new Error("Could not initialize Web3 connection.");
+
+      const accounts = await requestExecutionAccounts();
+      if (!accounts || accounts.length === 0)
+        throw new Error("No MetaMask accounts found or access denied.");
+      const deployer = accounts[0];
+
+      // Convert variables for Smart Contract types
+      // Using a random large integer for productId to fit uint256
+      const numericProductId = Math.floor(
+        Math.random() * 1000000000000,
+      ).toString();
+      const numericBatchNum = batchId.replace(/\D/g, ""); // strip non-numeric
+      const nowMs = Math.floor(Date.now() / 1000);
+      const saltValue = `${batchId}-${Date.now()}`;
+
+      await contract.methods
+        .addProductWithoutExpiry(
+          productName,
+          "Pharmaceutical", // category
+          manufacturerName, // brand
+          numericProductId, // _productId
+          nowMs, // _manufactureDate
+          numericBatchNum, // _batchNumber
+          0, // _price
+          saltValue, // _salt
+          uploadedUrls, // _imageUrls
+        )
+        .send({ from: deployer, gas: "5000000" });
+
+      setSuccess(true);
+      setCurrentStep(totalSteps + 1); // Success state
+    } catch (err: any) {
+      console.error("Failed to register batch:", err);
+      setError(err.message || "An error occurred during submission.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="max-w-4xl mx-auto w-full text-center space-y-6 pt-12">
+        <div className="mx-auto w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
+          <Check className="h-10 w-10" />
+        </div>
+        <h1 className="text-3xl font-bold text-foreground">
+          Batch Successfully Registered!
+        </h1>
+        <p className="text-muted-foreground">
+          Your new batch <strong>{batchId}</strong> has been minted and secured
+          on the blockchain.
+        </p>
+        <Button onClick={() => window.location.reload()}>
+          Register Another Batch
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto w-full">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground">Add New Product</h1>
         <p className="text-muted-foreground">
-          Register a new pharmaceutical product or batch
+          Register a new pharmaceutical product or batch securely on the
+          blockchain.
         </p>
       </div>
+
+      {error && (
+        <div className="mb-6 p-4 rounded-md bg-destructive/10 text-destructive flex items-center gap-2">
+          <AlertCircle className="h-5 w-5 flex-shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
 
       {/* Progress Steps */}
       <div className="mb-8">
@@ -114,51 +221,22 @@ export default function AddProductPage() {
 
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="productName">Product Name</Label>
-                <Input id="productName" placeholder="e.g. Amoxicillin 500mg" />
+                <Label htmlFor="productName">Product Name *</Label>
+                <Input
+                  id="productName"
+                  placeholder="e.g. Amoxicillin 500mg"
+                  value={productName}
+                  onChange={(e) => setProductName(e.target.value)}
+                />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="sku">SKU / Product Code</Label>
-                <Input id="sku" placeholder="e.g. AMOX-500-001" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <Select>
-                  <SelectTrigger id="category">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="antibiotics">Antibiotics</SelectItem>
-                    <SelectItem value="pain-relief">Pain Relief</SelectItem>
-                    <SelectItem value="supplements">Supplements</SelectItem>
-                    <SelectItem value="chronic">Chronic Care</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dosage">Dosage Form</Label>
-                <Select>
-                  <SelectTrigger id="dosage">
-                    <SelectValue placeholder="Select form" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="tablet">Tablet</SelectItem>
-                    <SelectItem value="capsule">Capsule</SelectItem>
-                    <SelectItem value="liquid">Liquid/Syrup</SelectItem>
-                    <SelectItem value="injection">Injection</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="description">Description (Optional)</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Additional product details..."
-                  className="h-24"
+                <Label htmlFor="manufacturerName">Manufacturer Name *</Label>
+                <Input
+                  id="manufacturerName"
+                  placeholder="e.g. PharmaCorp Inc."
+                  value={manufacturerName}
+                  onChange={(e) => setManufacturerName(e.target.value)}
                 />
               </div>
             </div>
@@ -174,37 +252,21 @@ export default function AddProductPage() {
 
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="batchNumber">Batch Number</Label>
-                <Input
-                  id="batchNumber"
-                  placeholder="Generated Automatically"
-                  disabled
-                />
+                <Label htmlFor="batchNumber">Batch ID</Label>
+                <Input id="batchNumber" value={batchId} disabled />
                 <p className="text-xs text-muted-foreground">
-                  Will be assigned upon creation
+                  Auto-generated blockchain identifier.
                 </p>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="quantity">Quantity (Units)</Label>
-                <Input id="quantity" type="number" placeholder="e.g. 50000" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="mfgDate">Manufacturing Date</Label>
-                <Input id="mfgDate" type="date" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="expDate">Expiration Date</Label>
-                <Input id="expDate" type="date" />
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="location">Manufacturing Location</Label>
                 <Input
-                  id="location"
-                  placeholder="e.g. Plant A, Sector 4, Mumbai"
+                  id="quantity"
+                  type="number"
+                  placeholder="e.g. 50000"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
                 />
               </div>
             </div>
@@ -214,46 +276,47 @@ export default function AddProductPage() {
         {currentStep === 3 && (
           <div className="space-y-6">
             <h2 className="text-xl font-semibold flex items-center gap-2">
-              <FileText className="text-primary h-5 w-5" />
-              Compliance & Documentation
+              <ImageIcon className="text-primary h-5 w-5" />
+              Product Photographs
             </h2>
 
             <div className="space-y-4">
-              <div className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center text-center hover:bg-muted/50 transition-colors cursor-pointer">
+              <div className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center text-center hover:bg-muted/50 transition-colors cursor-pointer relative">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  onChange={handleFileChange}
+                />
                 <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                  <Upload className="h-6 w-6 text-primary" />
+                  <ImageIcon className="h-6 w-6 text-primary" />
                 </div>
                 <h3 className="font-semibold text-foreground">
-                  Upload Lab Results
+                  Upload Physical Images
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                  Drag and drop your PDF test reports here, or click to browse.
-                  Required for quality assurance.
+                  Take clear pictures of the product from multiple angles. Max 5
+                  images.
                 </p>
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="flex items-center space-x-2 border rounded-md p-4 bg-muted/20">
-                  <input
-                    type="checkbox"
-                    id="gmp"
-                    className="rounded border-gray-300"
-                  />
-                  <Label htmlFor="gmp" className="cursor-pointer">
-                    GMP Certified
-                  </Label>
+              {previewUrls.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mt-4">
+                  {previewUrls.map((url, idx) => (
+                    <div
+                      key={idx}
+                      className="relative aspect-square rounded-md overflow-hidden border border-border"
+                    >
+                      <img
+                        src={url}
+                        alt={`Preview ${idx + 1}`}
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center space-x-2 border rounded-md p-4 bg-muted/20">
-                  <input
-                    type="checkbox"
-                    id="fda"
-                    className="rounded border-gray-300"
-                  />
-                  <Label htmlFor="fda" className="cursor-pointer">
-                    FDA Approved
-                  </Label>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -268,27 +331,30 @@ export default function AddProductPage() {
             <div className="bg-muted/30 p-4 rounded-lg space-y-4 border border-border">
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <span className="text-muted-foreground">Product:</span>
-                <span className="font-medium">Amoxicillin 500mg</span>
+                <span className="font-medium">
+                  {productName || "Not Provided"}
+                </span>
 
-                <span className="text-muted-foreground">Category:</span>
-                <span className="font-medium">Antibiotics</span>
+                <span className="text-muted-foreground">Manufacturer:</span>
+                <span className="font-medium">
+                  {manufacturerName || "Not Provided"}
+                </span>
 
-                <span className="text-muted-foreground">Batch Size:</span>
-                <span className="font-medium">50,000 Units</span>
+                <span className="text-muted-foreground">Batch ID:</span>
+                <span className="font-medium">{batchId}</span>
 
-                <span className="text-muted-foreground">Mfg Date:</span>
-                <span className="font-medium">2024-02-14</span>
-
-                <span className="text-muted-foreground">Exp Date:</span>
-                <span className="font-medium">2026-02-14</span>
+                <span className="text-muted-foreground">Images:</span>
+                <span className="font-medium">
+                  {selectedFiles.length} Selected
+                </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 p-4 bg-yellow-500/10 text-yellow-600 rounded-lg text-sm">
+            <div className="flex items-center gap-2 p-4 bg-yellow-500/10 text-yellow-600 rounded-lg text-sm border border-yellow-500/20">
               <div className="h-2 w-2 rounded-full bg-yellow-500 flex-shrink-0" />
               <p>
-                This action will generate unique blockchain hashes for all
-                units. This process requires gas fees and cannot be undone.
+                This action requires a signature from MetaMask. The event will
+                be permanently recorded on the blockchain.
               </p>
             </div>
           </div>
@@ -300,7 +366,7 @@ export default function AddProductPage() {
         <Button
           variant="outline"
           onClick={handlePrev}
-          disabled={currentStep === 1}
+          disabled={currentStep === 1 || loading}
           className="gap-2"
         >
           <ChevronLeft className="h-4 w-4" /> Back
@@ -312,10 +378,16 @@ export default function AddProductPage() {
           </Button>
         ) : (
           <Button
-            onClick={() => alert("Product submitting...")}
-            className="gap-2 bg-green-600 hover:bg-green-700"
+            onClick={handleRegisterBatch}
+            disabled={loading}
+            className="gap-2 bg-primary hover:bg-primary/90"
           >
-            <Save className="h-4 w-4" /> Register Batch
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {loading ? "Minting to Blockchain..." : "Register Batch"}
           </Button>
         )}
       </div>

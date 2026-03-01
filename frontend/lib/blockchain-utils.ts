@@ -1,119 +1,131 @@
+import { getContract } from './web3-client';
+
 /**
  * Blockchain Verification Utilities
  * For ChainTrust pharmaceutical verification system
  */
 
 export interface BlockchainRecord {
-  blockchainId: string
-  batchId: string
-  productName: string
-  manufacturerId: string
-  manufacturerName: string
-  timestamp: number
-  status: 'minted' | 'verified' | 'shipped' | 'delivered'
-  transactionHash: string
-  blockNumber: number
-  supplyChainEvents: SupplyChainEvent[]
+  blockchainId: string;
+  batchId: string;
+  productName: string;
+  manufacturerName: string;
+  timestamp: number;
+  status: 'minted' | 'verified' | 'shipped' | 'delivered';
+  transactionHash: string;
+  blockNumber: number;
+  images: string[];
+  supplyChainEvents: SupplyChainEvent[];
 }
 
 export interface SupplyChainEvent {
-  status: 'manufactured' | 'quality-checked' | 'packaged' | 'shipped' | 'received' | 'verified'
-  timestamp: number
-  location: string
-  verified: boolean
-  dataHash: string
+  status: 'manufactured' | 'quality-checked' | 'packaged' | 'shipped' | 'received' | 'verified';
+  timestamp: number;
+  location: string;
+  updatedBy: string; // The address that made the change
+  verified: boolean;
+  dataHash: string;
 }
 
 export interface VerificationResult {
-  isValid: boolean
-  record: BlockchainRecord | null
-  verificationDate: number
-  trustScore: number
-  warnings: string[]
+  isValid: boolean;
+  record: BlockchainRecord | null;
+  verificationDate: number;
+  trustScore: number;
+  warnings: string[];
 }
 
-/**
- * Mock blockchain verification
- * In production, this would interact with actual blockchain nodes
- */
-export function verifyOnBlockchain(blockchainId: string): VerificationResult {
-  // Simulate blockchain lookup
-  const isValid = blockchainId.startsWith('PHARM-')
-  const trustScore = isValid ? 95 : 0
+// Convert from Blockchain status code to string representation
+const getStatusString = (code: number): SupplyChainEvent['status'] => {
+  const statuses: SupplyChainEvent['status'][] = [
+    'manufactured',
+    'quality-checked',
+    'packaged',
+    'shipped',
+    'received',
+  ];
+  return statuses[code] || 'manufactured';
+};
 
-  if (!isValid) {
+/**
+ * Real blockchain verification
+ * Interacts with the actual blockchain node via Web3
+ */
+export async function verifyOnBlockchain(blockchainId: string): Promise<VerificationResult> {
+  try {
+    const contract = getContract();
+    if (!contract) {
+        throw new Error('Web3 Contract instance not found');
+    }
+
+    const productIdBytes32 = contract.utils.utf8ToHex(blockchainId);
+
+    // Check if product exists first
+    const exists = await contract.methods.products(productIdBytes32).call();
+
+    // If timestamp is 0, it doesn't exist.
+    if (!exists || Number(exists.timestamp) === 0) {
+        return {
+          isValid: false,
+          record: null,
+          verificationDate: Date.now(),
+          trustScore: 0,
+          warnings: ['Product not found on the blockchain'],
+        }
+    }
+
+    // Fetch the timeline history
+    const history = await contract.methods.getProductHistory(productIdBytes32).call();
+    
+    // Map smart contract events to frontend model
+    const supplyChainEvents: SupplyChainEvent[] = history.map((event: any) => ({
+      status: getStatusString(Number(event.status)),
+      timestamp: Number(event.timestamp) * 1000, 
+      location: event.location,
+      updatedBy: event.updatedBy,
+      verified: true, // Data originates from BC, natively verified
+      dataHash: "verified-on-chain",
+    }));
+
+    const trustScore = 100;
+
+    const record: BlockchainRecord = {
+      blockchainId,
+      batchId: exists.batchId,
+      productName: exists.name,
+      manufacturerName: exists.manufacturerName,
+      timestamp: Number(exists.timestamp) * 1000,
+      status: 'verified',
+      transactionHash: '...', // We don't fetch TX hash retrospectively easily without parsing logs
+      blockNumber: 0,
+      images: exists.images || [],
+      supplyChainEvents,
+    }
+
+    return {
+      isValid: true,
+      record,
+      verificationDate: Date.now(),
+      trustScore,
+      warnings: [],
+    };
+  } catch (error) {
+    console.error("Blockchain Verification Error:", error);
     return {
       isValid: false,
       record: null,
       verificationDate: Date.now(),
       trustScore: 0,
-      warnings: ['Invalid blockchain ID format'],
+      warnings: ['Failed to connect to the blockchain network to verify. Please try again.'],
     }
-  }
-
-  const record: BlockchainRecord = {
-    blockchainId,
-    batchId: `BATCH-${blockchainId.substring(6, 10)}-${blockchainId.substring(15, 19)}-A`,
-    productName: 'Amoxicillin 500mg',
-    manufacturerId: 'MFR-001',
-    manufacturerName: 'PharmaCorp Inc',
-    timestamp: Date.now() - 86400000, // 1 day ago
-    status: 'verified',
-    transactionHash: `0x${Math.random().toString(16).substring(2)}`,
-    blockNumber: 18234567,
-    supplyChainEvents: [
-      {
-        status: 'manufactured',
-        timestamp: Date.now() - 604800000,
-        location: 'PharmaCorp Manufacturing Plant, USA',
-        verified: true,
-        dataHash: `0x${Math.random().toString(16).substring(2)}`,
-      },
-      {
-        status: 'quality-checked',
-        timestamp: Date.now() - 604800000 + 86400000,
-        location: 'PharmaCorp QA Lab',
-        verified: true,
-        dataHash: `0x${Math.random().toString(16).substring(2)}`,
-      },
-      {
-        status: 'packaged',
-        timestamp: Date.now() - 604800000 + 172800000,
-        location: 'PharmaCorp Distribution Center',
-        verified: true,
-        dataHash: `0x${Math.random().toString(16).substring(2)}`,
-      },
-      {
-        status: 'shipped',
-        timestamp: Date.now() - 604800000 + 259200000,
-        location: 'In Transit',
-        verified: true,
-        dataHash: `0x${Math.random().toString(16).substring(2)}`,
-      },
-      {
-        status: 'received',
-        timestamp: Date.now() - 259200000,
-        location: 'Pharmacy Chain - Downtown Store',
-        verified: true,
-        dataHash: `0x${Math.random().toString(16).substring(2)}`,
-      },
-    ],
-  }
-
-  return {
-    isValid: true,
-    record,
-    verificationDate: Date.now(),
-    trustScore,
-    warnings: [],
   }
 }
 
 /**
  * Verify batch on blockchain
  */
-export function verifyBatchOnBlockchain(batchId: string): VerificationResult {
-  const isValid = /^BATCH-\d{4}-\d{4}-[A-Z]$/.test(batchId)
+export async function verifyBatchOnBlockchain(batchId: string): Promise<VerificationResult> {
+  const isValid = /^BATCH-\d{4}-\d{4}-[A-Z]$/.test(batchId);
 
   if (!isValid) {
     return {
@@ -126,9 +138,9 @@ export function verifyBatchOnBlockchain(batchId: string): VerificationResult {
   }
 
   // Generate blockchain ID from batch ID
-  const blockchainId = `PHARM-${batchId.substring(6, 10)}${batchId.substring(11, 15)}-${batchId.charCodeAt(16).toString(16).padStart(8, '0')}`
+  const blockchainId = `PHARM-${batchId.substring(6, 10)}${batchId.substring(11, 15)}-${batchId.charCodeAt(16).toString(16).padStart(8, '0')}`;
 
-  return verifyOnBlockchain(blockchainId)
+  return await verifyOnBlockchain(blockchainId);
 }
 
 /**
@@ -139,12 +151,6 @@ export function checkSupplyChainIntegrity(record: BlockchainRecord): {
   issues: string[]
 } {
   const issues: string[] = []
-
-  // Check all events are verified
-  const unverifiedEvents = record.supplyChainEvents.filter((e) => !e.verified)
-  if (unverifiedEvents.length > 0) {
-    issues.push(`${unverifiedEvents.length} unverified event(s) in supply chain`)
-  }
 
   // Check chronological order
   for (let i = 1; i < record.supplyChainEvents.length; i++) {
@@ -175,10 +181,6 @@ export function checkSupplyChainIntegrity(record: BlockchainRecord): {
  */
 export function calculateTrustScore(record: BlockchainRecord): number {
   let score = 100
-
-  // Deduct for unverified events
-  const unverifiedCount = record.supplyChainEvents.filter((e) => !e.verified).length
-  score -= unverifiedCount * 10
 
   // Deduct for supply chain gaps
   for (let i = 1; i < record.supplyChainEvents.length; i++) {
@@ -237,3 +239,48 @@ export function generateVerificationCertificate(record: BlockchainRecord): strin
 export function exportVerificationData(result: VerificationResult): string {
   return JSON.stringify(result, null, 2)
 }
+
+/**
+ * Fetch all registered products from the blockchain
+ */
+export async function getAllProductsFromBlockchain(): Promise<any[]> {
+  try {
+    const contract = getContract();
+    if (!contract) return [];
+
+    // Fetch past events to get all product additions
+    const events = await contract.getPastEvents('ProductAdded', {
+      fromBlock: 0,
+      toBlock: 'latest'
+    });
+
+    const products = [];
+
+    // Reverse iterate to show newest products first
+    for (let i = events.length - 1; i >= 0; i--) {
+      const event = events[i];
+      const productId = event.returnValues?.productId;
+      if (!productId) continue;
+
+      const productData = await contract.methods.products(productId).call();
+      const history = await contract.methods.getProductHistory(productId).call();
+      
+      products.push({
+        id: productId.toString(),
+        name: productData.name,
+        sku: productData.saltValue || productId.toString(), 
+        batchSize: productData.batchNumber.toString(),
+        registered: history.length > 0 ? history.length : 1, // Number of history events
+        status: "active",
+        verifications: 0, // Mock verifications
+        date: new Date(Number(productData.manufactureDate) * 1000).toISOString().split('T')[0],
+      });
+    }
+
+    return products;
+  } catch (err) {
+    console.error("Failed to fetch products from blockchain:", err);
+    return [];
+  }
+}
+

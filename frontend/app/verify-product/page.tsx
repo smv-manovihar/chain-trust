@@ -18,6 +18,7 @@ import {
   Loader2,
   XCircle,
 } from "lucide-react";
+import { verifyOnBlockchain, VerificationResult } from "@/lib/blockchain-utils";
 
 // Define types for API response
 interface TimelineEvent {
@@ -34,8 +35,7 @@ interface ProductData {
   productId: string;
   batchNumber: string;
   expiryDate?: string;
-  // manufactureDate isn't always returned by getProductFlow based in controller, check!
-  // Controller returns: name, brand, productId, expiryDate, batchNumber.
+  images?: string[];
 }
 
 export default function VerifyProductPage() {
@@ -54,20 +54,37 @@ export default function VerifyProductPage() {
     setProduct(null);
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/track/${qrInput}`,
-      );
+      const result: VerificationResult = await verifyOnBlockchain(qrInput);
 
-      if (!response.ok) {
-        throw new Error("Product not found or verification failed");
+      if (!result.isValid || !result.record) {
+        throw new Error(
+          result.warnings[0] || "Product not found on the blockchain",
+        );
       }
 
-      const data = await response.json();
-      setProduct(data.product);
-      setTimeline(data.timeline);
+      setProduct({
+        name: result.record.productName,
+        brand: result.record.manufacturerName,
+        productId: result.record.blockchainId,
+        batchNumber: result.record.batchId,
+        images: result.record.images || [],
+      } as any);
+
+      const timelineEvents = result.record.supplyChainEvents.map(
+        (event: any) => ({
+          status:
+            event.status.charAt(0).toUpperCase() +
+            event.status.slice(1).replace("-", " "),
+          date: new Date(event.timestamp).toISOString(),
+          location: event.location,
+          description: `Updated by: ${event.updatedBy}`,
+        }),
+      );
+
+      setTimeline(timelineEvents);
       setScanned(true);
     } catch (err: any) {
-      setError(err.message || "Failed to verify product");
+      setError(err.message || "Failed to verify product via Blockchain");
     } finally {
       setLoading(false);
     }
@@ -244,6 +261,25 @@ export default function VerifyProductPage() {
                 </div>
               </div>
             </Card>
+
+            {/* Product Images */}
+            {product?.images && product.images.length > 0 && (
+              <Card className="p-6 border border-border space-y-6">
+                <h2 className="text-xl font-semibold text-foreground">
+                  Product Images
+                </h2>
+                <div className="flex gap-4 overflow-x-auto pb-2">
+                  {product.images.map((img, idx) => (
+                    <img
+                      key={idx}
+                      src={img}
+                      alt={`Product view ${idx + 1}`}
+                      className="h-48 w-48 object-cover rounded-md border border-border flex-shrink-0"
+                    />
+                  ))}
+                </div>
+              </Card>
+            )}
 
             {/* Supply Chain Timeline */}
             <Card className="p-6 border border-border space-y-6">

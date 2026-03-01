@@ -6,53 +6,27 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Edit2, Trash2, Eye } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getAllProductsFromBlockchain } from "@/lib/blockchain-utils";
 
 export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const products = [
-    {
-      id: 1,
-      name: "Amoxicillin 500mg",
-      sku: "AMOX-500-001",
-      batchSize: "500,000 units",
-      registered: "847 batches",
-      status: "active",
-      verifications: "12,847",
-      date: "2024-08-15",
-    },
-    {
-      id: 2,
-      name: "Ibuprofen 200mg",
-      sku: "IBUP-200-001",
-      batchSize: "750,000 units",
-      registered: "623 batches",
-      status: "active",
-      verifications: "9,203",
-      date: "2024-07-20",
-    },
-    {
-      id: 3,
-      name: "Vitamin D3 Tablets",
-      sku: "VITD-300-001",
-      batchSize: "1,000,000 units",
-      registered: "234 batches",
-      status: "active",
-      verifications: "3,421",
-      date: "2024-09-01",
-    },
-    {
-      id: 4,
-      name: "Aspirin 325mg",
-      sku: "ASPI-325-001",
-      batchSize: "600,000 units",
-      registered: "156 batches",
-      status: "active",
-      verifications: "4,156",
-      date: "2024-06-15",
-    },
-  ];
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        const data = await getAllProductsFromBlockchain();
+        setProducts(data);
+      } catch (error) {
+        console.error("Error loading products:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadProducts();
+  }, []);
 
   const filteredProducts = products.filter(
     (p) =>
@@ -117,7 +91,13 @@ export default function ProductsPage() {
 
         {/* Products Table */}
         <Card className="border border-border overflow-hidden">
-          {filteredProducts.length === 0 ? (
+          {loading ? (
+            <div className="p-8 text-center">
+              <p className="text-muted-foreground">
+                Loading products from blockchain...
+              </p>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-muted-foreground">
                 No products found matching your search.

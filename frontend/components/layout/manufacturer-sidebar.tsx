@@ -67,11 +67,6 @@ export function ManufacturerSidebar({ className }: SidebarProps) {
           href: "/manufacturer/batches",
           icon: Boxes,
         },
-        {
-          label: "QR Manager",
-          href: "/manufacturer/qr-manager",
-          icon: QrCode,
-        },
       ],
     },
     {

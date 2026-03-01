@@ -11,6 +11,7 @@ import authRouter from './routers/auth.router.js';
 import alertRouter from './routers/alert.router.js';
 import productRouter from './routers/product.router.js';
 import trackingRouter from './routers/tracking.router.js';
+import uploadRouter from './routers/upload.router.js';
 import { startCronJobs } from './jobs/cron.js';
 
 // Initialize Express
@@ -70,6 +71,7 @@ app.use('/api/company', authLimiter, companyRouter);
 app.use('/api/alerts', alertRouter);
 app.use('/api/products', productRouter);
 app.use('/api/track', trackingRouter);
+app.use('/api/upload', uploadRouter);
 
 // 404 handler
 app.use((_req, res) => {
