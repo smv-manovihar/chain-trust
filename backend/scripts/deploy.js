@@ -14,14 +14,48 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 const RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:7545';
 const web3 = new Web3(RPC_URL);
 
+/**
+ * Utility to update .env files robustly
+ */
+function updateEnvFile(filePath, updates) {
+    let content = '';
+    if (fs.existsSync(filePath)) {
+        content = fs.readFileSync(filePath, 'utf8');
+    }
+
+    for (const [key, value] of Object.entries(updates)) {
+        const regex = new RegExp(`^${key}\\s*=.*$`, 'm');
+        if (content.match(regex)) {
+            content = content.replace(regex, `${key}=${value}`);
+        } else {
+            content += content.endsWith('\n') || content === '' ? `${key}=${value}\n` : `\n${key}=${value}\n`;
+        }
+    }
+
+    fs.writeFileSync(filePath, content);
+}
+
 async function deploy() {
     console.log('--- Starting Deployment ---');
-    const accounts = await web3.eth.getAccounts();
-    const deployer = accounts[0];
+    
+    let deployer;
+    const privateKey = process.env.PRIVATE_KEY;
+
+    if (privateKey && privateKey !== 'your_private_key_here') {
+        const account = web3.eth.accounts.privateKeyToAccount(privateKey);
+        web3.eth.accounts.wallet.add(account);
+        deployer = account.address;
+        console.log('Using Private Key for Deployment.');
+    } else {
+        const accounts = await web3.eth.getAccounts();
+        deployer = accounts[0];
+        console.log('Using Local Node Account for Deployment.');
+    }
+
     console.log('Deployer Account:', deployer);
 
     // Read Contract File
-    const contractPath = path.join(__dirname, '../../contracts/ChainTrust.sol');
+    const contractPath = path.join(__dirname, '../contracts/ChainTrust.sol');
     const source = fs.readFileSync(contractPath, 'utf8');
 
     // Compile Contract
@@ -58,27 +92,22 @@ async function deploy() {
     const abi = contractData.abi;
     const bytecode = contractData.evm.bytecode.object;
 
-    // Save ABI to backend/abis/ChainTrust.json
-    const abiDir = path.join(__dirname, '../abis');
-    if (!fs.existsSync(abiDir)) fs.mkdirSync(abiDir, { recursive: true });
-    fs.writeFileSync(
-        path.join(abiDir, 'ChainTrust.json'),
-        JSON.stringify(abi, null, 2)
-    );
-    console.log('ABI saved to backend/abis/ChainTrust.json');
+    // --- DEPLOYMENT ARTIFACTS ---
+    const rootDir = path.join(__dirname, '../../');
+    const contractsDir = path.join(__dirname, '../contracts'); // backend/contracts
+    if (!fs.existsSync(contractsDir)) fs.mkdirSync(contractsDir, { recursive: true });
 
-    // Save ABI to frontend/abis/ChainTrust.json
-    const frontendAbiDir = path.join(__dirname, '../../frontend/abis');
-    if (!fs.existsSync(frontendAbiDir)) fs.mkdirSync(frontendAbiDir, { recursive: true });
-    fs.writeFileSync(
-        path.join(frontendAbiDir, 'ChainTrust.json'),
-        JSON.stringify(abi, null, 2)
-    );
-    console.log('ABI also saved to frontend/abis/ChainTrust.json');
-    console.log('ABI saved to backend/abis/ChainTrust.json');
+    // 1. Backend Record (Source of truth for backend)
+    fs.writeFileSync(path.join(contractsDir, 'ChainTrust.json'), JSON.stringify(abi, null, 2));
+    console.log('ABI saved to backend/contracts/ChainTrust.json');
+
+    // 2. Frontend Sync (Required for frontend build)
+    const frontendTarget = path.join(rootDir, 'frontend/api/ChainTrust.json');
+    fs.writeFileSync(frontendTarget, JSON.stringify(abi, null, 2));
+    console.log('ABI synced to frontend/api/ChainTrust.json');
 
     // Deploy Contract
-    console.log('Deploying to Ganache...');
+    console.log('Deploying to blockchain...');
     const contract = new web3.eth.Contract(abi);
     const deployTx = contract.deploy({ data: '0x' + bytecode });
 
@@ -92,19 +121,26 @@ async function deploy() {
         console.log('--- Deployment Successful! ---');
         console.log('Contract Address:', address);
 
-        // Update .env with new address (simple append/replace logic)
-        const envPath = path.join(__dirname, '../.env');
-        let envContent = fs.readFileSync(envPath, 'utf8');
-        const addressKey = 'CONTRACT_ADDRESS';
-        
-        if (envContent.includes(addressKey)) {
-            envContent = envContent.replace(new RegExp(`${addressKey}=.*`), `${addressKey}=${address}`);
-        } else {
-            envContent += `\n${addressKey}=${address}`;
-        }
-        
-        fs.writeFileSync(envPath, envContent);
-        console.log(`Updated ${addressKey} in backend/.env`);
+        // 3. Save Metadata to backend/contracts
+        const metadata = {
+            contractAddress: address,
+            deployer: deployer,
+            network: RPC_URL,
+            timestamp: new Date().toISOString(),
+        };
+        fs.writeFileSync(
+            path.join(contractsDir, 'metadata.json'),
+            JSON.stringify(metadata, null, 2)
+        );
+        console.log('Deployment metadata saved to backend/contracts/metadata.json');
+
+        // 4. Update frontend .env
+        const frontendEnvPath = path.join(rootDir, 'frontend/.env');
+        updateEnvFile(frontendEnvPath, {
+            'NEXT_PUBLIC_CONTRACT_ADDRESS': address,
+            'NEXT_PUBLIC_RPC_URL': RPC_URL
+        });
+        console.log(`Updated frontend/.env`);
 
     } catch (error) {
         console.error('Deployment failed:', error);

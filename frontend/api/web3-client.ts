@@ -1,5 +1,5 @@
 import Web3 from 'web3';
-import ChainTrustABI from '../abis/ChainTrust.json';
+import ChainTrustABI from './ChainTrust.json';
 
 declare global {
   interface Window {
@@ -15,7 +15,8 @@ if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
     web3 = new Web3(window.ethereum);
 } else {
     // Fallback or Server-side (SSR) environment
-    web3 = new Web3('http://127.0.0.1:7545'); // Local Ganache fallback
+    const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'http://127.0.0.1:7545';
+    web3 = new Web3(RPC_URL);
 }
 
 // Contract Address - Should ideally come from env vars, but using the deployed address here
