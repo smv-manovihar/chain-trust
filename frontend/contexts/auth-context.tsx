@@ -44,11 +44,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const cacheAvatarBlob = async (url: string) => {
+    if (typeof window === "undefined" || !url) return;
+    try {
+      if (url.startsWith("data:")) {
+        localStorage.setItem("cached_avatar", url);
+        return;
+      }
+      const response = await fetch(url);
+      if (!response.ok) return;
+      const blob = await response.blob();
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (reader.result) {
+          localStorage.setItem("cached_avatar", reader.result as string);
+        }
+      };
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      console.error("Failed to cache avatar blob:", err);
+    }
+  };
+
   const refreshUser = async () => {
     setIsLoading(true);
     try {
       const userData = await getCurrentUser();
       setUser(userData);
+      if (typeof window !== "undefined" && userData?.avatar) {
+        cacheAvatarBlob(userData.avatar);
+      }
       setError(null);
     } catch {
       setUser(null);
@@ -63,6 +88,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const data = await apiLogin(email, password);
       setUser(data.user);
+      if (typeof window !== "undefined" && data.user.avatar) {
+        cacheAvatarBlob(data.user.avatar);
+      }
 
       if (data.user.mustChangePassword) {
         return "/auth/force-change-password";
@@ -113,6 +141,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = async () => {
     await apiLogout();
     setUser(null);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("cached_avatar");
+    }
   };
 
   useEffect(() => {

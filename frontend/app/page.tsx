@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { TextAnimate } from "@/components/ui/text-animate";
-import { motion, Variants } from "motion/react";
+import { motion } from "motion/react";
 import { useAuth } from "@/contexts/auth-context";
 import {
   ShieldCheck,
@@ -18,33 +18,6 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 
-// --- 1. Animation Configuration ---
-const containerVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
-
-const cardVariants: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 40, // Slide up distance
-    filter: "blur(4px)", // The "slight blur" effect
-  },
-  visible: {
-    opacity: 1,
-    y: 0,
-    filter: "blur(0px)",
-    transition: {
-      duration: 0.6,
-      ease: "easeOut", // Smooth standard easing
-    },
-  },
-};
 
 export default function Home() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -91,10 +64,10 @@ export default function Home() {
 
   return (
     <div className="min-h-screen font-sans selection:bg-primary/20">
-      <Header />
+      <Header variant="floating" />
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex flex-col justify-center pt-20 pb-32 overflow-hidden">
+      <section id="hero" className="relative min-h-screen flex flex-col justify-center pt-20 pb-32 overflow-hidden">
         {/* Global grid pattern is now in layout */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-primary/10 blur-[120px] rounded-full z-0 pointer-events-none" />
 
@@ -179,8 +152,8 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-24 md:py-32 relative">
-        <div className="absolute inset-0 bg-muted/20 skew-y-3 transform origin-top-left z-[-1]" />
+      <section id="features" className="py-24 md:py-32 relative text-center">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-muted/20 to-transparent z-[-1]" />
 
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center max-w-3xl mx-auto mb-20">
@@ -199,38 +172,53 @@ export default function Home() {
             </p>
           </div>
 
-          {/* 2. Grid Container with Stagger */}
-          <motion.div
-            className="grid md:grid-cols-3 gap-8"
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }} // Triggers when 100px into view
-          >
+          {/* Features Grid */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, i) => (
-              /* 3. The Card with Slide Up + Blur */
               <motion.div
                 key={i}
-                variants={cardVariants}
-                whileHover={{ y: -5, transition: { duration: 0.2 } }}
-                className="group p-8 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md shadow-sm hover:shadow-xl transition-all duration-300 dark:bg-card/30 dark:border-white/5"
+                initial={{ opacity: 0, filter: "blur(10px)", y: 20 }}
+                whileInView={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{
+                  duration: 0.5,
+                  delay: i * 0.1,
+                  ease: "easeOut",
+                }}
+                className="group relative rounded-3xl p-[1px] overflow-hidden transition-all duration-500 hover:shadow-2xl hover:shadow-primary/20 hover:-translate-y-2"
               >
-                <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 group-hover:bg-primary group-hover:text-primary-foreground">
-                  <feature.icon className="h-7 w-7" />
+                {/* Gradient border effect */}
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-primary/10 opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
+                
+                {/* Inner Card content */}
+                <div className="relative h-full bg-background/80 dark:bg-card/80 backdrop-blur-xl p-8 rounded-[23px] border border-white/5 flex flex-col items-start overflow-hidden">
+                  
+                  {/* Subtle background glow on hover */}
+                  <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 rounded-full blur-3xl group-hover:bg-primary/30 transition-all duration-500 opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 pointer-events-none" />
+
+                  <div className="relative z-10 w-full flex items-start text-left gap-5">
+                    <div className="relative h-14 w-14 shrink-0 rounded-2xl flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-500 group-hover:-rotate-6 overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 transition-opacity duration-500 group-hover:opacity-0" />
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary to-primary/80 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+                      <feature.icon className="relative z-10 h-7 w-7 text-primary group-hover:text-primary-foreground transition-colors duration-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold mb-2 tracking-tight group-hover:text-primary transition-colors duration-300">{feature.title}</h3>
+                      <p className="text-muted-foreground leading-relaxed text-sm">
+                        {feature.desc}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  {feature.desc}
-                </p>
               </motion.div>
             ))}
-          </motion.div>
+          </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-primary/5 -z-10" />
+      <section id="cta" className="py-24 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent -z-10" />
         <motion.div
           className="container mx-auto px-4 text-center relative z-10"
           initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
