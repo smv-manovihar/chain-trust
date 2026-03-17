@@ -182,7 +182,7 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
 		if (user.role === 'manufacturer') {
 			res.redirect(`${FRONTEND_URL}/manufacturer`);
 		} else {
-			res.redirect(`${FRONTEND_URL}/customer-home`);
+			res.redirect(`${FRONTEND_URL}/customer`);
 		}
 
 	} catch (err) {
@@ -311,7 +311,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
 			accessToken,
 			refreshToken,
 			sessionExpiresAt: expiresAt,
-			redirectUrl: user.role === 'manufacturer' ? '/manufacturer' : '/customer-home',
+			redirectUrl: user.role === 'manufacturer' ? '/manufacturer' : '/customer',
 		});
 	} catch (err) {
 		console.error('Login error:', err);
@@ -417,7 +417,7 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
 				emailSent,
 				message: 'Verification email sent with both OTP and link methods.',
 			},
-			redirectUrl: newUser.role === 'manufacturer' ? '/manufacturer' : '/customer-home',
+			redirectUrl: newUser.role === 'manufacturer' ? '/manufacturer' : '/customer',
 		});
 	} catch (err) {
 		console.error('Registration error:', err);

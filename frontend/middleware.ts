@@ -28,7 +28,7 @@ export function middleware(request: NextRequest) {
     
     // Protect manufacturer routes
     if (isManufacturerRoute && decodedPayload.role !== 'manufacturer' && decodedPayload.role !== 'employee') {
-      return NextResponse.redirect(new URL('/customer-home', request.url));
+      return NextResponse.redirect(new URL('/customer', request.url));
     }
   } catch (err) {
     // Invalid token format

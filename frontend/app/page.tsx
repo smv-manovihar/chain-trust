@@ -26,7 +26,7 @@ export default function Home() {
     if (user?.role === "manufacturer") {
       return "/manufacturer";
     }
-    return "/customer-home";
+    return "/customer";
   };
 
   const features = [

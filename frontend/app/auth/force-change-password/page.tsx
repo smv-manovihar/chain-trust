@@ -44,7 +44,7 @@ export default function ForceChangePasswordPage() {
 
       toast.success("Password changed successfully");
       router.push(
-        user?.role === "manufacturer" ? "/manufacturer" : "/customer-home",
+        user?.role === "manufacturer" ? "/manufacturer" : "/customer",
       );
     } catch (error: any) {
       toast.error("Failed to change password", {

@@ -1,19 +1,21 @@
 "use client";
 
-import { ManufacturerSidebar, MobileSidebar } from "@/components/layout/manufacturer-sidebar";
+import { CustomerSidebar, MobileSidebar } from "@/components/layout/customer-sidebar";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserNav } from "@/components/layout/user-nav";
 
-export default function ManufacturerLayout({
+import { BrandLogo } from "@/components/layout/brand-logo";
+
+export default function CustomerLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground selection:bg-primary/20">
-      <ManufacturerSidebar />
+      <CustomerSidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Header Layer */}
         <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b bg-background/95 px-4 backdrop-blur-md md:px-6 shadow-sm z-10">

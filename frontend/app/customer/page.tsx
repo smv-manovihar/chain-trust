@@ -1,6 +1,5 @@
 "use client";
 
-import { Header } from "@/components/layout/header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,9 +42,7 @@ export default function CustomerHomePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-
+    <div className="min-h-screen bg-transparent">
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-8">
         {/* Welcome Section */}
         <div className="mb-8 space-y-4">

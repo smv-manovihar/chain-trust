@@ -35,7 +35,7 @@ export default function SelectRolePage() {
       if (selectedRole === "manufacturer") {
         router.push("/manufacturer");
       } else {
-        router.push("/customer-home");
+        router.push("/customer");
       }
     } catch (error) {
       console.error("Failed to update role:", error);

@@ -2,14 +2,14 @@
 import { BrandLogo } from "@/components/layout/brand-logo";
 import {
   LayoutDashboard,
-  Package,
+  QrCode,
+  Archive,
   Settings,
   LogOut,
   Menu,
-  BarChart3,
-  Boxes,
   ChevronLeft,
   ChevronRight,
+  Pill,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -25,28 +25,23 @@ export const navGroups = [
     items: [
       {
         label: "Dashboard",
-        href: "/manufacturer",
+        href: "/customer",
         icon: LayoutDashboard,
       },
       {
-        label: "Analytics",
-        href: "/manufacturer/analytics",
-        icon: BarChart3,
+        label: "Verify Product",
+        href: "/verify-product",
+        icon: QrCode,
       },
     ],
   },
   {
-    label: "Inventory & Production",
+    label: "My Health",
     items: [
       {
-        label: "Products",
-        href: "/manufacturer/products",
-        icon: Package,
-      },
-      {
-        label: "Batches",
-        href: "/manufacturer/batches",
-        icon: Boxes,
+        label: "Cabinet & Tracking",
+        href: "/customer/cabinet",
+        icon: Pill,
       },
     ],
   },
@@ -55,7 +50,7 @@ export const navGroups = [
     items: [
       {
         label: "Settings",
-        href: "/manufacturer/settings",
+        href: "/customer/settings",
         icon: Settings,
       },
     ],
@@ -88,14 +83,17 @@ export function SidebarContent({ isCollapsed, onNavigate }: { isCollapsed?: bool
             <div className="space-y-1">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                // special case for dashboard since it matches everything
+                const isActuallyActive = item.href === '/customer' ? pathname === '/customer' : isActive;
+
                 return (
                   <Button
                     key={item.href}
-                    variant={isActive ? "secondary" : "ghost"}
+                    variant={isActuallyActive ? "secondary" : "ghost"}
                     className={cn(
                       "w-full justify-start transition-all duration-200",
-                      isActive
+                      isActuallyActive
                         ? "bg-primary/10 text-primary hover:bg-primary/20 font-medium"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
                       isCollapsed ? "justify-center px-2" : "px-4",
@@ -104,7 +102,7 @@ export function SidebarContent({ isCollapsed, onNavigate }: { isCollapsed?: bool
                     asChild
                   >
                     <Link href={item.href}>
-                      <Icon className={cn("h-5 w-5", !isCollapsed && "mr-3", isActive ? "text-primary" : "text-muted-foreground")} />
+                      <Icon className={cn("h-5 w-5", !isCollapsed && "mr-3", isActuallyActive ? "text-primary" : "text-muted-foreground")} />
                       {!isCollapsed && <span>{item.label}</span>}
                     </Link>
                   </Button>
@@ -140,7 +138,7 @@ export function SidebarContent({ isCollapsed, onNavigate }: { isCollapsed?: bool
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
 
-export function ManufacturerSidebar({ className }: SidebarProps) {
+export function CustomerSidebar({ className }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (

@@ -98,7 +98,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       return (
         data.redirectUrl ||
-        (data.user.role === "manufacturer" ? "/manufacturer" : "/customer-home")
+        (data.user.role === "manufacturer" ? "/manufacturer" : "/customer")
       );
     } catch (err: any) {
       setError(err.message || "Login failed");
@@ -121,7 +121,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(data.user);
       return (
         data.redirectUrl ||
-        (data.user.role === "manufacturer" ? "/manufacturer" : "/customer-home")
+        (data.user.role === "manufacturer" ? "/manufacturer" : "/customer")
       );
     } catch (err: any) {
       setError(err.message || "Registration failed");

@@ -35,7 +35,7 @@ export function UserNav() {
     if (user?.role === "manufacturer") {
       return "/manufacturer";
     }
-    return "/customer-home";
+    return "/customer";
   };
 
   if (isLoading) {
