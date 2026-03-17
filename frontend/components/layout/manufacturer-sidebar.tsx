@@ -15,7 +15,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "../ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "../ui/sheet";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
 
@@ -168,8 +168,23 @@ export function ManufacturerSidebar({ className }: SidebarProps) {
   );
 }
 
+
 export function MobileSidebar() {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <Button variant="outline" size="icon" className="md:hidden shrink-0">
+        <Menu className="h-5 w-5" />
+        <span className="sr-only">Toggle Sidebar</span>
+      </Button>
+    );
+  }
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -181,7 +196,7 @@ export function MobileSidebar() {
       </SheetTrigger>
       <SheetContent side="left" className="w-[85vw] max-w-[300px] p-0 border-r-0">
         <SheetHeader className="sr-only">
-            <SheetTitle>Navigation Menu</SheetTitle>
+          <SheetTitle>Navigation Menu</SheetTitle>
         </SheetHeader>
         <SidebarContent onNavigate={() => setOpen(false)} />
       </SheetContent>

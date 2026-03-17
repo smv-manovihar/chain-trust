@@ -1,214 +1,200 @@
 "use client";
 
-import { Card } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { Copy, Eye, QrCode, Search, Filter, Loader2, AlertCircle, RefreshCw, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Download, MoreVertical } from "lucide-react";
-import { useState } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { listBatches, recallBatch } from "@/api/batch.api";
+import { format } from "date-fns";
+import Link from "next/link";
+import { toast } from "sonner"; // Assuming you have a toast component, or standard alert works
+
+interface Batch {
+  _id: string;
+  batchNumber: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  manufactureDate: string;
+  totalScans: number;
+  isRecalled: boolean;
+  blockchainHash: string;
+}
 
 export default function BatchesPage() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const batches = [
-    {
-      id: "BATCH-2024-0847-A",
-      product: "Amoxicillin 500mg",
-      quantity: "500,000 units",
-      manufactured: "2024-08-15",
-      expires: "2026-08-15",
-      status: "verified",
-      verifications: "847",
-      qrCodes: "500,000",
-    },
-    {
-      id: "BATCH-2024-0821-B",
-      product: "Ibuprofen 200mg",
-      quantity: "750,000 units",
-      manufactured: "2024-08-21",
-      expires: "2025-08-21",
-      status: "verified",
-      verifications: "623",
-      qrCodes: "750,000",
-    },
-    {
-      id: "BATCH-2024-0801-C",
-      product: "Vitamin D3 Tablets",
-      quantity: "1,000,000 units",
-      manufactured: "2024-08-01",
-      expires: "2026-08-01",
-      status: "verified",
-      verifications: "234",
-      qrCodes: "1,000,000",
-    },
-    {
-      id: "BATCH-2024-0915-D",
-      product: "Aspirin 325mg",
-      quantity: "600,000 units",
-      manufactured: "2024-09-15",
-      expires: "2027-09-15",
-      status: "pending",
-      verifications: "0",
-      qrCodes: "600,000",
-    },
-  ];
+  const fetchBatches = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const res = await listBatches();
+      setBatches(res.batches || []);
+    } catch (err: any) {
+      console.error("Failed to fetch batches:", err);
+      setError("Failed to load batches from server. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBatches();
+  }, []);
+
+  const handleCopyHash = (hash: string) => {
+    navigator.clipboard.writeText(hash);
+    toast("Copied to clipboard", { description: "Blockchain transaction hash copied." });
+  };
+
+  const handleRecall = async (id: string) => {
+    if (!confirm("Are you sure you want to recall this batch? This will flag ALL products in this batch as invalid during verification.")) return;
+    
+    try {
+      await recallBatch(id);
+      fetchBatches(); // Reload
+      toast("Batch Recalled", { description: "The batch has been successfully recalled." });
+    } catch (err: any) {
+      console.error("Failed to recall batch:", err);
+      alert("Failed to recall batch: " + err.message);
+    }
+  };
 
   const filteredBatches = batches.filter(
     (b) =>
-      b.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.product.toLowerCase().includes(searchQuery.toLowerCase()),
+      b.batchNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      b.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      b.productId.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <>
-      {/* Header */}
-      <div className="border-b border-border bg-card sticky top-0 z-10 -mx-4 md:-mx-8 px-4 md:px-8 py-4 mb-6 shadow-sm">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                Batch Management
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Monitor and manage all product batches on blockchain
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by batch ID or product..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Button variant="outline" className="gap-2 bg-transparent">
-                <Download className="h-4 w-4" />
-                Export
-              </Button>
-            </div>
-          </div>
+    <div className="h-[calc(100vh-4rem)] flex flex-col gap-6 py-4">
+      <div className="flex-none flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Manufactured Batches</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Manage and monitor production runs.</p>
         </div>
+        <Button asChild size="sm" className="rounded-lg shadow-sm hover:shadow-md transition-shadow">
+          <Link href="/manufacturer/batches/new">Enroll New Batch</Link>
+        </Button>
       </div>
 
-      <div className="space-y-6">
-        {/* Stats */}
-        <div className="grid md:grid-cols-4 gap-4">
-          {[
-            { label: "Total Batches", value: "1,860", color: "text-primary" },
-            { label: "Verified", value: "1,847", color: "text-accent" },
-            { label: "Pending", value: "13", color: "text-amber-600" },
-            {
-              label: "QR Codes Generated",
-              value: "3.2M",
-              color: "text-blue-600",
-            },
-          ].map((stat, i) => (
-            <Card key={i} className="p-4 border border-border">
-              <p className="text-xs font-medium text-muted-foreground mb-2">
-                {stat.label}
-              </p>
-              <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-            </Card>
-          ))}
+      <div className="flex-none flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search by batch number, name, or product ID..." 
+            className="pl-9 h-10 rounded-lg text-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
+        <Button variant="outline" className="gap-2 h-10 px-4 rounded-lg text-sm" onClick={fetchBatches}>
+          <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+          Refresh
+        </Button>
+      </div>
 
-        {/* Batches Table */}
-        <Card className="border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-border bg-muted/30">
-                <tr>
-                  <th className="text-left py-3 px-6 font-semibold text-foreground">
-                    Batch ID
-                  </th>
-                  <th className="text-left py-3 px-6 font-semibold text-foreground">
-                    Product
-                  </th>
-                  <th className="text-left py-3 px-6 font-semibold text-foreground">
-                    Quantity
-                  </th>
-                  <th className="text-left py-3 px-6 font-semibold text-foreground">
-                    Manufactured
-                  </th>
-                  <th className="text-left py-3 px-6 font-semibold text-foreground">
-                    Expires
-                  </th>
-                  <th className="text-left py-3 px-6 font-semibold text-foreground">
-                    Status
-                  </th>
-                  <th className="text-left py-3 px-6 font-semibold text-foreground">
-                    Verifications
-                  </th>
-                  <th className="text-left py-3 px-6 font-semibold text-foreground"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredBatches.map((batch) => (
-                  <tr
-                    key={batch.id}
-                    className="border-b border-border hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="py-4 px-6">
-                      <p className="font-mono text-xs font-semibold text-foreground">
-                        {batch.id}
-                      </p>
-                    </td>
-                    <td className="py-4 px-6">
-                      <p className="text-foreground font-medium">
-                        {batch.product}
-                      </p>
-                    </td>
-                    <td className="py-4 px-6">
-                      <p className="text-muted-foreground">{batch.quantity}</p>
-                    </td>
-                    <td className="py-4 px-6">
-                      <p className="text-muted-foreground text-xs">
-                        {batch.manufactured}
-                      </p>
-                    </td>
-                    <td className="py-4 px-6">
-                      <p className="text-muted-foreground text-xs">
-                        {batch.expires}
-                      </p>
-                    </td>
-                    <td className="py-4 px-6">
-                      <Badge
-                        className={
-                          batch.status === "verified"
-                            ? "bg-accent text-accent-foreground"
-                            : "bg-amber-600 text-white"
-                        }
-                      >
-                        {batch.status}
-                      </Badge>
-                    </td>
-                    <td className="py-4 px-6">
-                      <p className="text-foreground font-semibold">
-                        {batch.verifications}
-                      </p>
-                    </td>
-                    <td className="py-4 px-6">
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                        <MoreVertical className="h-4 w-4" />
+      {error ? (
+        <div className="flex-none p-4 rounded-lg bg-destructive/10 text-destructive flex items-center gap-3 border border-destructive/20 shadow-sm">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <p className="font-medium text-sm">{error}</p>
+        </div>
+      ) : loading ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-16 text-muted-foreground">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+          <p className="text-sm">Loading batch data...</p>
+        </div>
+      ) : filteredBatches.length > 0 ? (
+        <div className="flex-1 min-h-0 border border-border rounded-xl overflow-hidden bg-card shadow-sm flex flex-col">
+          <div className="flex-1 overflow-y-auto">
+            <Table>
+              <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="font-semibold px-4 py-3 text-xs uppercase tracking-wider">Batch ID / Product</TableHead>
+                  <TableHead className="font-semibold py-3 text-xs uppercase tracking-wider">Units</TableHead>
+                  <TableHead className="font-semibold py-3 hidden md:table-cell text-xs uppercase tracking-wider">Mfg Date</TableHead>
+                  <TableHead className="font-semibold py-3 text-center text-xs uppercase tracking-wider">Status</TableHead>
+                  <TableHead className="font-semibold py-3 hidden lg:table-cell text-center text-xs uppercase tracking-wider">Scan Activity</TableHead>
+                  <TableHead className="text-right font-semibold px-4 py-3 text-xs uppercase tracking-wider">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+              {filteredBatches.map((batch) => (
+                <TableRow key={batch._id} className="group hover:bg-muted/30 transition-colors">
+                  <TableCell className="px-4 py-3">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-mono font-medium text-primary text-sm">{batch.batchNumber}</span>
+                      <span className="text-xs text-foreground">{batch.productName} <span className="text-muted-foreground">({batch.productId})</span></span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3 font-medium text-sm">{batch.quantity.toLocaleString()}</TableCell>
+                  <TableCell className="py-3 hidden md:table-cell text-muted-foreground text-sm">
+                    {format(new Date(batch.manufactureDate), 'MMM d, yyyy')}
+                  </TableCell>
+                  <TableCell className="py-3 text-center">
+                    {batch.isRecalled ? (
+                      <Badge variant="destructive" className="font-medium px-2 py-0.5 text-xs">Recalled</Badge>
+                    ) : (
+                      <Badge variant="default" className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200 font-medium px-2 py-0.5 text-xs">Active</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="py-3 hidden lg:table-cell text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                       <span className="font-semibold min-w-8 text-right text-sm">{batch.totalScans}</span>
+                       <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Scans</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right px-4 py-3">
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => handleCopyHash(batch.blockchainHash)} title="Copy Blockchain Hash">
+                        <Copy className="h-3.5 w-3.5" />
                       </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <Button asChild variant="ghost" size="icon" className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10" title="View & Print QR Codes">
+                        <Link href={`/manufacturer/batches/${batch._id}`}>
+                           <QrCode className="h-3.5 w-3.5" />
+                        </Link>
+                      </Button>
+                      {!batch.isRecalled && (
+                        <Button variant="ghost" size="sm" className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10 text-xs px-2" onClick={() => handleRecall(batch._id)}>
+                          Recall
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
           </div>
-        </Card>
-
-        {filteredBatches.length === 0 && (
-          <Card className="p-8 text-center border border-border">
-            <p className="text-muted-foreground">
-              No batches found matching your search.
-            </p>
-          </Card>
-        )}
-      </div>
-    </>
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center p-16 text-muted-foreground border border-dashed rounded-xl border-border bg-muted/10">
+          <Package className="h-10 w-10 mb-3 text-muted-foreground/50" />
+          <p className="text-lg font-medium text-foreground">No batches found</p>
+          <p className="mb-6 mt-1 text-center max-w-sm">You haven't enrolled any batches yet or none match your search criteria.</p>
+          <Button asChild>
+             <Link href="/manufacturer/batches/new">Enroll Your First Batch</Link>
+          </Button>
+        </div>
+      )}
+    </div>
   );
+}
+
+// Utility for merging tailwind classes locally just for the refresh spin icon
+function cn(...classes: (string | undefined | null | false)[]) {
+  return classes.filter(Boolean).join(" ");
 }

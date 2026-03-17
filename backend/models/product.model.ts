@@ -1,21 +1,14 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IProduct extends Document {
 	name: string;
+	productId: string; // SKU, NDC, or any identifier the manufacturer uses
 	category: string;
 	brand: string;
-	productId: string; // Internal/External ID
 	price: number;
-	batchNumber: string;
-	manufactureDate: Date;
-	expiryDate?: Date;
-	description: string;
-	isRecalled: boolean;
-	
-	// Blockchain fields
-	isOnBlockchain: boolean;
-	blockchainHash: string; // Transaction Hash
-	saltValue: string; // The salt used for verification
+	description?: string;
+	images: string[]; // S3/MinIO URLs
+	createdBy: Types.ObjectId;
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -23,6 +16,11 @@ export interface IProduct extends Document {
 const productSchema = new Schema<IProduct>(
 	{
 		name: {
+			type: String,
+			required: true,
+			trim: true,
+		},
+		productId: {
 			type: String,
 			required: true,
 			trim: true,
@@ -37,52 +35,30 @@ const productSchema = new Schema<IProduct>(
 			required: true,
 			trim: true,
 		},
-		productId: {
-			type: String,
-			required: true,
-			unique: true,
-			trim: true,
-		},
 		price: {
 			type: Number,
-			required: true,
-		},
-		batchNumber: {
-			type: String,
-			required: true,
-			trim: true,
-		},
-		manufactureDate: {
-			type: Date,
-			required: true,
-		},
-		expiryDate: {
-			type: Date,
+			default: 0,
 		},
 		description: {
 			type: String,
 			trim: true,
 		},
-		isRecalled: {
-			type: Boolean,
-			default: false,
+		images: {
+			type: [String],
+			default: [],
 		},
-		isOnBlockchain: {
-			type: Boolean,
-			default: false,
-		},
-		blockchainHash: {
-			type: String,
-			trim: true,
-		},
-		saltValue: {
-			type: String,
-			trim: true,
+		createdBy: {
+			type: Schema.Types.ObjectId,
+			ref: 'User',
+			required: true,
 		},
 	},
 	{
 		timestamps: true,
 	},
 );
+
+// Same manufacturer can't have duplicate product IDs
+productSchema.index({ productId: 1, createdBy: 1 }, { unique: true });
 
 export default mongoose.model<IProduct>('Product', productSchema);

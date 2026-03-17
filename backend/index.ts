@@ -10,8 +10,9 @@ import companyRouter from './routers/company.router.js';
 import authRouter from './routers/auth.router.js';
 import alertRouter from './routers/alert.router.js';
 import productRouter from './routers/product.router.js';
-import uploadRouter from './routers/upload.router.js';
+import mediaRouter from './routers/media.router.js';
 import userRouter from './routers/user.router.js';
+import batchRouter from './routers/batch.router.js';
 import { startCronJobs } from './jobs/cron.js';
 
 // Initialize Express
@@ -70,7 +71,8 @@ app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/company', authLimiter, companyRouter);
 app.use('/api/alerts', alertRouter);
 app.use('/api/products', productRouter);
-app.use('/api/upload', uploadRouter);
+app.use('/api/batches', batchRouter);
+app.use('/api/media', mediaRouter);
 app.use('/api/users', userRouter);
 
 // 404 handler

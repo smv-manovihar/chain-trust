@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,266 +8,138 @@ import { Badge } from "@/components/ui/badge";
 import {
   Search,
   Plus,
-  Edit2,
-  Trash2,
-  Eye,
   Loader2,
-  AlertTriangle,
+  Package,
 } from "lucide-react";
-import Link from "next/link";
-import { useState, useEffect } from "react";
 import {
-  getAllProductsFromBlockchain,
-  recallProductOnChain,
-} from "@/lib/blockchain-utils";
-import { requestExecutionAccounts } from "@/api/web3-client";
+  listProducts,
+} from "@/api/product.api";
+import { toast } from "sonner";
+import Link from "next/link";
+import { resolveMediaUrl } from "@/lib/media-url";
+
+interface Product {
+  _id: string;
+  name: string;
+  productId: string;
+  category: string;
+  brand: string;
+  price: number;
+  description?: string;
+  images: string[];
+  createdAt: string;
+}
 
 export default function ProductsPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [recallingId, setRecallingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const loadProducts = async () => {
-    setLoading(true);
+  const fetchProducts = async () => {
     try {
-      const data = await getAllProductsFromBlockchain();
-      setProducts(data);
-    } catch (error) {
-      console.error("Error loading products:", error);
+      setLoading(true);
+      const res = await listProducts();
+      setProducts(res.products || []);
+    } catch (err: any) {
+      console.error("Failed to load products:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadProducts();
+    fetchProducts();
   }, []);
 
-  const handleRecall = async (saltValue: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to RECALL this batch? This action is IRREVERSIBLE built on the blockchain.",
-      )
-    )
-      return;
-
-    setRecallingId(saltValue);
-    try {
-      const accounts = await requestExecutionAccounts();
-      if (!accounts || accounts.length === 0)
-        throw new Error("No Web3 account found");
-
-      const deployer = accounts[0];
-      await recallProductOnChain(saltValue, deployer);
-
-      // Sync backend
-      await fetch(process.env.NEXT_PUBLIC_API_URL + "/api/products/recall", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ saltValue }),
-      });
-
-      // Refresh products from blockchain
-      await loadProducts();
-      alert("Product successfully recalled on the blockchain.");
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || "Failed to recall product");
-    } finally {
-      setRecallingId(null);
-    }
-  };
-
-  const filteredProducts = products.filter(
+  const filtered = products.filter(
     (p) =>
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchQuery.toLowerCase()),
+      p.productId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <>
+    <div className="flex-1 flex flex-col min-h-0 gap-4">
       {/* Header */}
-      <div className="border-b border-border bg-card sticky top-0 z-10 -mx-4 md:-mx-8 px-4 md:px-8 py-4 mb-6 shadow-sm">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Products</h1>
-              <p className="text-sm text-muted-foreground">
-                Manage your pharmaceutical products and batches
-              </p>
-            </div>
+      <div className="flex-none flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Products</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Your product catalogue. Add products here, then create batches from them.
+          </p>
+        </div>
+        <Button asChild className="gap-2">
+          <Link href="/manufacturer/products/new">
+            <Plus className="h-4 w-4" />
+            Add Product
+          </Link>
+        </Button>
+      </div>
+
+      {/* Search */}
+      <div className="flex-none relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search by name, SKU, or category..."
+          className="pl-9 h-10 text-sm"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      {/* Inline Form Removed - Relocated to /manufacturer/products/new and /[id] */}
+
+      {/* Products Grid */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center p-16 text-muted-foreground">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+            <p className="text-sm">Loading your catalogue...</p>
+          </div>
+        ) : filtered.length > 0 ? (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-4">
+            {filtered.map((p) => (
+              <Link key={p._id} href={`/manufacturer/products/${p._id}`}>
+                <Card className="border border-border hover:border-primary/40 transition-all hover:shadow-lg group flex flex-col overflow-hidden h-full">
+                  {/* Image area */}
+                  <div className="h-32 bg-muted/30 flex items-center justify-center border-b border-border transition-colors group-hover:bg-muted/50">
+                    {p.images && p.images.length > 0 ? (
+                      <img src={resolveMediaUrl(p.images[0])} alt={p.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                    ) : (
+                      <Package className="h-10 w-10 text-muted-foreground/40 transition-transform group-hover:scale-110" />
+                    )}
+                  </div>
+                  {/* Content */}
+                  <div className="p-4 flex-1 flex flex-col">
+                    <div className="flex-1">
+                      <p className="font-semibold text-foreground text-sm truncate group-hover:text-primary transition-colors">{p.name}</p>
+                      <p className="text-xs text-muted-foreground font-mono mt-0.5">{p.productId}</p>
+                      <div className="flex gap-2 mt-2">
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{p.category}</Badge>
+                        <span className="text-xs text-muted-foreground">{p.brand}</span>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center p-16 text-muted-foreground border border-dashed rounded-xl border-border bg-muted/10">
+            <Package className="h-10 w-10 mb-3 text-muted-foreground/50" />
+            <p className="text-lg font-medium text-foreground">No products yet</p>
+            <p className="mb-4 mt-1 text-center max-w-sm text-sm">
+              Add products to your catalogue first, then create batches from them.
+            </p>
             <Button asChild className="gap-2">
-              <Link href="/manufacturer/add-product">
+              <Link href="/manufacturer/products/new">
                 <Plus className="h-4 w-4" />
-                Add Product
+                Add Your First Product
               </Link>
             </Button>
           </div>
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by product name or SKU..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-        </div>
+        )}
       </div>
-
-      <div className="space-y-6">
-        {/* Summary */}
-        <div className="grid md:grid-cols-4 gap-4">
-          {[
-            { label: "Active Products", value: "4", color: "text-primary" },
-            { label: "Total Batches", value: "1,860", color: "text-accent" },
-            {
-              label: "Total Verifications",
-              value: "29,627",
-              color: "text-green-600",
-            },
-            { label: "This Month", value: "423", color: "text-blue-600" },
-          ].map((stat, i) => (
-            <Card key={i} className="p-4 border border-border">
-              <p className="text-xs font-medium text-muted-foreground mb-2">
-                {stat.label}
-              </p>
-              <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-            </Card>
-          ))}
-        </div>
-
-        {/* Products Table */}
-        <Card className="border border-border overflow-hidden">
-          {loading ? (
-            <div className="p-8 text-center">
-              <p className="text-muted-foreground">
-                Loading products from blockchain...
-              </p>
-            </div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-muted-foreground">
-                No products found matching your search.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="border-b border-border bg-muted/30">
-                  <tr>
-                    <th className="text-left py-3 px-6 font-semibold text-foreground">
-                      Product Name
-                    </th>
-                    <th className="text-left py-3 px-6 font-semibold text-foreground">
-                      SKU
-                    </th>
-                    <th className="text-left py-3 px-6 font-semibold text-foreground">
-                      Registered Batches
-                    </th>
-                    <th className="text-left py-3 px-6 font-semibold text-foreground">
-                      Verifications
-                    </th>
-                    <th className="text-left py-3 px-6 font-semibold text-foreground">
-                      Status
-                    </th>
-                    <th className="text-left py-3 px-6 font-semibold text-foreground">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProducts.map((product, idx) => (
-                    <tr
-                      key={product.id}
-                      className="border-b border-border hover:bg-muted/30 transition-colors"
-                    >
-                      <td className="py-4 px-6">
-                        <div className="space-y-1">
-                          <p className="font-semibold text-foreground">
-                            {product.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Registered {product.date}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <p className="font-mono text-sm text-muted-foreground">
-                          {product.sku}
-                        </p>
-                      </td>
-                      <td className="py-4 px-6">
-                        <p className="text-foreground font-medium">
-                          {product.registered}
-                        </p>
-                      </td>
-                      <td className="py-4 px-6">
-                        <p className="text-foreground font-medium">
-                          {product.verifications}
-                        </p>
-                      </td>
-                      <td className="py-4 px-6">
-                        <Badge
-                          className={
-                            product.status === "recalled"
-                              ? "bg-red-500 text-white"
-                              : "bg-accent text-accent-foreground"
-                          }
-                        >
-                          {product.status === "recalled"
-                            ? "Recalled"
-                            : "Active"}
-                        </Badge>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0 hover:text-red-500"
-                            title="Recall Product"
-                            disabled={
-                              product.status === "recalled" ||
-                              recallingId === product.sku
-                            }
-                            onClick={() => handleRecall(product.sku)}
-                          >
-                            {recallingId === product.sku ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-red-500" />
-                            ) : (
-                              <AlertTriangle
-                                className={`h-4 w-4 ${product.status === "recalled" ? "text-gray-400" : "text-red-500"}`}
-                              />
-                            )}
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      </div>
-    </>
+    </div>
   );
 }

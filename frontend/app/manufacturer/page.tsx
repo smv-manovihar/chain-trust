@@ -27,7 +27,7 @@ export default function ManufacturerDashboard() {
         <div className="flex gap-3">
           <Button variant="outline">Export Report</Button>
           <Button asChild>
-            <Link href="/manufacturer/add-product">
+            <Link href="/manufacturer/batches/new">
               <Plus className="mr-2 h-4 w-4" />
               Add Product
             </Link>
