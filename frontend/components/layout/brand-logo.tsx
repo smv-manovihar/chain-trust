@@ -5,12 +5,16 @@ interface BrandLogoProps {
   className?: string;
   size?: "sm" | "md" | "lg";
   withText?: boolean;
+  textClassName?: string;
+  onClick?: () => void;
 }
 
 export function BrandLogo({
   className,
   size = "md",
   withText = true,
+  textClassName,
+  onClick,
 }: BrandLogoProps) {
   const sizes = {
     sm: {
@@ -43,6 +47,7 @@ export function BrandLogo({
         currentSize.gap,
         className,
       )}
+      onClick={onClick}
     >
       <div
         className={cn(
@@ -57,6 +62,7 @@ export function BrandLogo({
           className={cn(
             "font-bold tracking-tight text-foreground group-hover:text-primary transition-colors",
             currentSize.title,
+            textClassName
           )}
         >
           ChainTrust

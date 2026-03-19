@@ -13,6 +13,7 @@ import productRouter from './routers/product.router.js';
 import mediaRouter from './routers/media.router.js';
 import userRouter from './routers/user.router.js';
 import batchRouter from './routers/batch.router.js';
+import categoryRouter from './routers/category.router.js';
 import { startCronJobs } from './jobs/cron.js';
 
 // Initialize Express
@@ -74,6 +75,7 @@ app.use('/api/products', productRouter);
 app.use('/api/batches', batchRouter);
 app.use('/api/media', mediaRouter);
 app.use('/api/users', userRouter);
+app.use('/api/categories', categoryRouter);
 
 // 404 handler
 app.use((_req, res) => {

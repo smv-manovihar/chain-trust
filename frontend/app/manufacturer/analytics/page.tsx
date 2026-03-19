@@ -8,6 +8,7 @@ import {
   PieChart,
   Activity,
   AlertTriangle,
+  Download,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -37,20 +38,24 @@ export default function AnalyticsPage() {
     <>
       {/* Header */}
       <div className="border-b border-border bg-card sticky top-0 z-10 -mx-4 md:-mx-8 px-4 md:px-8 py-4 mb-6 shadow-sm">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">Analytics</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">
               Monitor production metrics and supply chain performance
             </p>
           </div>
-          <Button variant="outline">Export Report</Button>
+          <Button variant="outline" className="w-full sm:w-auto gap-2">
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export Analytics</span>
+            <span className="sm:hidden">Export Report</span>
+          </Button>
         </div>
       </div>
 
       <div className="space-y-6">
         {/* Key Metrics */}
-        <div className="grid md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             {
               label: "Total Products Registered",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -8,11 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, X, Check, ImageIcon, ArrowLeft } from "lucide-react";
+import { Loader2, X, Check, ImageIcon, ArrowLeft, ChevronsUpDown } from "lucide-react";
 import { createProduct } from "@/api/product.api";
 import { uploadImages } from "@/api/upload.api";
 import { toast } from "sonner";
 import Link from "next/link";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { fetchCategories, Category } from "@/api/category.api";
 
 export default function NewProductPage() {
   const router = useRouter();
@@ -25,6 +28,16 @@ export default function NewProductPage() {
   const [formImages, setFormImages] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  
+  // Categories State
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [openCategory, setOpenCategory] = useState(false);
+
+  useEffect(() => {
+    fetchCategories()
+      .then((data) => setCategories(data.categories))
+      .catch((err) => console.error("Could not fetch categories:", err));
+  }, []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -123,17 +136,61 @@ export default function NewProductPage() {
                 className="h-10 transition-all focus:ring-2 focus:ring-primary/20"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="f-cat" className="text-sm font-medium">
+            <div className="space-y-2 flex flex-col">
+              <Label className="text-sm font-medium mb-2">
                 Category <span className="text-destructive">*</span>
               </Label>
-              <Input
-                id="f-cat"
-                placeholder="e.g. Antibiotics, Vaccines..."
-                value={formCategory}
-                onChange={(e) => setFormCategory(e.target.value)}
-                className="h-10 transition-all focus:ring-2 focus:ring-primary/20"
-              />
+              <Popover open={openCategory} onOpenChange={setOpenCategory}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openCategory}
+                    className="w-full justify-between h-10 font-normal"
+                  >
+                    {formCategory
+                      ? formCategory
+                      : "Select category..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search categories..." />
+                    <CommandList>
+                      <CommandEmpty>
+                        No category found.{" "}
+                        <span className="text-muted-foreground italic">
+                          Manage categories from the main Products page.
+                        </span>
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {categories.map((cat) => (
+                          <CommandItem
+                            key={cat._id}
+                            value={cat.name}
+                            onSelect={(currentValue) => {
+                              // Shadcn command converts to lowercase values usually, 
+                              // find Original Case from object.
+                              const originalCat = categories.find(c => c.name.toLowerCase() === currentValue.toLowerCase());
+                              setFormCategory(originalCat?.name || currentValue);
+                              setOpenCategory(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                formCategory === cat.name ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {cat.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <Label htmlFor="f-brand" className="text-sm font-medium">
@@ -165,12 +222,13 @@ export default function NewProductPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="f-desc" className="text-sm font-medium">
+            <Label htmlFor="f-desc" className="text-sm font-medium flex items-center justify-between">
               Product Description
+              <span className="text-xs text-muted-foreground font-normal bg-muted/50 px-2 py-0.5 rounded">Visible to consumers</span>
             </Label>
             <Textarea
               id="f-desc"
-              placeholder="Describe product details, instructions, or ingredients..."
+              placeholder="Describe product details, instructions, or ingredients. Make this user-friendly as it is shown to consumers scanning the product."
               value={formDescription}
               onChange={(e) => setFormDescription(e.target.value)}
               className="min-h-[120px] transition-all focus:ring-2 focus:ring-primary/20"

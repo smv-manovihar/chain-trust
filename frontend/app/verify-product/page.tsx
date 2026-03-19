@@ -26,13 +26,26 @@ import { AIChatEmbed } from "@/components/chat/AIChatEmbed";
 import api from "@/api/client";
 import { verifyScan } from "@/api/batch.api";
 import { verifyOnBlockchain } from "@/lib/blockchain-utils";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/auth-context";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import Link from "next/link";
 
 interface ScanResult {
   isValid: boolean;
   product?: {
     productId: string;
     productName: string;
-    category: string;
+    description?: string;
     brand: string;
     batchNumber: string;
     manufactureDate: string;
@@ -55,6 +68,29 @@ function VerifyContent() {
   const [error, setError] = useState("");
   const [product, setProduct] = useState<ScanResult['product'] | null>(null);
   const [scanStats, setScanStats] = useState({ count: 0, blockchainHash: "" });
+   const { user, isAuthenticated } = useAuth();
+   const [showLoginDialog, setShowLoginDialog] = useState(false);
+   const [pendingAction, setPendingAction] = useState<string | null>(null);
+   const [viewerId, setViewerId] = useState<string>("");
+
+   useEffect(() => {
+     // Generate or retrieve a persistent unique ID for this browser
+     let vid = localStorage.getItem("ct_viewer_id");
+     if (!vid) {
+       vid = `v_${Math.random().toString(36).substring(2, 15)}_${Date.now().toString(36)}`;
+       localStorage.setItem("ct_viewer_id", vid);
+     }
+     setViewerId(vid);
+   }, []);
+
+  const handleRestrictedAction = (actionName: string, action: () => void) => {
+    if (!isAuthenticated) {
+      setPendingAction(actionName);
+      setShowLoginDialog(true);
+      return;
+    }
+    action();
+  };
 
   const handleScan = async (overrideSalt?: string) => {
     const saltToVerify = overrideSalt || qrInput;
@@ -81,7 +117,6 @@ function VerifyContent() {
       let finalProduct: ScanResult['product'] = {
         productId: blockchainResult.record.blockchainId,
         productName: blockchainResult.record.productName,
-        category: "Medicine", // fallback
         brand: blockchainResult.record.manufacturerName,
         batchNumber: blockchainResult.record.batchId,
         manufactureDate: new Date(blockchainResult.record.timestamp).toISOString(),
@@ -96,7 +131,7 @@ function VerifyContent() {
       // 2. As a supplementary step, ping backend for rich metadata and to track the scan.
       // Since "Metadata is handled by the mongodb", we merge it into the product but don't fail if it's absent.
       try {
-        const result: ScanResult = await verifyScan(saltToVerify);
+        const result: ScanResult = await verifyScan(saltToVerify, viewerId);
 
         if (result.isValid && result.product) {
           // Merge MongoDB richer metadata with our base Product
@@ -290,7 +325,7 @@ function VerifyContent() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={async () => {
+                        onClick={() => handleRestrictedAction("save this medicine", async () => {
                           try {
                             await api.post("/users/cabinet/add", {
                                name: product?.productName,
@@ -300,11 +335,11 @@ function VerifyContent() {
                                expiryDate: product?.expiryDate,
                                images: product?.images
                             });
-                            alert("Product saved to your Personal Cabinet!");
+                            toast.success("Product saved to My Medicines!");
                           } catch (err: any) {
-                            // Fallback to local storage if not logged in or error
+                            // Fallback to local storage
                             const saved = JSON.parse(
-                              localStorage.getItem("cabinet") || "[]",
+                              localStorage.getItem("my_medicines") || "[]",
                             );
                             if (
                               !saved.find(
@@ -313,20 +348,18 @@ function VerifyContent() {
                             ) {
                               saved.push(product);
                               localStorage.setItem(
-                                "cabinet",
+                                "my_medicines",
                                 JSON.stringify(saved),
                               );
-                              alert(
-                                "Product saved to your Personal Cabinet (Local)!",
-                              );
+                              toast.success("Product saved to My Medicines (Local)!");
                             } else {
-                              alert("Product already in your Cabinet.");
+                              toast.info("Product already in My Medicines.");
                             }
                           }
-                        }}
+                        })}
                       >
                         <BookmarkPlus className="h-4 w-4 mr-2" />
-                        Save to Cabinet
+                        Save to My Medicines
                       </Button>
                     </div>
                   </div>
@@ -351,6 +384,17 @@ function VerifyContent() {
                 </div>
 
                 <div className="space-y-4">
+                  {product?.description && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Product Description
+                      </p>
+                      <div className="text-sm text-foreground whitespace-pre-wrap bg-muted/30 p-3 rounded-lg border">
+                        {product.description}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-muted-foreground">
                       Batch Details
@@ -447,6 +491,23 @@ function VerifyContent() {
           </div>
         )}
       </main>
+
+      <AlertDialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sign in Required</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please log in or create an account to {pendingAction || "use this feature"} and track your medicines across devices.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Maybe Later</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Link href="/login">Sign In</Link>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

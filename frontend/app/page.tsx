@@ -77,9 +77,9 @@ export default function Home() {
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.8, ease: "easeOut" }}
         >
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-foreground max-w-4xl text-balance mb-8">
+          <h1 className="text-4xl md:text-7xl font-bold tracking-tight text-foreground max-w-4xl mx-auto text-balance mb-6">
             <TextAnimate animation="blurInUp" by="word" as="span" once>
-              Secure the future of
+              Uncompromising Integrity
             </TextAnimate>
             <br />
             <TextAnimate
@@ -90,23 +90,22 @@ export default function Home() {
               delay={0.3}
               once
             >
-              Pharmaceutical Supply
+              Powered by ChainTrust
             </TextAnimate>
           </h1>
 
           <TextAnimate
-            className="text-xl text-muted-foreground max-w-2xl text-balance mb-12 leading-relaxed"
+            className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto text-balance mb-8 md:mb-12 leading-relaxed"
             animation="blurInUp"
             by="word"
             delay={0.6}
             once={true}
           >
-            ChainTrust provides immutable blockchain tracking from manufacture
-            to patient. Stop counterfeits, ensure compliance, and build trust in
-            every dose.
+            The immutable global standard for pharmaceutical authenticity and
+            patient safety.
           </TextAnimate>
 
-          <div className="flex flex-col sm:flex-row gap-4 mb-20">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12 md:mb-20">
             {isLoading ? (
               <div className="h-14 w-48 bg-muted animate-pulse rounded-full" />
             ) : isAuthenticated ? (

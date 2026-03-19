@@ -41,8 +41,8 @@ export default function CabinetPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">My Cabinet</h1>
-        <p className="text-muted-foreground mt-2">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">My Medicines</h1>
+        <p className="text-muted-foreground mt-2 text-sm sm:text-base">
           Track your active medications, manage your health status, and receive usage alerts.
         </p>
       </div>

@@ -10,6 +10,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Plus,
+  Download,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -17,16 +18,21 @@ export default function ManufacturerDashboard() {
   return (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+            Dashboard
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Overview of your production and supply chain
           </p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline">Export Report</Button>
-          <Button asChild>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Button variant="outline" className="flex-1 sm:flex-none gap-2">
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export Report</span>
+          </Button>
+          <Button asChild className="flex-1 sm:flex-none">
             <Link href="/manufacturer/batches/new">
               <Plus className="mr-2 h-4 w-4" />
               Add Product

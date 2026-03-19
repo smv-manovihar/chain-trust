@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import crypto from 'crypto';
 import Batch from '../models/batch.model.js';
 import Product from '../models/product.model.js';
+import Scan from '../models/scan.model.js';
 
 /**
  * Derive a unit-level salt from a batch salt and unit index.
@@ -214,12 +215,34 @@ export const verifyScan = async (req: Request, res: Response) => {
 		}
 
 		const { batch, unitIndex } = result;
+		const ip = req.ip || req.socket.remoteAddress || 'unknown';
+		const viewerFingerprint = req.headers['x-viewer-id'] || '';
+		const viewerId = `${ip}-${viewerFingerprint}`;
 
-		// Increment scan count
-		const currentCount = batch.scanCounts?.get(String(unitIndex)) || 0;
-		const newCount = currentCount + 1;
-		batch.scanCounts.set(String(unitIndex), newCount);
-		await batch.save();
+		// Attempt to record a unique scan
+		let newCount = batch.scanCounts?.get(String(unitIndex)) || 0;
+		try {
+			const existingScan = await Scan.findOne({
+				batch: batch._id,
+				unitIndex,
+				viewerId,
+			});
+
+			if (!existingScan) {
+				// Record new unique scan
+				await Scan.create({
+					batch: batch._id,
+					unitIndex,
+					viewerId,
+				});
+				// Increment cached count only for first-time unique scan
+				newCount += 1;
+				batch.scanCounts.set(String(unitIndex), newCount);
+				await batch.save();
+			}
+		} catch (scanError) {
+			console.error('Unique scan tracking error:', scanError);
+		}
 
 		res.json({
 			isValid: !batch.isRecalled,

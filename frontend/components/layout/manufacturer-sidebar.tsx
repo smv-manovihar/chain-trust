@@ -62,81 +62,7 @@ export const navGroups = [
   },
 ];
 
-export function SidebarContent({ isCollapsed, onNavigate }: { isCollapsed?: boolean, onNavigate?: () => void }) {
-  const pathname = usePathname();
-  const { logout } = useAuth();
-
-  return (
-    <div className="flex h-full flex-col gap-4 bg-card/50 backdrop-blur-xl border-r shadow-sm">
-      <div
-        className={cn(
-          "flex h-16 shrink-0 items-center border-b px-6",
-          isCollapsed ? "justify-center px-2" : "gap-3",
-        )}
-      >
-        <BrandLogo size="sm" withText={!isCollapsed} />
-      </div>
-
-      <div className="flex-1 overflow-y-auto py-4 scrollbar-thin scrollbar-thumb-muted-foreground/20">
-        {navGroups.map((group, index) => (
-          <div key={index} className="mb-6 px-3">
-            {!isCollapsed && (
-              <h4 className="mb-3 px-4 text-[11px] font-semibold uppercase text-muted-foreground/70 tracking-wider">
-                {group.label}
-              </h4>
-            )}
-            <div className="space-y-1">
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href;
-                return (
-                  <Button
-                    key={item.href}
-                    variant={isActive ? "secondary" : "ghost"}
-                    className={cn(
-                      "w-full justify-start transition-all duration-200",
-                      isActive
-                        ? "bg-primary/10 text-primary hover:bg-primary/20 font-medium"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                      isCollapsed ? "justify-center px-2" : "px-4",
-                    )}
-                    onClick={onNavigate}
-                    asChild
-                  >
-                    <Link href={item.href}>
-                      <Icon className={cn("h-5 w-5", !isCollapsed && "mr-3", isActive ? "text-primary" : "text-muted-foreground")} />
-                      {!isCollapsed && <span>{item.label}</span>}
-                    </Link>
-                  </Button>
-                );
-              })}
-            </div>
-            {!isCollapsed && index < navGroups.length - 1 && (
-              <div className="mx-4 mt-6 border-t border-border/50" />
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="p-4 bg-muted/20">
-        <Button
-          variant="ghost"
-          className={cn(
-            "w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors",
-            isCollapsed && "justify-center px-2",
-          )}
-          onClick={() => {
-            if (onNavigate) onNavigate();
-            logout();
-          }}
-        >
-          <LogOut className={cn("h-[18px] w-[18px]", !isCollapsed && "mr-3")} />
-          {!isCollapsed && <span className="font-medium">Sign Out</span>}
-        </Button>
-      </div>
-    </div>
-  );
-}
+import { SidebarContent } from "./sidebar-content";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
 
@@ -148,10 +74,26 @@ export function ManufacturerSidebar({ className }: SidebarProps) {
       className={cn(
         "hidden transition-all duration-300 md:block relative flex-shrink-0 h-full z-20 bg-background",
         isCollapsed ? "w-20" : "w-72",
-        className,
+        className
       )}
     >
-      <SidebarContent isCollapsed={isCollapsed} />
+      <div className="flex h-full flex-col bg-card/50 backdrop-blur-xl border-r shadow-sm">
+        <div
+          className={cn(
+            "flex h-16 shrink-0 items-center border-b px-6",
+            isCollapsed ? "justify-center px-2" : "gap-3"
+          )}
+        >
+          <BrandLogo size="sm" withText={!isCollapsed} />
+        </div>
+
+        <SidebarContent
+          navGroups={navGroups}
+          isCollapsed={isCollapsed}
+          className="flex-1"
+        />
+      </div>
+
       <Button
         variant="outline"
         size="icon"
@@ -168,38 +110,70 @@ export function ManufacturerSidebar({ className }: SidebarProps) {
   );
 }
 
+import { Sling as Hamburger } from "hamburger-react";
+import { useScrollDirection } from "@/hooks/use-scroll-direction";
 
-export function MobileSidebar() {
-  const [open, setOpen] = useState(false);
+export function MobileSidebar({ 
+  mainRef,
+  open: externalOpen,
+  onOpenChange 
+}: { 
+  mainRef?: React.RefObject<HTMLElement | null>;
+  open?: boolean;
+  onOpenChange?: React.Dispatch<React.SetStateAction<boolean>>;
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const open = externalOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
+
+
+  const isVisible = useScrollDirection(mainRef);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!mounted) {
-    return (
-      <Button variant="outline" size="icon" className="md:hidden shrink-0">
-        <Menu className="h-5 w-5" />
-        <span className="sr-only">Toggle Sidebar</span>
-      </Button>
-    );
-  }
+  if (!mounted) return null;
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button variant="outline" size="icon" className="md:hidden shrink-0">
-          <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle Sidebar</span>
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="left" className="w-[85vw] max-w-[300px] p-0 border-r-0">
-        <SheetHeader className="sr-only">
-          <SheetTitle>Navigation Menu</SheetTitle>
-        </SheetHeader>
-        <SidebarContent onNavigate={() => setOpen(false)} />
-      </SheetContent>
-    </Sheet>
+    <>
+      <div
+        className={cn(
+          "md:hidden z-[110] transition-all duration-300 ease-in-out",
+          "fixed left-0 top-0 flex items-center h-14 pl-3",
+          !isVisible && !open && "-translate-y-full",
+        )}
+      >
+        <Hamburger toggled={open} toggle={setOpen} size={20} />
+      </div>
+
+      {/* Custom Backdrop */}
+      <div
+        onClick={() => setOpen(false)}
+        className={cn(
+          "fixed inset-0 z-[90] bg-background/40 backdrop-blur-sm md:hidden transition-all duration-300",
+          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+      />
+
+      {/* Custom Sidebar Panel */}
+      <div
+        className={cn(
+          "fixed inset-y-0 left-0 z-[100] w-[85vw] max-w-[300px] md:hidden transition-transform duration-300 ease-in-out",
+          "bg-background/80 backdrop-blur-2xl border-r border-border/50 shadow-2xl rounded-r-[2.5rem] flex flex-col overflow-hidden",
+          open ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="flex h-16 shrink-0 items-center border-b px-6 pl-14 gap-3">
+          <BrandLogo size="sm" />
+        </div>
+        <SidebarContent
+          navGroups={navGroups}
+          onNavigate={() => setOpen(false)}
+          className="flex-1"
+        />
+      </div>
+    </>
   );
 }

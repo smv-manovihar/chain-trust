@@ -21,7 +21,7 @@ export default function CabinetPage() {
         }
       } catch (err) {
         // Fallback
-        const data = localStorage.getItem("cabinet");
+        const data = localStorage.getItem("my_medicines");
         if (data) {
           setSavedProducts(JSON.parse(data));
         }
@@ -40,7 +40,7 @@ export default function CabinetPage() {
         (p) => p.productId !== productId,
       );
       setSavedProducts(newProducts);
-      localStorage.setItem("cabinet", JSON.stringify(newProducts));
+      localStorage.setItem("my_medicines", JSON.stringify(newProducts));
     }
   };
 
@@ -50,10 +50,10 @@ export default function CabinetPage() {
       <main className="max-w-4xl mx-auto px-4 md:px-6 py-8 space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">
-              Personal Cabinet
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+              My Medicines
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Your verified and saved medications
             </p>
           </div>
@@ -67,7 +67,7 @@ export default function CabinetPage() {
             <div className="flex justify-center">
               <Package className="h-12 w-12 text-muted-foreground opacity-50" />
             </div>
-            <p className="text-muted-foreground">Your cabinet is empty.</p>
+            <p className="text-muted-foreground text-sm">You haven't saved any medicines yet.</p>
           </Card>
         ) : (
           <div className="grid md:grid-cols-2 gap-4">

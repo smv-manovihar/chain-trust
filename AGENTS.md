@@ -14,13 +14,22 @@
 4. **Immediate Feedback:**
    - Display loading states (`Loader2`, skeletons) prominently.
    - Provide clear, bold status indicators (e.g., Green checkmarks for Authentic, Red alerts for Counterfeit/Recalled).
+5. **Mobile-First Responsive Design:**
+   - **Page Headers:** Use `flex-col sm:flex-row` for headers. Titles should be `text-2xl` on mobile and `text-3xl` on desktops.
+   - **Button Collapse:** Universally understood actions (Delete, Refresh, Print, Export) should collapse to icons or compact versions on `sm` screens. Use `hidden sm:inline` for button text.
+   - **Sticky Headers:** Application layouts should use the `useScrollDirection` hook to auto-hide the header on scroll-down and show it on scroll-up for mobile users.
+   - **Grid Adaptability:** Use `grid-cols-1` or `grid-cols-2` on mobile, scaling to `md:grid-cols-3` or `lg:grid-cols-4` for dashboards.
+6. **"My Medicines" Rename:**
+   - Always refer to the user's saved medications as "My Medicines" instead of "Cabinet".
+   - Local storage keys should use `my_medicines`.
 
 ## Frontend Context
 - **Framework:** Next.js (React) with Tailwind CSS.
 - **Key Pages:**
-  - `/verify-product`: Consumer-facing verification. Fetches directly from the blockchain for decentralized validation, then enriches with MongoDB metadata. Designed to fit in `h-screen`.
+  - `/customer/cabinet`: User's "My Medicines" dashboard. Track active medications and alerts. Designed for mobile-first tracking.
+  - `/verify-product`: Consumer-facing verification. Fetches directly from the blockchain for decentralized validation, then enriches with MongoDB metadata. Designed to fit in `h-screen`. Logged-out users get a restricted view with a login prompt for saving to "My Medicines".
   - `/manufacturer/add-product`: Multi-step wizard for enrolling batches. Derives cryptographic salts client-side before sending to backend.
-  - `/manufacturer/batches`: Dashboard showing enrolled batches and their scan counts.
+  - `/manufacturer/batches`: Dashboard showing enrolled batches and their scan counts. Supports mobile-first refreshing and row actions.
   - `/manufacturer/batches/[id]`: QR generation page with `print`-media CSS to directly output grid sheets without the UI chrome.
 - **Blockchain Integration:** Handled via APIs in `frontend/api/web3-client.ts` and `frontend/lib/blockchain-utils.ts`. 
   - **Core Rule:** The UI should ALWAYS prefer blockchain data as the root source of truth for product verification, using the DB only for rich metadata (high-res images, dynamic scan counts). Verification must function even if the MongoDB node is unresponsive.

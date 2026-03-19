@@ -159,34 +159,37 @@ export default function ProductDetailsPage() {
   return (
     <div className="flex-1 flex flex-col min-h-0 max-w-6xl mx-auto w-full h-full">
       {/* Header */}
-      <div className="flex-none flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild className="rounded-full">
+      <div className="flex-none flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <Button variant="ghost" size="icon" asChild className="rounded-full shrink-0">
             <Link href="/manufacturer/products">
               <ArrowLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">{product.name}</h1>
-              <Badge variant="outline" className="font-mono text-sm uppercase px-3 py-0.5 bg-primary/5 border-primary/20 text-primary">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-foreground truncate">{product.name}</h1>
+              <Badge variant="outline" className="font-mono text-[10px] sm:text-xs uppercase px-2 py-0.5 bg-primary/5 border-primary/20 text-primary shrink-0">
                 {product.productId}
               </Badge>
             </div>
-            <p className="text-muted-foreground mt-1 text-sm flex items-center gap-2">
-              <Layers className="h-3.5 w-3.5" />
+            <p className="text-muted-foreground mt-0.5 text-xs sm:text-sm flex items-center gap-2">
+              <Layers className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
               {product.brand} · {product.category}
             </p>
           </div>
         </div>
-        <Button 
-          variant="destructive" 
-          className="gap-2 border border-destructive/20"
-          onClick={handleDelete}
-        >
-          <Trash2 className="h-4 w-4" />
-          Delete Product
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto pl-12 sm:pl-0">
+          <Button 
+            variant="destructive" 
+            className="flex-1 sm:flex-none gap-2 border border-destructive/20 h-9 sm:h-10"
+            onClick={handleDelete}
+          >
+            <Trash2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Delete Product</span>
+            <span className="sm:hidden text-xs">Delete</span>
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto pb-6 pr-2 scrollbar-thin scrollbar-thumb-muted-foreground/10">

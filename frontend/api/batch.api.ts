@@ -33,8 +33,10 @@ export const getBatchQRData = async (id: string, page = 1, limit = 50) => {
 	return response.data;
 };
 
-export const verifyScan = async (salt: string) => {
-	const response = await client.post('/batches/verify-scan', { salt });
+export const verifyScan = async (salt: string, viewerId?: string) => {
+	const response = await client.post('/batches/verify-scan', { salt }, {
+		headers: viewerId ? { 'x-viewer-id': viewerId } : {}
+	});
 	return response.data;
 };
 

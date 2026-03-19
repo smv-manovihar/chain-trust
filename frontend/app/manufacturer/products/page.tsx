@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import Link from "next/link";
 import { resolveMediaUrl } from "@/lib/media-url";
+import { CategoryManagementDialog } from "@/components/manufacturer/category-dialog";
 
 interface Product {
   _id: string;
@@ -63,17 +64,22 @@ export default function ProductsPage() {
       {/* Header */}
       <div className="flex-none flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Products</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Products</h1>
+          <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
             Your product catalogue. Add products here, then create batches from them.
           </p>
         </div>
-        <Button asChild className="gap-2">
-          <Link href="/manufacturer/products/new">
-            <Plus className="h-4 w-4" />
-            Add Product
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex-1 sm:flex-none">
+            <CategoryManagementDialog onCategoriesChange={fetchProducts} />
+          </div>
+          <Button asChild className="flex-1 sm:flex-none gap-2 shadow-sm">
+            <Link href="/manufacturer/products/new">
+              <Plus className="h-4 w-4" />
+              Add Product
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Search */}

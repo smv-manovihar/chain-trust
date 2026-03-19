@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Copy, Eye, QrCode, Search, Filter, Loader2, AlertCircle, RefreshCw, Package } from "lucide-react";
+import { Copy, Eye, QrCode, Search, Filter, Loader2, AlertCircle, RefreshCw, Package, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -35,9 +35,11 @@ export default function BatchesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchBatches = async () => {
     try {
+      setIsRefreshing(true);
       setLoading(true);
       setError("");
       const res = await listBatches();
@@ -47,6 +49,7 @@ export default function BatchesPage() {
       setError("Failed to load batches from server. Please try again.");
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -83,12 +86,36 @@ export default function BatchesPage() {
     <div className="h-[calc(100vh-4rem)] flex flex-col gap-6 py-4">
       <div className="flex-none flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Manufactured Batches</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Manage and monitor production runs.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Manufactured Batches</h1>
+          <p className="text-muted-foreground mt-1 text-xs sm:text-sm">Manage and monitor production runs.</p>
         </div>
-        <Button asChild size="sm" className="rounded-lg shadow-sm hover:shadow-md transition-shadow">
-          <Link href="/manufacturer/batches/new">Enroll New Batch</Link>
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            size="icon"
+            className="sm:hidden"
+            onClick={fetchBatches}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+          </Button>
+          <Button
+            variant="outline"
+            className="hidden sm:flex gap-2"
+            onClick={fetchBatches}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+            Refresh
+          </Button>
+          <Button asChild className="flex-1 sm:flex-none rounded-lg shadow-sm hover:shadow-md transition-shadow">
+            <Link href="/manufacturer/batches/new">
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Enroll New Batch</span>
+              <span className="sm:hidden">New Batch</span>
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex-none flex flex-col sm:flex-row gap-4">

@@ -45,12 +45,12 @@ export default function CustomerHomePage() {
     <div className="min-h-screen bg-transparent">
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-8">
         {/* Welcome Section */}
-        <div className="mb-8 space-y-4">
+        <div className="mb-6 sm:mb-8 space-y-2">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
               Verify Your Medicines
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground">
               Scan any product to confirm authenticity and track its journey
             </p>
           </div>
@@ -60,10 +60,10 @@ export default function CustomerHomePage() {
         <Card className="p-8 md:p-12 border border-primary/50 bg-gradient-to-br from-primary/10 to-transparent mb-8">
           <div className="space-y-6">
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-foreground">
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground">
                 Quick Product Verification
               </h2>
-              <p className="text-muted-foreground">
+              <p className="text-sm sm:text-base text-muted-foreground">
                 Use your device camera or upload a QR code image to instantly
                 verify pharmaceutical authenticity
               </p>
@@ -82,7 +82,7 @@ export default function CustomerHomePage() {
           </div>
         </Card>
 
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
           {/* Stats */}
           {[
             { label: "Products Verified", value: "1,247", icon: CheckCircle2 },
@@ -91,16 +91,16 @@ export default function CustomerHomePage() {
           ].map((stat, i) => {
             const Icon = stat.icon;
             return (
-              <Card key={i} className="p-6 border border-border">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Icon className="h-6 w-6 text-primary" />
+              <Card key={i} className="p-4 sm:p-6 border border-border">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       {stat.label}
                     </p>
-                    <p className="text-2xl font-bold text-foreground">
+                    <p className="text-xl sm:text-2xl font-bold text-foreground">
                       {stat.value}
                     </p>
                   </div>
@@ -155,7 +155,7 @@ export default function CustomerHomePage() {
                 Why ChainTrust?
               </h2>
             </div>
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               {[
                 {
                   title: "Blockchain Verified",
