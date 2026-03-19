@@ -56,48 +56,30 @@ export const generateSalt = async (productId: string, brandName: string): Promis
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-export interface ProductData {
-    name: string;
-    category: string;
+export interface BatchData {
+    productId: string;       // SKU/NDC
+    productName: string;
     brand: string;
-    productId: string;
-    manufactureDate: number; // Unix timestamp
     batchNumber: string;
-    price: number;
-    expiryDate?: number; // Optional Unix timestamp
-    saltValue: string;
-    imageUrls: string[];
+    batchSalt: string;
+    manufactureDate: number; // Unix timestamp
+    expiryDate: number;      // Unix timestamp (0 if none)
+    quantity: number;
 }
 
-// Add Product via Smart Contract
-export const addProductOnChain = async (productData: ProductData, deployerAccount: string) => {
+// Register Batch via Smart Contract
+export const registerBatchOnChain = async (batchData: BatchData, deployerAccount: string) => {
     const contract = getContract();
     if (!contract) throw new Error("Could not initialize Web3 connection.");
 
-    if (productData.expiryDate) {
-        return await contract.methods.addProductWithExpiry(
-            productData.name,
-            productData.category,
-            productData.brand,
-            productData.productId,
-            productData.manufactureDate,
-            productData.batchNumber,
-            productData.price,
-            productData.expiryDate,
-            productData.saltValue,
-            productData.imageUrls
-        ).send({ from: deployerAccount, gas: '5000000' });
-    } else {
-        return await contract.methods.addProductWithoutExpiry(
-            productData.name,
-            productData.category,
-            productData.brand,
-            productData.productId,
-            productData.manufactureDate,
-            productData.batchNumber,
-            productData.price,
-            productData.saltValue,
-            productData.imageUrls
-        ).send({ from: deployerAccount, gas: '5000000' });
-    }
+    return await contract.methods.registerBatch(
+        batchData.productId,
+        batchData.productName,
+        batchData.brand,
+        batchData.batchNumber,
+        batchData.batchSalt,
+        batchData.manufactureDate,
+        batchData.expiryDate,
+        batchData.quantity
+    ).send({ from: deployerAccount, gas: '5000000' });
 };

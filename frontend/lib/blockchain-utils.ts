@@ -29,7 +29,7 @@ export interface VerificationResult {
  * Real blockchain verification
  * Interacts with the actual blockchain node via Web3
  */
-export async function verifyOnBlockchain(saltValue: string): Promise<VerificationResult> {
+export async function verifyOnBlockchain(batchSalt: string): Promise<VerificationResult> {
   try {
     const contract = getContract();
     if (!contract) {
@@ -37,34 +37,31 @@ export async function verifyOnBlockchain(saltValue: string): Promise<Verificatio
     }
 
     try {
-      // Call the new smart contract method using the salt
-      const result: any = await contract.methods.getFullProductBySalt(saltValue).call();
-      const product = result.product;
-      const images = result.images;
+      // Query the new smart contract method using the batchSalt
+      const batch: any = await contract.methods.getBatch(batchSalt).call();
 
-      // If it doesn't exist, it reverts and falls to catch block.
-      // But let's check product.exists anyway
-      if (!product.exists) {
-        throw new Error("Product data is marked as invalid/deleted.");
+      // Check if it exists (getBatch reverts if not, but safety first)
+      if (!batch.exists) {
+        throw new Error("Batch data is marked as invalid/deleted.");
       }
 
-      const trustScore = product.isRecalled ? 0 : 100;
-      const warnings = product.isRecalled ? ["PRODUCT HAS BEEN RECALLED BY MANUFACTURER"] : [];
+      const trustScore = batch.isRecalled ? 0 : 100;
+      const warnings = batch.isRecalled ? ["THIS BATCH HAS BEEN RECALLED BY THE MANUFACTURER"] : [];
 
       const record: BlockchainRecord = {
-        blockchainId: product.productId,
-        batchId: product.batchNumber,
-        productName: product.name,
-        manufacturerName: product.brand,
-        timestamp: Number(product.manufactureDate) * 1000,
+        blockchainId: batch.productId, // This is the SKU
+        batchId: batch.batchNumber,
+        productName: batch.productName,
+        manufacturerName: batch.brand,
+        timestamp: Number(batch.manufactureDate) * 1000,
         status: 'verified',
-        transactionHash: 'N/A', // Direct check
+        transactionHash: 'Verified On-Chain', 
         blockNumber: 0,
-        images: images || [],
+        images: [], // Images are now DB-only to save gas, can be enriched by verifyScan
       }
 
       return {
-        isValid: !product.isRecalled, // invalid if recalled
+        isValid: !batch.isRecalled,
         record,
         verificationDate: Date.now(),
         trustScore,
@@ -72,13 +69,13 @@ export async function verifyOnBlockchain(saltValue: string): Promise<Verificatio
       };
 
     } catch (e: any) {
-        // If the contract call reverts (e.g. ProductNotFound)
+        // If the contract call reverts (e.g. BatchNotFound)
         return {
           isValid: false,
           record: null,
           verificationDate: Date.now(),
           trustScore: 0,
-          warnings: ['Product not found on the blockchain or is a counterfeit.'],
+          warnings: ['Batch not found on the blockchain or is a counterfeit.'],
         }
     }
   } catch (error) {
@@ -97,57 +94,50 @@ export async function verifyOnBlockchain(saltValue: string): Promise<Verificatio
  * Verify batch on blockchain
  */
 export async function verifyBatchOnBlockchain(batchId: string): Promise<VerificationResult> {
-  const isValid = /^BATCH-\d{4}-\d{4}-[A-Z]$/.test(batchId);
-
-  if (!isValid) {
-    return {
+  // Mock logic or specific mapping if batchId is used directly on-chain
+  // In the current architecture, verifications use batchSalt.
+  return {
       isValid: false,
       record: null,
       verificationDate: Date.now(),
       trustScore: 0,
-      warnings: ['Invalid batch ID format'],
-    }
-  }
-
-  // Generate blockchain ID from batch ID
-  const blockchainId = `PHARM-${batchId.substring(6, 10)}${batchId.substring(11, 15)}-${batchId.charCodeAt(16).toString(16).padStart(8, '0')}`;
-
-  return await verifyOnBlockchain(blockchainId);
+      warnings: ['Direct batch ID lookup is secondary to salt-based verification.'],
+  };
 }
 
 /**
- * Fetch all registered products from the blockchain
+ * Fetch all registered batches from the blockchain
  */
 export async function getAllProductsFromBlockchain(): Promise<any[]> {
   try {
     const contract = getContract();
     if (!contract) return [];
 
-    // Fetch past events to get all product additions
-    const events = await contract.getPastEvents('ProductAdded', {
+    // Fetch past events to get all batch registrations
+    const events = await contract.getPastEvents('BatchRegistered', {
       fromBlock: 0,
       toBlock: 'latest'
     });
 
     const products = [];
 
-    // Reverse iterate to show newest products first
+    // Reverse iterate to show newest batches first
     for (let i = events.length - 1; i >= 0; i--) {
       const event = events[i];
-      const productId = event.returnValues?.productId;
-      if (!productId) continue;
+      const batchSalt = event.returnValues?.batchSalt;
+      if (!batchSalt) continue;
 
-      const productData = await contract.methods.products(productId).call();
+      const batchData = await contract.methods.batches(batchSalt).call();
       
       products.push({
-        id: productId.toString(),
-        name: productData.name,
-        sku: productData.saltValue || productId.toString(), 
-        batchSize: productData.batchNumber.toString(),
-        registered: 1, // Number of history events
-        status: productData.isRecalled ? "recalled" : "active",
-        verifications: 0, // Mock verifications
-        date: new Date(Number(productData.manufactureDate) * 1000).toISOString().split('T')[0],
+        id: batchData.batchNumber.toString(),
+        name: batchData.productName,
+        sku: batchData.productId.toString(), 
+        batchSize: batchData.quantity.toString(),
+        registered: 1,
+        status: batchData.isRecalled ? "recalled" : "active",
+        verifications: 0,
+        date: new Date(Number(batchData.manufactureDate) * 1000).toISOString().split('T')[0],
       });
     }
 
@@ -159,15 +149,15 @@ export async function getAllProductsFromBlockchain(): Promise<any[]> {
 }
 
 /**
- * Recall a product on the blockchain
+ * Recall a batch on the blockchain
  */
-export async function recallProductOnChain(saltValue: string, account: string): Promise<any> {
+export async function recallProductOnChain(batchSalt: string, account: string): Promise<any> {
   const contract = getContract();
   if (!contract) {
     throw new Error('Web3 Contract instance not found');
   }
 
-  return await contract.methods.recallProduct(saltValue).send({
+  return await contract.methods.recallBatch(batchSalt).send({
     from: account,
     gas: "500000"
   });

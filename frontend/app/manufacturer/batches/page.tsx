@@ -28,6 +28,7 @@ interface Batch {
   totalScans: number;
   isRecalled: boolean;
   blockchainHash: string;
+  batchSalt: string;
 }
 
 export default function BatchesPage() {
@@ -62,16 +63,28 @@ export default function BatchesPage() {
     toast("Copied to clipboard", { description: "Blockchain transaction hash copied." });
   };
 
-  const handleRecall = async (id: string) => {
-    if (!confirm("Are you sure you want to recall this batch? This will flag ALL products in this batch as invalid during verification.")) return;
+  const handleRecall = async (batch: Batch) => {
+    if (!confirm(`Are you sure you want to recall batch ${batch.batchNumber}? This will flag ALL units on the blockchain AND in the database as invalid.`)) return;
     
     try {
-      await recallBatch(id);
+      // 1. First, Recall on Blockchain (Decentralized Recall)
+      const { requestExecutionAccounts } = await import("@/api/web3-client");
+      const { recallProductOnChain } = await import("@/lib/blockchain-utils");
+      
+      const accounts = await requestExecutionAccounts();
+      if (!accounts || accounts.length === 0) throw new Error("No Web3 account found. Connection to blockchain required for recall.");
+      
+      toast("Broadcasting Recall...", { description: "Sending recall transaction to the blockchain." });
+      await recallProductOnChain(batch.batchSalt, accounts[0]);
+
+      // 2. Second, update the backend scan-tracker
+      await recallBatch(batch._id);
+      
       fetchBatches(); // Reload
-      toast("Batch Recalled", { description: "The batch has been successfully recalled." });
+      toast.success("Batch Recalled Everywhere", { description: "Successfully updated on-chain and in database." });
     } catch (err: any) {
       console.error("Failed to recall batch:", err);
-      alert("Failed to recall batch: " + err.message);
+      toast.error("Recall Failed", { description: err.message || "An error occurred during the recall process." });
     }
   };
 
@@ -195,7 +208,7 @@ export default function BatchesPage() {
                         </Link>
                       </Button>
                       {!batch.isRecalled && (
-                        <Button variant="ghost" size="sm" className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10 text-xs px-2" onClick={() => handleRecall(batch._id)}>
+                        <Button variant="ghost" size="sm" className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10 text-xs px-2" onClick={() => handleRecall(batch)}>
                           Recall
                         </Button>
                       )}

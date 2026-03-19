@@ -130,48 +130,25 @@ export default function EnrollBatchPage() {
         );
       const deployer = accounts[0];
 
-      const contract = getContract();
       const numMfDate = Math.floor(new Date(manufactureDate).getTime() / 1000);
       const numExDate = expiryDate
         ? Math.floor(new Date(expiryDate).getTime() / 1000)
         : 0;
-      const imageUrls = selectedProduct.images || [];
 
       setUploadProgress(50);
 
-      let txResult: any;
-      const priceInCents = Math.round((selectedProduct.price || 0) * 100);
-
-      if (numExDate > 0) {
-        txResult = await contract.methods
-          .addProductWithExpiry(
-            selectedProduct.name,
-            selectedProduct.category,
-            selectedProduct.brand,
-            batchNumber,
-            numMfDate,
-            batchNumber,
-            priceInCents,
-            numExDate,
-            batchSalt,
-            imageUrls,
-          )
-          .send({ from: deployer, gas: "5000000" });
-      } else {
-        txResult = await contract.methods
-          .addProductWithoutExpiry(
-            selectedProduct.name,
-            selectedProduct.category,
-            selectedProduct.brand,
-            batchNumber,
-            numMfDate,
-            batchNumber,
-            priceInCents,
-            batchSalt,
-            imageUrls,
-          )
-          .send({ from: deployer, gas: "5000000" });
-      }
+      const { registerBatchOnChain } = await import("@/api/web3-client");
+      
+      const txResult = await registerBatchOnChain({
+        productId: selectedProduct.productId,
+        productName: selectedProduct.name,
+        brand: selectedProduct.brand,
+        batchNumber: batchNumber,
+        batchSalt: batchSalt,
+        manufactureDate: numMfDate,
+        expiryDate: numExDate,
+        quantity: parseInt(quantity)
+      }, deployer);
 
       const txHash = txResult.transactionHash || txResult.blockHash;
       setUploadProgress(80);

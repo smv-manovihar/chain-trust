@@ -1,47 +1,44 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+/**
+ * @title ChainTrust Pharmaceutical Verification
+ * @dev Re-engineered for Batch-Aware Decentralized Verification (dApp)
+ */
 contract ChainTrust {
     
     // Custom Errors for gas efficiency
     error NotAuthorized(address caller);
-    error ProductAlreadyExists(string productId);
-    error ProductNotFound(string productId);
+    error BatchAlreadyExists(string batchSalt);
+    error BatchNotFound(string batchSalt);
     error InvalidInput(string parameter);
     error UnauthorizedManufacturer(address manufacturer);
 
-    struct Product {
-        string productId;
-        string name;
-        string category;
-        string brand;
+    struct Batch {
+        string productId;       // The unique SKU/NDC from the manufacturer
+        string productName;     // Core metadata for offline verification
+        string brand;           // Core metadata for offline verification
+        string batchNumber;     // Manufacturer's batch identifier
+        string batchSalt;       // Root salt for unit-level verification
         uint256 manufactureDate;
-        string batchNumber;
-        uint256 price;
         uint256 expiryDate;
-        bool exists;
-        string saltValue;
-        address creator;
+        uint32 quantity;        // Total units in this batch
+        address manufacturer;
         bool isRecalled;
+        bool exists;
     }
 
     address public owner;
-    uint256 public productCount = 0;
+    uint256 public totalBatches = 0;
     
-    // Access Control Mappings
+    // Manufacturer Access Control
     mapping(address => bool) public isManufacturer;
 
-    // Product mappings
-    mapping(string => Product) public products;
-    mapping(string => bool) public productExists;
-    mapping(string => string) public productIndex; // salt -> productId
-    
-    // Image mapping
-    mapping(string => string[]) public productImages;
+    // batchSalt -> Batch data
+    mapping(string => Batch) public batches;
 
-    event ProductAdded(string productId, address creator);
-    event ProductRecalled(string productId, address caller);
-    event ProductRemoved(string productId);
+    event BatchRegistered(string indexed batchSalt, string productId, string batchNumber, address manufacturer);
+    event BatchRecalled(string indexed batchSalt, address manufacturer);
     event RoleGranted(address indexed account, string role);
     event RoleRevoked(address indexed account, string role);
 
@@ -57,10 +54,11 @@ contract ChainTrust {
 
     constructor() {
         owner = msg.sender;
-        isManufacturer[msg.sender] = true; // Owner is manufacturer by default for testing
+        isManufacturer[msg.sender] = true;
     }
 
-    // Role Management
+    // --- Role Management ---
+    
     function authorizeManufacturer(address _account) external onlyOwner {
         isManufacturer[_account] = true;
         emit RoleGranted(_account, "MANUFACTURER");
@@ -71,138 +69,65 @@ contract ChainTrust {
         emit RoleRevoked(_account, "ALL");
     }
 
-    function addProductWithExpiry(
-        string memory _name,
-        string memory _category,
-        string memory _brand,
+    // --- Core Batch Logic ---
+
+    /**
+     * @dev Register a new production batch on-chain.
+     * Stores essential metadata to allow verification even if the database is offline.
+     */
+    function registerBatch(
         string memory _productId,
-        uint256 _manufactureDate,
+        string memory _productName,
+        string memory _brand,
         string memory _batchNumber,
-        uint256 _price,
+        string memory _batchSalt,
+        uint256 _manufactureDate,
         uint256 _expiryDate,
-        string memory _salt,
-        string[] memory _imageUrls
+        uint32 _quantity
     ) external onlyManufacturer {
-        if (productExists[_productId]) revert ProductAlreadyExists(_productId);
-        if (bytes(_name).length == 0) revert InvalidInput("name");
-        if (bytes(_salt).length == 0) revert InvalidInput("salt");
+        if (batches[_batchSalt].exists) revert BatchAlreadyExists(_batchSalt);
+        if (bytes(_batchSalt).length == 0) revert InvalidInput("batchSalt");
         if (bytes(_productId).length == 0) revert InvalidInput("productId");
         
-        products[_productId] = Product(
-            _productId,
-            _name,
-            _category,
-            _brand,
-            _manufactureDate,
-            _batchNumber,
-            _price,
-            _expiryDate,
-            true,
-            _salt,
-            msg.sender,
-            false // isRecalled
-        );
+        batches[_batchSalt] = Batch({
+            productId: _productId,
+            productName: _productName,
+            brand: _brand,
+            batchNumber: _batchNumber,
+            batchSalt: _batchSalt,
+            manufactureDate: _manufactureDate,
+            expiryDate: _expiryDate,
+            quantity: _quantity,
+            manufacturer: msg.sender,
+            isRecalled: false,
+            exists: true
+        });
         
-        productExists[_productId] = true;
-        productIndex[_salt] = _productId;
-        productCount++;
-
-        // Store image URLs
-        for (uint i = 0; i < _imageUrls.length; i++) {
-            productImages[_productId].push(_imageUrls[i]);
-        }
-
-        emit ProductAdded(_productId, msg.sender);
+        totalBatches++;
+        emit BatchRegistered(_batchSalt, _productId, _batchNumber, msg.sender);
     }
 
-    function addProductWithoutExpiry(
-        string memory _name,
-        string memory _category,
-        string memory _brand,
-        string memory _productId,
-        uint256 _manufactureDate,
-        string memory _batchNumber,
-        uint256 _price,
-        string memory _salt,
-        string[] memory _imageUrls
-    ) external onlyManufacturer {
-        if (productExists[_productId]) revert ProductAlreadyExists(_productId);
-        if (bytes(_name).length == 0) revert InvalidInput("name");
-        if (bytes(_productId).length == 0) revert InvalidInput("productId");
+    /**
+     * @dev Flag a batch as recalled.
+     * Only the original manufacturer or the contract owner can recall.
+     */
+    function recallBatch(string calldata _batchSalt) external {
+        if (!batches[_batchSalt].exists) revert BatchNotFound(_batchSalt);
         
-        products[_productId] = Product(
-            _productId,
-            _name,
-            _category,
-            _brand,
-            _manufactureDate,
-            _batchNumber,
-            _price,
-            0, 
-            true,
-            _salt,
-            msg.sender,
-            false
-        );
-        
-        productExists[_productId] = true;
-        productIndex[_salt] = _productId;
-        productCount++;
-
-        for (uint i = 0; i < _imageUrls.length; i++) {
-            productImages[_productId].push(_imageUrls[i]);
-        }
-
-        emit ProductAdded(_productId, msg.sender);
-    }
-
-    function recallProduct(string memory _saltValue) external onlyManufacturer {
-        string memory _productId = productIndex[_saltValue];
-        if (!productExists[_productId]) revert ProductNotFound(_productId);
-        
-        // Ensure that the recaller is the creator or the owner
-        if (products[_productId].creator != msg.sender && msg.sender != owner) {
+        // Authorization check
+        if (batches[_batchSalt].manufacturer != msg.sender && msg.sender != owner) {
              revert NotAuthorized(msg.sender);
         }
 
-        products[_productId].isRecalled = true;
-        emit ProductRecalled(_productId, msg.sender);
+        batches[_batchSalt].isRecalled = true;
+        emit BatchRecalled(_batchSalt, msg.sender);
     }
 
-    function getFullProductBySalt(string memory _saltValue) external view returns (
-        Product memory product,
-        string[] memory images
-    ) {
-        string memory _productId = productIndex[_saltValue];
-        if (!productExists[_productId]) revert ProductNotFound(_productId);
-        
-        return (
-            products[_productId],
-            productImages[_productId]
-        );
-    }
-    
-    function getProductBySalt(string memory _saltValue) external view returns (
-        string memory name,
-        string memory category,
-        string memory brand,
-        uint256 manufactureDate,
-        string memory batchNumber,
-        uint256 price,
-        uint256 expiryDate,
-        bool isRecalled
-    ) {
-        string memory _productId = productIndex[_saltValue];
-        if (!productExists[_productId]) revert ProductNotFound(_productId);
-        
-        Product memory p = products[_productId];
-        return (p.name, p.category, p.brand, p.manufactureDate, p.batchNumber, p.price, p.expiryDate, p.isRecalled);
-    }
-
-    function removeProduct(string memory _productId) external onlyOwner {
-        if (!productExists[_productId]) revert ProductNotFound(_productId);
-        productExists[_productId] = false;
-        productCount--;
-        emit ProductRemoved(_productId);
+    /**
+     * @dev Get full batch data for verification.
+     */
+    function getBatch(string calldata _batchSalt) external view returns (Batch memory) {
+        if (!batches[_batchSalt].exists) revert BatchNotFound(_batchSalt);
+        return batches[_batchSalt];
     }
 }

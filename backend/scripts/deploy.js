@@ -37,113 +37,133 @@ function updateEnvFile(filePath, updates) {
 
 async function deploy() {
     console.log('--- Starting Deployment ---');
+    console.log(`Connecting to network: ${RPC_URL}`);
     
     let deployer;
     const privateKey = process.env.PRIVATE_KEY;
+
+    // Detect if we are likely on a public network vs local Ganache
+    const isLocalNetwork = RPC_URL.includes('127.0.0.1') || RPC_URL.includes('localhost');
 
     if (privateKey && privateKey !== 'your_private_key_here') {
         const account = web3.eth.accounts.privateKeyToAccount(privateKey);
         web3.eth.accounts.wallet.add(account);
         deployer = account.address;
-        console.log('Using Private Key for Deployment.');
-    } else {
+        console.log('Wallet configured via Private Key.');
+    } else if (isLocalNetwork) {
         const accounts = await web3.eth.getAccounts();
         deployer = accounts[0];
-        console.log('Using Local Node Account for Deployment.');
+        console.log('Wallet configured via Local Node Account (Ganache).');
+    } else {
+        throw new Error('CRITICAL: Private key is required for deploying to public networks!');
     }
 
     console.log('Deployer Account:', deployer);
 
-    // Read Contract File
+    // Get current deployer balance for safety check
+    const balanceWei = await web3.eth.getBalance(deployer);
+    console.log(`Deployer Balance: ${web3.utils.fromWei(balanceWei, 'ether')} ETH`);
+
+    // --- COMPILATION ---
     const contractPath = path.join(__dirname, '../contracts/ChainTrust.sol');
+    if (!fs.existsSync(contractPath)) throw new Error(`Contract not found at ${contractPath}`);
     const source = fs.readFileSync(contractPath, 'utf8');
 
-    // Compile Contract
     const input = {
         language: 'Solidity',
-        sources: {
-            'ChainTrust.sol': {
-                content: source,
-            },
-        },
+        sources: { 'ChainTrust.sol': { content: source } },
         settings: {
             evmVersion: 'paris',
-            outputSelection: {
-                '*': {
-                    '*': ['abi', 'evm.bytecode'],
-                },
-            },
+            optimizer: { enabled: true, runs: 200 }, // Added optimizer for cheaper gas deployments
+            outputSelection: { '*': { '*': ['abi', 'evm.bytecode'] } },
         },
     };
 
-    console.log('Compiling contract with Paris EVM version...');
+    console.log('Compiling contract...');
     const output = JSON.parse(solc.compile(JSON.stringify(input)));
 
     if (output.errors) {
+        let hasFatalError = false;
         output.errors.forEach((err) => {
-            console.error(err.formattedMessage);
+            console[err.severity === 'error' ? 'error' : 'warn'](err.formattedMessage);
+            if (err.severity === 'error') hasFatalError = true;
         });
-        if (Object.values(output.errors).some(err => err.severity === 'error')) {
-            throw new Error('Compilation failed');
-        }
+        if (hasFatalError) throw new Error('Compilation failed. See errors above.');
     }
 
     const contractData = output.contracts['ChainTrust.sol']['ChainTrust'];
     const abi = contractData.abi;
     const bytecode = contractData.evm.bytecode.object;
 
-    // --- DEPLOYMENT ARTIFACTS ---
+    // --- ARTIFACT MANAGEMENT ---
     const rootDir = path.join(__dirname, '../../');
-    const contractsDir = path.join(__dirname, '../contracts'); // backend/contracts
+    const contractsDir = path.join(__dirname, '../contracts'); 
+    const frontendTargetDir = path.join(rootDir, 'frontend/api');
+
     if (!fs.existsSync(contractsDir)) fs.mkdirSync(contractsDir, { recursive: true });
+    if (!fs.existsSync(frontendTargetDir)) fs.mkdirSync(frontendTargetDir, { recursive: true });
 
-    // 1. Backend Record (Source of truth for backend)
     fs.writeFileSync(path.join(contractsDir, 'ChainTrust.json'), JSON.stringify(abi, null, 2));
-    console.log('ABI saved to backend/contracts/ChainTrust.json');
+    fs.writeFileSync(path.join(frontendTargetDir, 'ChainTrust.json'), JSON.stringify(abi, null, 2));
+    console.log('ABI artifacts saved and synced to frontend.');
 
-    // 2. Frontend Sync (Required for frontend build)
-    const frontendTarget = path.join(rootDir, 'frontend/api/ChainTrust.json');
-    fs.writeFileSync(frontendTarget, JSON.stringify(abi, null, 2));
-    console.log('ABI synced to frontend/api/ChainTrust.json');
-
-    // Deploy Contract
-    console.log('Deploying to blockchain...');
+    // --- DEPLOYMENT PREPARATION ---
+    console.log('Preparing deployment transaction...');
     const contract = new web3.eth.Contract(abi);
     const deployTx = contract.deploy({ data: '0x' + bytecode });
 
     try {
+        // 1. Dynamic Gas Estimation
+        const estimatedGas = await deployTx.estimateGas({ from: deployer });
+        // Add a 10% safety buffer to the estimated gas
+        const gasLimit = (BigInt(estimatedGas) * 110n) / 100n; 
+
+        // 2. Dynamic Network Fees (EIP-1559)
+        const feeData = await web3.eth.calculateFeeData();
+        
+        console.log(`Estimated Gas: ${estimatedGas} (Limit set to ${gasLimit})`);
+
+        // --- EXECUTE DEPLOYMENT ---
+        console.log('Broadcasting to blockchain (Waiting for confirmations)...');
         const deployedInstance = await deployTx.send({
             from: deployer,
-            gas: '5000000',
+            gas: gasLimit.toString(),
+            maxFeePerGas: feeData.maxFeePerGas,
+            maxPriorityFeePerGas: feeData.maxPriorityFeePerGas
+        })
+        .on('transactionHash', (hash) => {
+            console.log(`\n[Pending] Transaction Hash: ${hash}`);
+            console.log(`You can track this on the block explorer.`);
+        })
+        .on('receipt', (receipt) => {
+            console.log(`[Mined] Block Number: ${receipt.blockNumber}`);
+            console.log(`[Mined] Gas Used: ${receipt.gasUsed}`);
         });
 
         const address = deployedInstance.options.address;
-        console.log('--- Deployment Successful! ---');
+        console.log('\n--- Deployment Successful! ---');
         console.log('Contract Address:', address);
 
-        // 3. Save Metadata to backend/contracts
+        // --- METADATA & ENV SYNC ---
         const metadata = {
             contractAddress: address,
             deployer: deployer,
             network: RPC_URL,
             timestamp: new Date().toISOString(),
         };
-        fs.writeFileSync(
-            path.join(contractsDir, 'metadata.json'),
-            JSON.stringify(metadata, null, 2)
-        );
-        console.log('Deployment metadata saved to backend/contracts/metadata.json');
-
-        // 4. Update frontend .env
+        fs.writeFileSync(path.join(contractsDir, 'metadata.json'), JSON.stringify(metadata, null, 2));
+        
         const frontendEnvPath = path.join(rootDir, 'frontend/.env');
         updateEnvFile(frontendEnvPath, {
             'NEXT_PUBLIC_CONTRACT_ADDRESS': address,
             'NEXT_PUBLIC_RPC_URL': RPC_URL
         });
-        console.log(`Updated frontend/.env`);
+        console.log('Metadata and Frontend .env successfully updated.');
 
     } catch (error) {
-        console.error('Deployment failed:', error);
+        console.error('\n❌ Deployment failed:');
+        console.error(error.message || error);
+        process.exit(1);
     }
 }
 
