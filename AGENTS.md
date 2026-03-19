@@ -27,7 +27,7 @@
 - **Framework:** Next.js (React) with Tailwind CSS.
 - **Key Pages:**
   - `/customer/cabinet`: User's "My Medicines" dashboard. Track active medications and alerts. Designed for mobile-first tracking.
-  - `/verify-product`: Consumer-facing verification. Fetches directly from the blockchain for decentralized validation, then enriches with MongoDB metadata. Designed to fit in `h-screen`. Logged-out users get a restricted view with a login prompt for saving to "My Medicines".
+  - `/verify`: Consumer-facing verification. Fetches directly from the blockchain for decentralized validation, then enriches with MongoDB metadata. Designed to fit in `h-screen`. Logged-out users get a restricted view with a login prompt for saving to "My Medicines".
   - `/manufacturer/add-product`: Multi-step wizard for enrolling batches. Derives cryptographic salts client-side before sending to backend.
   - `/manufacturer/batches`: Dashboard showing enrolled batches and their scan counts. Supports mobile-first refreshing and row actions.
   - `/manufacturer/batches/[id]`: QR generation page with `print`-media CSS to directly output grid sheets without the UI chrome.

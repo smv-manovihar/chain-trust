@@ -1,5 +1,4 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/layout/brand-logo";
 import { Card } from "@/components/ui/card";
 
@@ -12,7 +11,6 @@ interface AuthLayoutProps {
 
 export function AuthLayout({
   children,
-  image,
   title = "ChainTrust",
   subtitle = "Secure Pharmaceutical Supply Chain",
 }: AuthLayoutProps) {

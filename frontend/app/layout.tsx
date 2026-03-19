@@ -1,16 +1,24 @@
 import React from "react";
 import type { Metadata, Viewport } from "next";
-import { Geist, JetBrains_Mono } from "next/font/google";
+import { Figtree, Noto_Sans } from "next/font/google";
 
 import "./globals.css";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/auth-context";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { SidebarProvider } from "@/contexts/sidebar-context";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
-const jetBrainsMono = JetBrains_Mono({
+const figtree = Figtree({
   subsets: ["latin"],
-  variable: "--font-jetbrains",
+  variable: "--font-figtree",
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
+});
+
+const notoish = Noto_Sans({
+  subsets: ["latin"],
+  variable: "--font-noto",
+  weight: ["300", "400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -24,6 +32,10 @@ export const metadata: Metadata = {
     title: "ChainTrust",
     description: "Blockchain-powered pharmaceutical verification system",
     type: "website",
+  },
+  icons: {
+    icon: "/chain-trust.png",
+    apple: "/chain-trust.png",
   },
 };
 
@@ -46,16 +58,20 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geist.variable} ${jetBrainsMono.variable}`}
+      className={`${figtree.variable} ${notoish.variable}`}
     >
-      <body className="font-sans antialiased relative">
+      <body className="font-sans antialiased relative selection:bg-primary/20">
         {/* Background Grid - z-0 to be above body background but below content */}
         <div className="fixed inset-0 bg-grid-pattern-global pointer-events-none z-0" />
 
         {/* Content - z-10 to sit above grid */}
         <div className="relative z-10">
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <AuthProvider>{children}</AuthProvider>
+            <TooltipProvider delayDuration={300}>
+              <AuthProvider>
+                <SidebarProvider>{children}</SidebarProvider>
+              </AuthProvider>
+            </TooltipProvider>
             <Toaster />
           </ThemeProvider>
         </div>

@@ -58,7 +58,7 @@ export default function CabinetPage() {
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/verify-product">Verify New Product</Link>
+            <Link href="/verify">Verify New Product</Link>
           </Button>
         </div>
 
@@ -116,7 +116,7 @@ export default function CabinetPage() {
                   </div>
                 </div>
                 <Button asChild variant="secondary" className="mt-4 w-full">
-                  <Link href={`/verify-product?salt=${product.productId}`}>
+                  <Link href={`/verify?salt=${product.productId}`}>
                     View Details
                   </Link>
                 </Button>

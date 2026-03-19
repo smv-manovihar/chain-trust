@@ -44,3 +44,10 @@ export const recallBatch = async (id: string) => {
 	const response = await client.post(`/batches/${id}/recall`);
 	return response.data;
 };
+
+export const downloadBatchPDF = async (id: string) => {
+	const response = await client.get(`/batches/${id}/pdf`, {
+		responseType: 'blob'
+	});
+	return response.data;
+};

@@ -1,191 +1,183 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  QrCode,
-  Shield,
+  Pill,
   Clock,
+  AlertTriangle,
   CheckCircle2,
-  AlertCircle,
-  Zap,
+  Calendar,
+  Activity,
+  BellRing,
+  ShieldCheck,
+  Smartphone,
+  ChevronRight,
+  TrendingUp,
+  History
 } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/contexts/auth-context";
 
-export default function CustomerHomePage() {
+export default function CustomerDashboard() {
+  const { user } = useAuth();
+  
+  // Mock data for the overview
+  const nextDose = {
+    name: "Amoxicillin",
+    time: "2:00 PM",
+    remaining: "1h 15m",
+  };
+
   const recentScans = [
-    {
-      id: 1,
-      product: "Amoxicillin 500mg",
-      manufacturer: "PharmaCorp Inc",
-      status: "verified",
-      date: "2 hours ago",
-      batch: "BATCH-2024-0847",
-    },
-    {
-      id: 2,
-      product: "Ibuprofen 200mg",
-      manufacturer: "MedSupply Global",
-      status: "verified",
-      date: "1 day ago",
-      batch: "BATCH-2024-0821",
-    },
-    {
-      id: 3,
-      product: "Vitamin D3 Tablets",
-      manufacturer: "HealthNet +",
-      status: "verified",
-      date: "3 days ago",
-      batch: "BATCH-2024-0775",
-    },
+    { id: 1, name: "Amoxicillin 500mg Batch #X-102", status: "Authentic", date: "2 hours ago" },
+    { id: 2, name: "Vitamin D3 Gold", status: "Authentic", date: "Yesterday" },
   ];
 
   return (
-    <div className="min-h-screen bg-transparent">
-      <main className="max-w-7xl mx-auto px-4 md:px-6 py-8">
-        {/* Welcome Section */}
-        <div className="mb-6 sm:mb-8 space-y-2">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-              Verify Your Medicines
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              Scan any product to confirm authenticity and track its journey
-            </p>
+    <div className="space-y-6 lg:space-y-10 max-w-6xl mx-auto">
+      {/* Hero Header: Safety & Next Action */}
+      <div className="flex flex-col md:flex-row gap-6">
+        <Card className="flex-1 p-6 lg:p-8 border-none bg-gradient-to-br from-primary/10 via-background to-primary/5 shadow-2xl shadow-primary/5 rounded-[2.5rem] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
+            <Pill className="h-40 w-40 text-primary rotate-12" />
           </div>
-        </div>
-
-        {/* Main CTA Card */}
-        <Card className="p-8 md:p-12 border border-primary/50 bg-gradient-to-br from-primary/10 to-transparent mb-8">
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <h2 className="text-xl sm:text-2xl font-bold text-foreground">
-                Quick Product Verification
-              </h2>
-              <p className="text-sm sm:text-base text-muted-foreground">
-                Use your device camera or upload a QR code image to instantly
-                verify pharmaceutical authenticity
-              </p>
+          
+          <div className="relative z-10">
+            <Badge className="mb-4 bg-primary/20 text-primary border-none px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Next Dose Reminder</Badge>
+            <h1 className="text-3xl lg:text-4xl font-black tracking-tighter mb-2">
+              {nextDose.name} 500mg
+            </h1>
+            <div className="flex items-center gap-4 text-muted-foreground mb-8">
+              <span className="flex items-center gap-2 font-bold bg-background/50 backdrop-blur px-3 py-1.5 rounded-2xl border border-primary/10">
+                <Clock className="h-4 w-4 text-primary" /> {nextDose.time}
+              </span>
+              <span className="text-sm font-medium">Coming up in <span className="text-foreground font-black">{nextDose.remaining}</span></span>
             </div>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button size="lg" asChild className="gap-2">
-                <Link href="/verify-product">
-                  <QrCode className="h-5 w-5" />
-                  Scan QR Code
-                </Link>
+            
+            <div className="flex flex-wrap gap-3">
+              <Button className="rounded-2xl h-12 px-8 font-bold shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5" size="lg">
+                <CheckCircle2 className="mr-2 h-5 w-5" /> Mark as Taken
               </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link href="/verify-by-batch">Enter Batch Number</Link>
+              <Button variant="outline" className="rounded-2xl h-12 px-6 font-bold bg-background/50 backdrop-blur" size="lg" asChild>
+                <Link href="/customer/cabinet">Full List</Link>
               </Button>
             </div>
           </div>
         </Card>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
-          {/* Stats */}
-          {[
-            { label: "Products Verified", value: "1,247", icon: CheckCircle2 },
-            { label: "Counterfeits Detected", value: "3", icon: AlertCircle },
-            { label: "Time Saved", value: "12+ hours", icon: Clock },
-          ].map((stat, i) => {
-            const Icon = stat.icon;
-            return (
-              <Card key={i} className="p-4 sm:p-6 border border-border">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      {stat.label}
-                    </p>
-                    <p className="text-xl sm:text-2xl font-bold text-foreground">
-                      {stat.value}
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+        <Card className="w-full md:w-[320px] p-6 lg:p-8 flex flex-col justify-between border-primary/10 bg-card/50 backdrop-blur-sm rounded-[2.5rem]">
+          <div>
+            <div className="h-14 w-14 rounded-2xl bg-green-500/10 flex items-center justify-center mb-6">
+              <ShieldCheck className="h-8 w-8 text-green-500" />
+            </div>
+            <h2 className="text-2xl font-black tracking-tight mb-2">Trust Certified</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              All <span className="text-foreground font-bold">12 medicines</span> in your cabinet have been verified via blockchain.
+            </p>
+          </div>
+          <Button variant="link" className="h-auto p-0 justify-start mt-6 text-primary font-black uppercase text-xs tracking-widest group" asChild>
+            <Link href="/customer/cabinet">
+              View Safety Report <ChevronRight className="ml-1 h-3 w-3 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </Button>
+        </Card>
+      </div>
 
-        {/* Recent Scans */}
-        <div className="space-y-4 mb-8">
-          <h2 className="text-xl font-bold text-foreground">
-            Recent Verifications
-          </h2>
+      {/* Grid: Attention Needed & Metrics */}
+      <div className="grid lg:grid-cols-3 gap-6 lg:gap-10">
+        
+        {/* Alerts & Reminders */}
+        <section className="lg:col-span-2 space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-black tracking-tight flex items-center gap-2">
+              <BellRing className="h-5 w-5 text-primary" /> Need Attention
+            </h3>
+            <Badge variant="outline" className="rounded-full border-primary/20 text-primary py-0.5">2 New Alerts</Badge>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Card className="p-5 border-amber-500/20 bg-amber-500/5 rounded-3xl group hover:bg-amber-500/10 transition-colors cursor-default">
+              <div className="flex items-start gap-4">
+                <div className="h-10 w-10 shrink-0 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-600">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-amber-900 dark:text-amber-400 text-sm mb-1">Refill Required</h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed mb-4">Vitamin D3 supply will run out in 3 days. Order now to avoid disruption.</p>
+                  <Button size="sm" variant="outline" className="rounded-xl h-8 text-[10px] font-black uppercase tracking-wider border-amber-500/30 bg-background/50">Order Now</Button>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-5 border-primary/20 bg-primary/5 rounded-3xl group hover:bg-primary/10 transition-colors cursor-default">
+              <div className="flex items-start gap-4">
+                <div className="h-10 w-10 shrink-0 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-primary text-sm mb-1">Check-up Slotted</h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed mb-4">Your medication review with Dr. Sarah is tomorrow at 10:00 AM.</p>
+                  <Button size="sm" variant="outline" className="rounded-xl h-8 text-[10px] font-black uppercase tracking-wider border-primary/30 bg-background/50">Add to Calendar</Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Quick Verification Stats Section */}
+          <div className="pt-4">
+            <Card className="p-6 lg:p-8 bg-muted/30 border-dashed border-2 border-border/50 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-6 text-center md:text-left">
+                <div className="h-16 w-16 rounded-full bg-background border-4 border-primary flex items-center justify-center text-xl font-black shadow-inner">
+                  85%
+                </div>
+                <div>
+                  <h4 className="font-bold text-lg">Adherence Rate</h4>
+                  <p className="text-sm text-muted-foreground italic">You're doing better than 70% of patients!</p>
+                </div>
+              </div>
+              <Button variant="outline" className="rounded-2xl h-12 px-6 font-bold bg-background shadow-sm border-primary/20" asChild>
+                <Link href="/customer/cabinet/history">
+                  <TrendingUp className="mr-2 h-4 w-4 text-primary" /> View detailed trends
+                </Link>
+              </Button>
+            </Card>
+          </div>
+        </section>
+
+        {/* Sidebar: Recent Activity */}
+        <section className="space-y-6">
+          <h3 className="text-xl font-black tracking-tight flex items-center gap-2">
+            <History className="h-5 w-5 text-primary" /> Recent Scans
+          </h3>
+          
           <div className="space-y-3">
             {recentScans.map((scan) => (
-              <Card
-                key={scan.id}
-                className="p-4 border border-border hover:border-primary/50 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="font-semibold text-foreground">
-                      {scan.product}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      By {scan.manufacturer}
-                    </p>
-                    <p className="text-xs font-mono text-muted-foreground mt-1">
-                      {scan.batch}
-                    </p>
-                  </div>
-                  <div className="text-right space-y-2">
-                    <Badge className="bg-accent text-accent-foreground">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Verified
-                    </Badge>
-                    <p className="text-xs text-muted-foreground">{scan.date}</p>
-                  </div>
+              <Card key={scan.id} className="p-4 rounded-2xl border-border/50 bg-card/30 hover:bg-muted/50 transition-colors cursor-default">
+                <div className="flex justify-between items-start mb-2">
+                  <h5 className="text-xs font-bold truncate max-w-[150px]">{scan.name}</h5>
+                  <Badge className="bg-green-500/10 text-green-500 border-none text-[8px] px-1.5 py-0">Authentic</Badge>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
+                  <span className="flex items-center gap-1"><Smartphone className="h-3 w-3" /> Mobile Scan</span>
+                  <span>{scan.date}</span>
                 </div>
               </Card>
             ))}
+            
+            <Button variant="ghost" className="w-full rounded-2xl text-xs font-bold text-muted-foreground hover:text-primary transition-colors py-6 border border-dashed border-border group" asChild>
+              <Link href="/verify">
+                <Plus className="mr-2 h-4 w-4 group-hover:rotate-90 transition-transform" /> 
+                Scan New Medicine
+              </Link>
+            </Button>
           </div>
-        </div>
+        </section>
 
-        {/* Trust Section */}
-        <Card className="p-8 border border-border bg-muted/30">
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-                <Shield className="h-6 w-6 text-accent" />
-                Why ChainTrust?
-              </h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {[
-                {
-                  title: "Blockchain Verified",
-                  description:
-                    "Every product is registered on immutable blockchain, preventing tampering",
-                },
-                {
-                  title: "Direct from Manufacturer",
-                  description:
-                    "Ensure your medicine came from the factory with complete transparency",
-                },
-                {
-                  title: "Instant Verification",
-                  description:
-                    "Get verification results in seconds with our advanced QR scanning technology",
-                },
-              ].map((item, i) => (
-                <div key={i} className="space-y-2">
-                  <h3 className="font-semibold text-foreground">
-                    {item.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {item.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-      </main>
+      </div>
     </div>
   );
 }
+
+import { Plus } from "lucide-react";

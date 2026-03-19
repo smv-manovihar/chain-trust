@@ -6,6 +6,7 @@ import {
 	getBatchQRData,
 	verifyScan,
 	recallBatch,
+	getBatchPDF,
 } from '../controllers/batch.controller.js';
 import { authenticateJWT, checkRole } from '../middlewares/auth.middleware.js';
 
@@ -20,6 +21,7 @@ router.post('/', authenticateJWT, checkManufacturer, createBatch);
 router.get('/', authenticateJWT, checkManufacturer, listBatches);
 router.get('/:id', authenticateJWT, checkManufacturer, getBatch);
 router.get('/:id/qr-data', authenticateJWT, checkManufacturer, getBatchQRData);
+router.get('/:id/pdf', authenticateJWT, checkManufacturer, getBatchPDF);
 router.post('/:id/recall', authenticateJWT, checkManufacturer, recallBatch);
 
 export default router;

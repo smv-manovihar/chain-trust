@@ -1,7 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Copy, Eye, QrCode, Search, Filter, Loader2, AlertCircle, RefreshCw, Package, Plus } from "lucide-react";
+import { 
+  Copy, 
+  QrCode, 
+  Search, 
+  RefreshCw, 
+  Package, 
+  Plus, 
+  MoreVertical, 
+  ExternalLink, 
+  AlertTriangle,
+  FileSpreadsheet,
+  ChevronRight,
+  TrendingUp,
+  Boxes
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -13,10 +27,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { listBatches, recallBatch } from "@/api/batch.api";
 import { format } from "date-fns";
 import Link from "next/link";
-import { toast } from "sonner"; // Assuming you have a toast component, or standard alert works
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { Card } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Batch {
   _id: string;
@@ -31,7 +55,29 @@ interface Batch {
   batchSalt: string;
 }
 
+const BatchActions = ({ batch, onRecall, onCopyHash }: { batch: Batch; onRecall: (b: Batch) => void; onCopyHash: (h: string) => void }) => (
+  <DropdownMenuContent align="end" className="rounded-2xl w-52 p-1.5 shadow-xl border-border/50 bg-background/95 backdrop-blur-xl">
+    <DropdownMenuItem asChild className="rounded-xl cursor-pointer py-2 px-3">
+      <Link href={`/manufacturer/batches/${batch._id}`} className="flex items-center">
+        <QrCode className="mr-2 h-4 w-4 text-primary" /> 
+        <span className="font-medium">View & Print QR</span>
+      </Link>
+    </DropdownMenuItem>
+    <DropdownMenuItem className="rounded-xl cursor-pointer py-2 px-3" onClick={() => onCopyHash(batch.blockchainHash)}>
+      <ExternalLink className="mr-2 h-4 w-4 text-muted-foreground" /> 
+      <span className="font-medium">Copy Blockchain Hash</span>
+    </DropdownMenuItem>
+    {!batch.isRecalled && (
+      <DropdownMenuItem className="rounded-xl cursor-pointer py-2 px-3 text-destructive focus:bg-destructive/10" onClick={() => onRecall(batch)}>
+        <AlertTriangle className="mr-2 h-4 w-4" /> 
+        <span className="font-medium">Recall Batch</span>
+      </DropdownMenuItem>
+    )}
+  </DropdownMenuContent>
+);
+
 export default function BatchesPage() {
+  const router = useRouter();
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -41,13 +87,12 @@ export default function BatchesPage() {
   const fetchBatches = async () => {
     try {
       setIsRefreshing(true);
-      setLoading(true);
       setError("");
       const res = await listBatches();
       setBatches(res.batches || []);
     } catch (err: any) {
       console.error("Failed to fetch batches:", err);
-      setError("Failed to load batches from server. Please try again.");
+      setError("Failed to load batches from server.");
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -60,181 +105,226 @@ export default function BatchesPage() {
 
   const handleCopyHash = (hash: string) => {
     navigator.clipboard.writeText(hash);
-    toast("Copied to clipboard", { description: "Blockchain transaction hash copied." });
+    toast.success("Blockchain hash copied!");
   };
 
   const handleRecall = async (batch: Batch) => {
-    if (!confirm(`Are you sure you want to recall batch ${batch.batchNumber}? This will flag ALL units on the blockchain AND in the database as invalid.`)) return;
-    
+    if (!confirm(`Recall batch ${batch.batchNumber}? This is irreversible on the blockchain.`)) return;
     try {
-      // 1. First, Recall on Blockchain (Decentralized Recall)
       const { requestExecutionAccounts } = await import("@/api/web3-client");
       const { recallProductOnChain } = await import("@/lib/blockchain-utils");
       
       const accounts = await requestExecutionAccounts();
-      if (!accounts || accounts.length === 0) throw new Error("No Web3 account found. Connection to blockchain required for recall.");
+      if (!accounts?.[0]) throw new Error("Wallet not connected.");
       
-      toast("Broadcasting Recall...", { description: "Sending recall transaction to the blockchain." });
+      toast.loading("Broadcasting recall to blockchain...");
       await recallProductOnChain(batch.batchSalt, accounts[0]);
-
-      // 2. Second, update the backend scan-tracker
       await recallBatch(batch._id);
       
-      fetchBatches(); // Reload
-      toast.success("Batch Recalled Everywhere", { description: "Successfully updated on-chain and in database." });
+      fetchBatches();
+      toast.success("Batch successfully recalled.");
     } catch (err: any) {
-      console.error("Failed to recall batch:", err);
-      toast.error("Recall Failed", { description: err.message || "An error occurred during the recall process." });
+      toast.error(err.message || "Recall failed.");
     }
   };
 
   const filteredBatches = batches.filter(
     (b) =>
       b.batchNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.productId.toLowerCase().includes(searchTerm.toLowerCase())
+      b.productName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col gap-6 py-4">
-      <div className="flex-none flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-6">
+      {/* Header Area */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Manufactured Batches</h1>
-          <p className="text-muted-foreground mt-1 text-xs sm:text-sm">Manage and monitor production runs.</p>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tighter text-foreground">
+            Batch Operations
+          </h1>
+          <p className="text-muted-foreground text-sm font-medium mt-0.5">
+            Monitor production runs and manage unit tracking.
+          </p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Button
-            variant="outline"
-            size="icon"
-            className="sm:hidden"
-            onClick={fetchBatches}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-          </Button>
-          <Button
-            variant="outline"
-            className="hidden sm:flex gap-2"
-            onClick={fetchBatches}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-            Refresh
-          </Button>
-          <Button asChild className="flex-1 sm:flex-none rounded-lg shadow-sm hover:shadow-md transition-shadow">
-            <Link href="/manufacturer/batches/new">
-              <Plus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Enroll New Batch</span>
-              <span className="sm:hidden">New Batch</span>
-            </Link>
-          </Button>
+           <Button 
+             variant="outline" 
+             size="icon" 
+             onClick={fetchBatches} 
+             className="rounded-xl h-10 w-10 border-border/50 hover:bg-muted/10 transition-all shadow-sm"
+             title="Refresh Batches"
+           >
+             <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+           </Button>
+           <Button asChild className="flex-1 sm:flex-none rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
+             <Link href="/manufacturer/batches/new">
+               <Plus className="h-4 w-4 mr-2" />
+               Enroll New Batch
+             </Link>
+           </Button>
         </div>
       </div>
 
-      <div className="flex-none flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search by batch number, name, or product ID..." 
-            className="pl-9 h-10 rounded-lg text-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <Button variant="outline" className="gap-2 h-10 px-4 rounded-lg text-sm" onClick={fetchBatches}>
-          <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-          Refresh
-        </Button>
+      {/* Stats Quick Look */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+         <Card className="p-4 bg-muted/30 border-none shadow-none flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+               <Boxes className="h-5 w-5" />
+            </div>
+            <div>
+               <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Active Batches</p>
+               <h4 className="text-xl font-black">{batches.filter(b => !b.isRecalled).length}</h4>
+            </div>
+         </Card>
+         <Card className="p-4 bg-muted/30 border-none shadow-none flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+               <TrendingUp className="h-5 w-5" />
+            </div>
+            <div>
+               <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Total Scans</p>
+               <h4 className="text-xl font-black">{batches.reduce((sum, b) => sum + b.totalScans, 0).toLocaleString()}</h4>
+            </div>
+         </Card>
       </div>
 
-      {error ? (
-        <div className="flex-none p-4 rounded-lg bg-destructive/10 text-destructive flex items-center gap-3 border border-destructive/20 shadow-sm">
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          <p className="font-medium text-sm">{error}</p>
-        </div>
-      ) : loading ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-16 text-muted-foreground">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-          <p className="text-sm">Loading batch data...</p>
-        </div>
-      ) : filteredBatches.length > 0 ? (
-        <div className="flex-1 min-h-0 border border-border rounded-xl overflow-hidden bg-card shadow-sm flex flex-col">
-          <div className="flex-1 overflow-y-auto">
-            <Table>
-              <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="font-semibold px-4 py-3 text-xs uppercase tracking-wider">Batch ID / Product</TableHead>
-                  <TableHead className="font-semibold py-3 text-xs uppercase tracking-wider">Units</TableHead>
-                  <TableHead className="font-semibold py-3 hidden md:table-cell text-xs uppercase tracking-wider">Mfg Date</TableHead>
-                  <TableHead className="font-semibold py-3 text-center text-xs uppercase tracking-wider">Status</TableHead>
-                  <TableHead className="font-semibold py-3 hidden lg:table-cell text-center text-xs uppercase tracking-wider">Scan Activity</TableHead>
-                  <TableHead className="text-right font-semibold px-4 py-3 text-xs uppercase tracking-wider">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+      {/* Search & Filters */}
+      <div className="flex gap-4">
+         <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search batches..." 
+              className="pl-11 h-12 bg-card/50 border-border/50 rounded-2xl"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+         </div>
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block rounded-[2rem] border border-border/50 bg-card/50 overflow-hidden shadow-sm">
+        <ScrollArea className="h-full">
+          <Table>
+            <TableHeader className="bg-muted/50">
+              <TableRow className="hover:bg-transparent border-border/50">
+                <TableHead className="w-[300px] h-14 text-[10px] font-black uppercase tracking-widest px-6">ID & Product</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest">Date</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest">Units</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest">Status</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest text-center">Engagement</TableHead>
+                <TableHead className="text-right h-14 px-6"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filteredBatches.map((batch) => (
-                <TableRow key={batch._id} className="group hover:bg-muted/30 transition-colors">
-                  <TableCell className="px-4 py-3">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-mono font-medium text-primary text-sm">{batch.batchNumber}</span>
-                      <span className="text-xs text-foreground">{batch.productName} <span className="text-muted-foreground">({batch.productId})</span></span>
+                <TableRow 
+                  key={batch._id} 
+                  className="group hover:bg-muted/20 border-border/50 transition-colors cursor-pointer"
+                  onClick={() => router.push(`/manufacturer/batches/${batch._id}`)}
+                >
+                  <TableCell className="px-6 py-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="font-mono font-bold text-primary text-sm tracking-tight">{batch.batchNumber}</span>
+                      <span className="text-sm font-semibold truncate">{batch.productName}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="py-3 font-medium text-sm">{batch.quantity.toLocaleString()}</TableCell>
-                  <TableCell className="py-3 hidden md:table-cell text-muted-foreground text-sm">
-                    {format(new Date(batch.manufactureDate), 'MMM d, yyyy')}
+                  <TableCell className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+                    {format(new Date(batch.manufactureDate), 'MMM dd, yyyy')}
                   </TableCell>
-                  <TableCell className="py-3 text-center">
+                  <TableCell>
+                    <Badge variant="outline" className="rounded-full bg-background/50">{batch.quantity.toLocaleString()}</Badge>
+                  </TableCell>
+                  <TableCell>
                     {batch.isRecalled ? (
-                      <Badge variant="destructive" className="font-medium px-2 py-0.5 text-xs">Recalled</Badge>
+                      <Badge variant="destructive" className="font-black px-3 rounded-full text-[10px] uppercase tracking-tighter">Recalled</Badge>
                     ) : (
-                      <Badge variant="default" className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200 font-medium px-2 py-0.5 text-xs">Active</Badge>
+                      <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20 border-green-200 font-black px-3 rounded-full text-[10px] uppercase tracking-tighter">Active</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="py-3 hidden lg:table-cell text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                       <span className="font-semibold min-w-8 text-right text-sm">{batch.totalScans}</span>
-                       <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Scans</span>
-                    </div>
+                  <TableCell className="text-center font-bold text-sm tracking-tight">
+                    {batch.totalScans} <span className="text-[10px] text-muted-foreground uppercase ml-1">Scans</span>
                   </TableCell>
-                  <TableCell className="text-right px-4 py-3">
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => handleCopyHash(batch.blockchainHash)} title="Copy Blockchain Hash">
-                        <Copy className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button asChild variant="ghost" size="icon" className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10" title="View & Print QR Codes">
-                        <Link href={`/manufacturer/batches/${batch._id}`}>
-                           <QrCode className="h-3.5 w-3.5" />
-                        </Link>
-                      </Button>
-                      {!batch.isRecalled && (
-                        <Button variant="ghost" size="sm" className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10 text-xs px-2" onClick={() => handleRecall(batch)}>
-                          Recall
+                  <TableCell className="px-6 text-right" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                          <MoreVertical className="h-4 w-4" />
                         </Button>
-                      )}
-                    </div>
+                      </DropdownMenuTrigger>
+                      <BatchActions 
+                        batch={batch} 
+                        onRecall={handleRecall} 
+                        onCopyHash={handleCopyHash} 
+                      />
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 flex flex-col items-center justify-center p-16 text-muted-foreground border border-dashed rounded-xl border-border bg-muted/10">
-          <Package className="h-10 w-10 mb-3 text-muted-foreground/50" />
-          <p className="text-lg font-medium text-foreground">No batches found</p>
-          <p className="mb-6 mt-1 text-center max-w-sm">You haven't enrolled any batches yet or none match your search criteria.</p>
-          <Button asChild>
-             <Link href="/manufacturer/batches/new">Enroll Your First Batch</Link>
-          </Button>
-        </div>
-      )}
+        </ScrollArea>
+      </div>
+
+      {/* Mobile Card View (No Tables) */}
+      <div className="md:hidden space-y-4 pb-8">
+        {filteredBatches.map((batch) => (
+          <Card 
+            key={batch._id} 
+            className="p-5 rounded-[2rem] border-border/50 bg-card/40 backdrop-blur-sm relative overflow-hidden cursor-pointer"
+            onClick={() => router.push(`/manufacturer/batches/${batch._id}`)}
+          >
+            <div className="flex justify-between items-start mb-4">
+               <div>
+                  <Badge variant="outline" className="mb-2 font-mono text-[10px] px-2 py-0.5 border-primary/20 text-primary">{batch.batchNumber}</Badge>
+                  <h3 className="font-bold text-lg leading-tight">{batch.productName}</h3>
+                  <p className="text-xs text-muted-foreground font-medium mt-1">{format(new Date(batch.manufactureDate), 'MMMM dd, yyyy')}</p>
+               </div>
+               {batch.isRecalled ? (
+                  <Badge variant="destructive" className="font-black px-2 py-0.5 text-[9px] uppercase">Recalled</Badge>
+               ) : (
+                  <Badge className="bg-green-500/10 text-green-600 border-green-200 font-black px-2 py-0.5 text-[9px] uppercase">Active</Badge>
+               )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-5">
+               <div className="bg-muted/30 p-3 rounded-2xl border border-border/30">
+                  <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">Quantity</p>
+                  <p className="text-sm font-bold">{batch.quantity.toLocaleString()}</p>
+               </div>
+               <div className="bg-muted/30 p-3 rounded-2xl border border-border/30">
+                  <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1">Total Scans</p>
+                  <p className="text-sm font-bold">{batch.totalScans}</p>
+               </div>
+            </div>
+
+            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+               <Button asChild className="flex-1 rounded-xl h-12 gap-2" variant="outline">
+                  <Link href={`/manufacturer/batches/${batch._id}`}>
+                    <QrCode className="h-4 w-4" />
+                    Print
+                  </Link>
+               </Button>
+               <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                     <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl border-border/50">
+                        <MoreVertical className="h-5 w-5" />
+                     </Button>
+                  </DropdownMenuTrigger>
+                   <BatchActions 
+                      batch={batch} 
+                      onRecall={handleRecall} 
+                      onCopyHash={handleCopyHash} 
+                   />
+               </DropdownMenu>
+            </div>
+          </Card>
+        ))}
+        {filteredBatches.length === 0 && (
+           <div className="py-12 text-center text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-4 opacity-20" />
+              <p>No matches found.</p>
+           </div>
+        )}
+      </div>
     </div>
   );
-}
-
-// Utility for merging tailwind classes locally just for the refresh spin icon
-function cn(...classes: (string | undefined | null | false)[]) {
-  return classes.filter(Boolean).join(" ");
 }

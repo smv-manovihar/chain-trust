@@ -8,6 +8,14 @@ export interface IProduct extends Document {
 	price: number;
 	description?: string;
 	images: string[]; // S3/MinIO URLs
+	qrSettings: {
+		qrSize: number;
+		columns: number;
+		showProductName: boolean;
+		showUnitIndex: boolean;
+		showBatchNumber: boolean;
+		labelPadding: number;
+	};
 	createdBy: Types.ObjectId;
 	createdAt: Date;
 	updatedAt: Date;
@@ -46,6 +54,14 @@ const productSchema = new Schema<IProduct>(
 		images: {
 			type: [String],
 			default: [],
+		},
+		qrSettings: {
+			qrSize: { type: Number, default: 40 }, // mm
+			columns: { type: Number, default: 4 },
+			showProductName: { type: Boolean, default: true },
+			showUnitIndex: { type: Boolean, default: true },
+			showBatchNumber: { type: Boolean, default: true },
+			labelPadding: { type: Number, default: 10 }, // px
 		},
 		createdBy: {
 			type: Schema.Types.ObjectId,

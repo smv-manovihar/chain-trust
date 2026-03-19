@@ -16,6 +16,7 @@ import {
   Smartphone,
   Box,
   LayoutDashboard,
+  QrCode,
 } from "lucide-react";
 
 
@@ -106,46 +107,51 @@ export default function Home() {
           </TextAnimate>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12 md:mb-20">
+            <Button
+              size="lg"
+              className="group h-14 px-10 rounded-full text-lg shadow-2xl shadow-primary/30 relative overflow-hidden bg-primary hover:bg-primary/90"
+              asChild
+            >
+              <Link href="/verify">
+                <span className="relative z-10 flex items-center font-bold text-primary-foreground">
+                  <QrCode className="mr-3 h-6 w-6" />
+                  Verify Product Now
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out" />
+              </Link>
+            </Button>
+            
             {isLoading ? (
               <div className="h-14 w-48 bg-muted animate-pulse rounded-full" />
             ) : isAuthenticated ? (
               <Button
                 size="lg"
-                className="group h-14 px-8 rounded-full text-lg shadow-xl shadow-primary/20 relative overflow-hidden"
+                variant="outline"
+                className="group h-14 px-8 rounded-full text-lg border-primary/20 hover:bg-primary/5 transition-all"
                 asChild
               >
                 <Link href={getDashboardLink()}>
-                  <span className="relative z-10 flex items-center">
+                  <span className="relative z-10 flex items-center font-bold">
                     <LayoutDashboard className="mr-2 h-5 w-5" />
                     Go to Dashboard
-                    <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out" />
                 </Link>
               </Button>
             ) : (
               <Button
                 size="lg"
-                className="group h-14 px-8 rounded-full text-lg shadow-xl shadow-primary/20 relative overflow-hidden"
+                variant="outline"
+                className="group h-14 px-8 rounded-full text-lg border-primary/20 hover:bg-primary/5 transition-all"
                 asChild
               >
-                <Link href="/register">
-                  <span className="relative z-10 flex items-center">
-                    Get Started for Free
+                <Link href="/login">
+                  <span className="relative z-10 flex items-center font-bold">
+                    Manufacturer Login
                     <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out" />
                 </Link>
               </Button>
             )}
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-14 px-8 rounded-full text-lg bg-background/50 backdrop-blur border-border hover:bg-muted/50 transition-colors"
-              asChild
-            >
-              <Link href="#features">View Features</Link>
-            </Button>
           </div>
         </motion.div>
       </section>

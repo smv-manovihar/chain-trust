@@ -11,7 +11,9 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: 'var(--font-geist)',
+        sans: ['var(--font-figtree)', 'system-ui', 'sans-serif'],
+        heading: ['var(--font-figtree)', 'system-ui', 'sans-serif'],
+        body: ['var(--font-noto)', 'system-ui', 'sans-serif'],
         mono: 'var(--font-jetbrains)',
       },
       colors: {

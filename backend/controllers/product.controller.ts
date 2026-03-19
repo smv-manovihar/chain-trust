@@ -79,7 +79,7 @@ export const updateProduct = async (req: Request, res: Response) => {
 			return res.status(403).json({ message: 'Not authorized' });
 		}
 
-		const { name, productId, category, brand, price, description, images } = req.body;
+		const { name, productId, category, brand, price, description, images, qrSettings } = req.body;
 
 		if (name) product.name = name;
 		if (productId) product.productId = productId;
@@ -88,6 +88,7 @@ export const updateProduct = async (req: Request, res: Response) => {
 		if (price !== undefined) product.price = price;
 		if (description !== undefined) product.description = description;
 		if (images) product.images = images;
+		if (qrSettings) product.qrSettings = { ...product.qrSettings, ...qrSettings };
 
 		await product.save();
 		res.json({ message: 'Product updated.', product });

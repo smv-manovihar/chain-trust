@@ -21,5 +21,5 @@ export async function deriveUnitSalt(batchSalt: string, unitIndex: number): Prom
  */
 export function generateVerifyUrl(salt: string): string {
   const baseUrl = process.env.NEXT_PUBLIC_FRONTEND_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
-  return `${baseUrl}/verify-product?salt=${encodeURIComponent(salt)}`;
+  return `${baseUrl}/verify?salt=${encodeURIComponent(salt)}`;
 }

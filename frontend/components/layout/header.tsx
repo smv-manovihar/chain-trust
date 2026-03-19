@@ -96,13 +96,14 @@ export function Header({ variant = "default" }: HeaderProps = {}) {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6 bg-muted/40 px-6 py-2.5 rounded-full border border-border/50 backdrop-blur-md shadow-sm">
             {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-all duration-300 hover:-translate-y-0.5"
-              >
-                {link.label}
-              </Link>
+              <div key={link.href}>
+                <Link
+                  href={link.href}
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-all duration-300 hover:-translate-y-0.5"
+                >
+                  {link.label}
+                </Link>
+              </div>
             ))}
           </nav>
 

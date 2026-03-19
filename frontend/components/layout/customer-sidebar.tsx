@@ -4,44 +4,44 @@ import {
   LayoutDashboard,
   QrCode,
   Settings,
-  ChevronLeft,
-  ChevronRight,
+  PanelLeft,
   Pill,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useSidebar } from "@/contexts/sidebar-context";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export const navGroups = [
   {
-    label: "Overview",
+    label: "Main",
     items: [
       {
-        label: "Dashboard",
+        label: "Overview",
         href: "/customer",
         icon: LayoutDashboard,
       },
-      {
-        label: "Verify Product",
-        href: "/verify-product",
-        icon: QrCode,
-      },
-    ],
-  },
-  {
-    label: "My Health",
-    items: [
       {
         label: "My Medicines",
         href: "/customer/cabinet",
         icon: Pill,
       },
+      {
+        label: "Verify Product",
+        href: "/verify",
+        icon: QrCode,
+      },
     ],
   },
   {
-    label: "Configuration",
+    label: "Settings",
     items: [
       {
-        label: "Settings",
+        label: "Profile",
         href: "/customer/settings",
         icon: Settings,
       },
@@ -54,24 +54,79 @@ import { SidebarContent } from "./sidebar-content";
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 export function CustomerSidebar({ className }: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { isCollapsed, toggleSidebar } = useSidebar();
 
   return (
     <aside
       className={cn(
-        "hidden transition-all duration-300 md:block relative flex-shrink-0 h-full z-20 bg-background",
+        "hidden transition-all duration-300 lg:block relative flex-shrink-0 h-full z-20 bg-background group/sidebar cursor-ew-resize",
         isCollapsed ? "w-20" : "w-72",
         className,
       )}
+      onClick={toggleSidebar}
+      role="button"
+      tabIndex={0}
+      aria-label="Toggle sidebar"
+      onKeyDown={(e) => {
+        if (!isCollapsed) return;
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        toggleSidebar();
+      }}
     >
       <div className="flex h-full flex-col bg-card/50 backdrop-blur-xl border-r shadow-sm">
         <div
           className={cn(
-            "flex h-16 shrink-0 items-center border-b px-6",
+            "flex h-16 shrink-0 items-center border-b px-6 relative group/logo",
             isCollapsed ? "justify-center px-2" : "gap-3",
           )}
         >
           <BrandLogo size="sm" withText={!isCollapsed} />
+
+          {!isCollapsed && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className={cn(
+                    "ml-auto rounded-full h-7 w-7 bg-background shadow-md border-border text-muted-foreground hover:text-foreground transition-all hover:scale-110 z-30 cursor-pointer",
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleSidebar();
+                  }}
+                  aria-label="Toggle sidebar"
+                  title="Toggle sidebar"
+                >
+                  <PanelLeft className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="max-w-[10rem]">
+                Toggle sidebar
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {/* Logo Hover Toggle (Visible when collapsed) */}
+          {isCollapsed && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="absolute inset-0 flex items-center justify-center bg-background opacity-0 group-hover/logo:opacity-100 transition-opacity cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleSidebar();
+                  }}
+                  aria-label="Expand sidebar"
+                >
+                  <PanelLeft className="h-5 w-5 text-primary rotate-180" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Expand sidebar</TooltipContent>
+            </Tooltip>
+          )}
         </div>
 
         <SidebarContent
@@ -80,19 +135,6 @@ export function CustomerSidebar({ className }: SidebarProps) {
           className="flex-1"
         />
       </div>
-
-      <Button
-        variant="outline"
-        size="icon"
-        className="absolute -right-3 top-20 h-6 w-6 rounded-full bg-background shadow-md border-border text-muted-foreground hover:text-foreground transition-transform hover:scale-110 z-30"
-        onClick={() => setIsCollapsed(!isCollapsed)}
-      >
-        {isCollapsed ? (
-          <ChevronRight className="h-3 w-3" />
-        ) : (
-          <ChevronLeft className="h-3 w-3" />
-        )}
-      </Button>
     </aside>
   );
 }
@@ -104,16 +146,15 @@ import { Button } from "../ui/button";
 export function MobileSidebar({
   mainRef,
   open: externalOpen,
-  onOpenChange
+  onOpenChange,
 }: {
-  mainRef?: React.RefObject<HTMLElement | null>;
+  mainRef?: React.RefObject<HTMLDivElement | null>;
   open?: boolean;
   onOpenChange?: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
-
 
   const isVisible = useScrollDirection(mainRef);
 
@@ -130,10 +171,12 @@ export function MobileSidebar({
       </div>
 
       {/* Custom Backdrop */}
-      <div
+      <button
+        type="button"
+        aria-label="Close mobile sidebar"
         onClick={() => setOpen(false)}
         className={cn(
-          "fixed inset-0 z-[90] bg-background/40 backdrop-blur-sm md:hidden transition-all duration-300",
+          "fixed inset-0 z-[90] bg-background/40 backdrop-blur-sm md:hidden transition-all duration-300 p-0 m-0 border-0 appearance-none",
           open
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none",

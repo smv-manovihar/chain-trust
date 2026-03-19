@@ -2,26 +2,98 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getBatch, getBatchQRData } from "@/api/batch.api";
+import { getBatch, getBatchQRData, downloadBatchPDF } from "@/api/batch.api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowLeft, Printer, Download, MapPin, Search } from "lucide-react";
-import Link from "next/link";
-import { format } from "date-fns";
+import { Loader2, ArrowLeft, Printer, Download, MapPin, Search, RefreshCw } from "lucide-react";
 import QrDisplay from "@/components/manufacturer/qr-display";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { updateProduct } from "@/api/product.api";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { Settings2, Save, ScanLine, FileText } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 
 export default function BatchDetailPage() {
-  const params = useParams();
+  const { id: batchId } = useParams() as { id: string };
   const router = useRouter();
-  const batchId = params.id as string;
 
   const [batch, setBatch] = useState<any>(null);
   const [qrData, setQrData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [qrSettings, setQrSettings] = useState({
+    qrSize: 40,
+    columns: 4,
+    showProductName: true,
+    showUnitIndex: true,
+    showBatchNumber: true,
+    labelPadding: 10,
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+
+  const handleDownloadPDF = async () => {
+    if (!batch) return;
+    try {
+      setIsDownloading(true);
+      const blob = await downloadBatchPDF(batchId);
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `batch-${batch.batchNumber}-labels.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      toast.success("PDF sheet generated successfully!");
+    } catch (err) {
+      console.error("PDF Download failed:", err);
+      toast.error("Failed to generate PDF. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleLoadAll = () => {
+    if (!batch?.quantity) return;
+    if (batch.quantity > 1000) {
+      if (!confirm(`Preparing ${batch.quantity} units for print might slow down your browser for a few seconds. Proceed?`)) return;
+    }
+    setPageSize(batch.quantity);
+    setPage(1);
+  };
+
+  useEffect(() => {
+    if (batch?.product?.qrSettings) {
+      setQrSettings(batch.product.qrSettings);
+    }
+  }, [batch]);
+
+  const handleSaveSettings = async () => {
+    if (!batch?.product?._id && !batch?.product) {
+       // Support both populated and unpopulated just in case
+       const productId = batch?.product?._id || batch?.product;
+       if (!productId) return;
+    }
+    const productId = batch.product._id || batch.product;
+    setIsSaving(true);
+    try {
+      await updateProduct(productId, { qrSettings });
+      toast.success("QR settings saved for this product!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save settings.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (!batchId) return;
@@ -31,7 +103,7 @@ export default function BatchDetailPage() {
       try {
          const [batchRes, qrRes] = await Promise.all([
            getBatch(batchId),
-           getBatchQRData(batchId, page, 50)
+           getBatchQRData(batchId, page, pageSize)
          ]);
          setBatch(batchRes.batch);
          setQrData(qrRes);
@@ -43,7 +115,7 @@ export default function BatchDetailPage() {
     };
 
     loadData();
-  }, [batchId, page]);
+  }, [batchId, page, pageSize]);
 
   // Just standard client-side printing
   const handlePrint = () => {
@@ -75,11 +147,11 @@ export default function BatchDetailPage() {
   });
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Hide controls when printing */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={() => router.back()}>
+          <Button variant="outline" size="icon" onClick={() => router.back()} className="rounded-xl">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -91,41 +163,137 @@ export default function BatchDetailPage() {
           </div>
         </div>
         <div className="flex gap-3">
-          <Button onClick={handlePrint} className="gap-2 shadow-sm">
-            <Printer className="h-4 w-4" /> 
-            Print QR Labels
+          {batch.quantity > pageSize && (
+            <Button variant="outline" onClick={handleLoadAll} className="gap-2 text-orange-600 border-orange-200 hover:bg-orange-50 transition-colors rounded-xl">
+              <RefreshCw className="h-4 w-4" />
+              Prepare All {batch.quantity}
+            </Button>
+          )}
+          <Button 
+            onClick={handleDownloadPDF} 
+            disabled={isDownloading} 
+            variant="outline"
+            className="gap-2 rounded-xl px-6"
+          >
+            {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Download PDF
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setShowSettings(!showSettings)}
+            className={cn("gap-2 rounded-xl", showSettings && "bg-primary/10 border-primary/30 text-primary")}
+          >
+            <Settings2 className="h-4 w-4" />
+            Design
+          </Button>
+          <Button onClick={handlePrint} disabled={isDownloading} className="gap-2 bg-primary shadow-lg shadow-primary/20 rounded-xl px-6">
+            {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />} 
+            Print Labels
           </Button>
         </div>
       </div>
 
-      {/* Batch Overview Card - Hidden somewhat on print */}
-      <Card className="p-6 border-border shadow-sm print:shadow-none print:border-b-2 print:border-black print:rounded-none bg-card">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-           <div>
-             <p className="text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">Manufacturer</p>
-             <p className="font-medium text-[15px]">{batch.brand}</p>
-           </div>
-           <div>
-             <p className="text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">Units Manufactured</p>
-             <p className="font-medium text-[15px]">{batch.quantity.toLocaleString()}</p>
-           </div>
-           <div>
-             <p className="text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">Manufacture Date</p>
-             <p className="font-medium text-[15px]">{format(new Date(batch.manufactureDate), 'MMM d, yyyy')}</p>
-           </div>
-           <div className="print:hidden">
-             <p className="text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">Blockchain Status</p>
-             <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                <p className="font-medium text-[14px] truncate" title={batch.blockchainHash}>
-                   Confirmed
-                </p>
-             </div>
-           </div>
-        </div>
-      </Card>
+      {/* QR Settings Panel */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <Card className="p-6 border-primary/20 bg-primary/5 rounded-[2rem] gap-8 grid grid-cols-1 md:grid-cols-3 shadow-none">
+              <div className="space-y-4">
+                <h4 className="font-bold flex items-center gap-2">
+                  <ScanLine className="h-4 w-4" /> Design Layout
+                </h4>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <Label className="text-xs font-bold uppercase tracking-wider">QR Size (mm)</Label>
+                      <span className="text-xs font-mono">{qrSettings.qrSize}mm</span>
+                    </div>
+                      <Slider 
+                      value={[qrSettings.qrSize]} 
+                      onValueChange={([v]) => setQrSettings(s => ({ ...s, qrSize: v }))}
+                      min={15} max={80} step={1}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <Label className="text-xs font-bold uppercase tracking-wider">Print Columns</Label>
+                      <span className="text-xs font-mono">{qrSettings.columns}</span>
+                    </div>
+                    <Slider 
+                      value={[qrSettings.columns]} 
+                      onValueChange={([v]) => setQrSettings(s => ({ ...s, columns: v }))}
+                      min={1} max={6} step={1}
+                    />
+                  </div>
+                </div>
+              </div>
 
-      <div className="flex items-center justify-between mt-8 print:hidden">
+              <div className="space-y-4">
+                <h4 className="font-bold flex items-center gap-2">
+                  <FileText className="h-4 w-4" /> Label Content
+                </h4>
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium">Show Product Name</Label>
+                    <Switch 
+                      checked={qrSettings.showProductName} 
+                      onCheckedChange={(v) => setQrSettings(s => ({ ...s, showProductName: v }))} 
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium">Show Unit Index</Label>
+                    <Switch 
+                      checked={qrSettings.showUnitIndex} 
+                      onCheckedChange={(v) => setQrSettings(s => ({ ...s, showUnitIndex: v }))} 
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium">Show Batch No.</Label>
+                    <Switch 
+                      checked={qrSettings.showBatchNumber} 
+                      onCheckedChange={(v) => setQrSettings(s => ({ ...s, showBatchNumber: v }))} 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col justify-between gap-6">
+                <div className="space-y-4">
+                   <h4 className="font-bold flex items-center gap-2">
+                    <Settings2 className="h-4 w-4" /> Spacing
+                  </h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <Label className="text-xs font-bold uppercase tracking-wider">Label Padding (mm)</Label>
+                      <span className="text-xs font-mono">{qrSettings.labelPadding}mm</span>
+                    </div>
+                    <Slider 
+                      value={[qrSettings.labelPadding]} 
+                      onValueChange={([v]) => setQrSettings(s => ({ ...s, labelPadding: v }))}
+                      min={0} max={20} step={1}
+                    />
+                  </div>
+                </div>
+                <Button 
+                  onClick={handleSaveSettings} 
+                  disabled={isSaving}
+                  className="w-full rounded-2xl h-12 gap-2 shadow-lg shadow-primary/20"
+                >
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save as Default
+                </Button>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="flex items-center justify-between mt-8">
          <h2 className="text-xl font-bold">QR Codes (Units {qrData.units[0]?.unitIndex + 1} - {qrData.units[qrData.units.length - 1]?.unitIndex + 1})</h2>
          
          <div className="flex gap-4 items-center">
@@ -133,13 +301,13 @@ export default function BatchDetailPage() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Find Unit ID..." 
-                className="w-[180px] pl-8 h-9 text-sm"
+                className="w-[180px] pl-8 h-9 text-sm rounded-xl"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
 
-            <div className="flex border rounded-md overflow-hidden h-9">
+            <div className="flex border rounded-xl overflow-hidden h-9">
               <Button 
                 variant="ghost" 
                 className="rounded-none border-r px-3 h-full"
@@ -163,62 +331,51 @@ export default function BatchDetailPage() {
          </div>
       </div>
 
-      {/* 
-        THE PRINT GRID 
-        On screen: standard grid
-        On print: CSS controls the grid layout perfectly for sheets of labels
-      */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 print:grid-cols-4 print:gap-x-2 print:gap-y-6">
+      <div 
+        className="grid gap-4"
+        style={{ 
+          gridTemplateColumns: `repeat(${qrSettings.columns}, minmax(0, 1fr))`,
+        }}
+      >
         {loading ? (
            <div className="col-span-full py-20 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" /></div>
         ) : filteredUnits.length === 0 ? (
            <div className="col-span-full py-20 text-center text-muted-foreground">No units found matching that ID.</div>
         ) : (
           filteredUnits.map((unit: any) => (
-            <Card key={unit.unitIndex} className="overflow-hidden border-border bg-card flex flex-col items-center p-4 print:border-2 print:border-black print:rounded-none print:shadow-none print:page-break-inside-avoid">
-               <QrDisplay salt={unit.salt} size={140} className="mb-3" />
-               <div className="text-center w-full">
-                  <p className="text-xs font-bold text-foreground mb-0.5 print:-mt-1 uppercase truncate w-full">{batch.productName}</p>
-                  <div className="flex items-center justify-center gap-2 mb-1 print:hidden">
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                      UNIT #{unit.unitIndex + 1}
-                    </Badge>
+            <Card 
+              key={unit.unitIndex} 
+              className="relative overflow-hidden border-border bg-card flex flex-col items-center rounded-[2rem] transition-all duration-200"
+              style={{ padding: `${qrSettings.labelPadding}px` }}
+            >
+               <QrDisplay 
+                 salt={unit.salt} 
+                 size={qrSettings.qrSize * 3.78} 
+                 className="mb-2"
+                 errorCorrectionLevel="M" // Set default error correction to 'M'
+               />
+               <div className="text-center w-full flex flex-col gap-0.5">
+                  {qrSettings.showProductName && (
+                    <p className="text-[10px] font-black text-foreground uppercase truncate w-full tracking-tight leading-none mb-0.5">{batch.productName}</p>
+                  )}
+                  
+                  <div className="flex items-center justify-center gap-2">
+                    {qrSettings.showUnitIndex && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-background/50">
+                        UNIT #{unit.unitIndex + 1}
+                      </Badge>
+                    )}
                     {unit.scanCount > 0 && (
                       <Badge variant={unit.scanCount > 5 ? "destructive" : "secondary"} className="text-[10px] px-1.5 py-0 h-4 bg-muted text-muted-foreground border-none">
                         {unit.scanCount} Scans
                       </Badge>
                     )}
                   </div>
-                  <p className="text-[10px] font-mono text-muted-foreground hidden print:block pt-1 border-t border-dashed w-full mt-1">
-                    UNIT: {String(unit.unitIndex + 1).padStart(6, '0')} | {batch.batchNumber}
-                  </p>
                </div>
             </Card>
           ))
         )}
       </div>
-
-      {/* Print styles injected to hide global nav/sidebar when printing this page */}
-      <style dangerouslySetInnerHTML={{__html: `
-        @media print {
-          body, html {
-            background-color: white !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-          nav, header, aside, .sidebar { 
-             display: none !important; 
-          }
-          main { 
-             margin: 0 !important; 
-             padding: 10mm !important; 
-          }
-          @page {
-            size: A4;
-            margin: 10mm;
-          }
-        }
-      `}} />
     </div>
   );
 }

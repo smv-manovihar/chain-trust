@@ -5,3 +5,6 @@ node_modules
 .env*.local
 refs
 tsconfig.tsbuildinfo
+design-system
+
+__pycache__

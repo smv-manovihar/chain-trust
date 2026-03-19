@@ -11,18 +11,25 @@ import {
   Package,
   Calendar,
   QrCode,
-  Image as ImageIcon,
   Loader2,
   AlertCircle,
   Search,
-  ChevronDown,
+  ArrowRight,
+  ArrowLeft,
+  ChevronRight,
+  Zap,
+  ShieldCheck,
+  Cpu
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createBatch } from "@/api/batch.api";
 import { listProducts } from "@/api/product.api";
-import { getContract, requestExecutionAccounts } from "@/api/web3-client";
+import { requestExecutionAccounts } from "@/api/web3-client";
 import Link from "next/link";
 import { resolveMediaUrl } from "@/lib/media-url";
+import { motion, AnimatePresence } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CatalogueProduct {
   _id: string;
@@ -35,538 +42,326 @@ interface CatalogueProduct {
 }
 
 const steps = [
-  { number: 1, title: "Select Product", icon: Package },
-  { number: 2, title: "Batch Details", icon: Calendar },
-  { number: 3, title: "Review & Mint", icon: QrCode },
+  { number: 1, title: "Identity", icon: Package },
+  { number: 2, title: "Batch Metrics", icon: Calendar },
+  { number: 3, title: "Blockchain Mint", icon: QrCode },
 ];
 
-const totalSteps = steps.length;
-
-export default function EnrollBatchPage() {
+export default function EnrollBatchWizard() {
   const [currentStep, setCurrentStep] = useState(1);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [mintProgress, setMintProgress] = useState(0);
   const [successId, setSuccessId] = useState<string | null>(null);
 
-  // Step 1: Product Selection
+  // Data
   const [products, setProducts] = useState<CatalogueProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
-  const [selectedProduct, setSelectedProduct] =
-    useState<CatalogueProduct | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<CatalogueProduct | null>(null);
   const [productSearch, setProductSearch] = useState("");
 
-  // Step 2: Batch Details
-  const [batchNumber, setBatchNumber] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [manufactureDate, setManufactureDate] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
-  const [description, setDescription] = useState("");
+  // Form
+  const [batchData, setBatchData] = useState({
+    batchNumber: "",
+    quantity: "",
+    manufactureDate: "",
+    expiryDate: "",
+    description: ""
+  });
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const res = await listProducts();
-        setProducts(res.products || []);
-      } catch (err) {
-        console.error("Failed to load products:", err);
-      } finally {
-        setProductsLoading(false);
-      }
-    };
-    fetchProducts();
+    listProducts()
+      .then(res => setProducts(res.products || []))
+      .catch(err => console.error("Failed to load products", err))
+      .finally(() => setProductsLoading(false));
   }, []);
 
   const filteredProducts = useMemo(() => {
-    if (!productSearch) return products;
     const q = productSearch.toLowerCase();
-    return products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.productId.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q),
-    );
+    return products.filter(p => p.name.toLowerCase().includes(q) || p.productId.toLowerCase().includes(q));
   }, [products, productSearch]);
 
-  const canAdvance = () => {
-    if (currentStep === 1) return !!selectedProduct;
-    if (currentStep === 2)
-      return (
-        !!batchNumber &&
-        !!quantity &&
-        parseInt(quantity) > 0 &&
-        !!manufactureDate
-      );
-    return true;
-  };
-
-  const handleSubmit = async () => {
+  const handleMint = async () => {
     if (!selectedProduct) return;
-
     setLoading(true);
     setError("");
-    setUploadProgress(10);
+    setMintProgress(20);
 
     try {
-      // 1. Generate batchSalt
       const encoder = new TextEncoder();
-      const saltInput = `${selectedProduct.productId}-${batchNumber}-${Date.now()}-${crypto.getRandomValues(new Uint8Array(16)).join("")}`;
-      const hashBuffer = await crypto.subtle.digest(
-        "SHA-256",
-        encoder.encode(saltInput),
-      );
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const batchSalt = hashArray
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-
-      setUploadProgress(30);
-
-      // 2. Deploy / Get contract and Mint on blockchain
-      const accounts = await requestExecutionAccounts();
-      if (!accounts || accounts.length === 0)
-        throw new Error(
-          "No Web3 account found. Make sure your blockchain node is running.",
-        );
-      const deployer = accounts[0];
-
-      const numMfDate = Math.floor(new Date(manufactureDate).getTime() / 1000);
-      const numExDate = expiryDate
-        ? Math.floor(new Date(expiryDate).getTime() / 1000)
-        : 0;
-
-      setUploadProgress(50);
-
-      const { registerBatchOnChain } = await import("@/api/web3-client");
+      const saltInput = `${selectedProduct.productId}-${batchData.batchNumber}-${Date.now()}-${crypto.getRandomValues(new Uint8Array(8)).join("")}`;
+      const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(saltInput));
+      const batchSalt = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
       
+      setMintProgress(40);
+      const accounts = await requestExecutionAccounts();
+      if (!accounts?.[0]) throw new Error("Blockchain wallet not detected.");
+      
+      setMintProgress(60);
+      const { registerBatchOnChain } = await import("@/api/web3-client");
       const txResult = await registerBatchOnChain({
         productId: selectedProduct.productId,
         productName: selectedProduct.name,
         brand: selectedProduct.brand,
-        batchNumber: batchNumber,
+        batchNumber: batchData.batchNumber,
         batchSalt: batchSalt,
-        manufactureDate: numMfDate,
-        expiryDate: numExDate,
-        quantity: parseInt(quantity)
-      }, deployer);
+        manufactureDate: Math.floor(new Date(batchData.manufactureDate).getTime() / 1000),
+        expiryDate: batchData.expiryDate ? Math.floor(new Date(batchData.expiryDate).getTime() / 1000) : 0,
+        quantity: parseInt(batchData.quantity)
+      }, accounts[0]);
 
-      const txHash = txResult.transactionHash || txResult.blockHash;
-      setUploadProgress(80);
-
-      // 3. Save to Backend
+      setMintProgress(90);
       const savedBatch = await createBatch({
         productRef: selectedProduct._id,
-        batchNumber,
-        quantity: parseInt(quantity),
-        manufactureDate: new Date(manufactureDate).toISOString(),
-        expiryDate: expiryDate ? new Date(expiryDate).toISOString() : undefined,
-        description,
+        batchNumber: batchData.batchNumber,
+        quantity: parseInt(batchData.quantity),
+        manufactureDate: new Date(batchData.manufactureDate).toISOString(),
+        expiryDate: batchData.expiryDate ? new Date(batchData.expiryDate).toISOString() : undefined,
+        description: batchData.description,
         batchSalt,
-        blockchainHash: txHash,
+        blockchainHash: txResult.transactionHash || txResult.blockHash,
       });
 
-      setUploadProgress(100);
+      setMintProgress(100);
       setSuccessId(savedBatch.batch._id);
-      setCurrentStep(totalSteps + 1);
     } catch (err: any) {
-      console.error("Failed to register batch:", err);
-      let readableError = err.message;
-      if (err.message?.includes("ProductAlreadyExists")) {
-        readableError = "Batch number already exists on the blockchain.";
-      }
-      setError(readableError);
+      setError(err.message || "Failed to mint batch.");
     } finally {
       setLoading(false);
-      setUploadProgress(0);
     }
   };
 
   if (successId) {
     return (
-      <div className="max-w-4xl mx-auto w-full text-center space-y-6 pt-12">
-        <div className="mx-auto w-20 h-20 bg-green-100/50 text-green-600 rounded-full flex items-center justify-center border border-green-200">
-          <Check className="h-10 w-10" />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="max-w-2xl mx-auto py-12 text-center space-y-8"
+      >
+        <div className="relative inline-block">
+          <div className="absolute inset-0 bg-green-500 blur-2xl opacity-20 animate-pulse" />
+          <div className="relative w-24 h-24 bg-green-500 rounded-[2rem] flex items-center justify-center text-white shadow-2xl">
+            <Check className="h-12 w-12" />
+          </div>
         </div>
-        <h1 className="text-3xl font-bold text-foreground">
-          Batch Registered Successfully!
-        </h1>
-        <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-          Batch <strong>{batchNumber}</strong> ({quantity} units) of{" "}
-          <strong>{selectedProduct?.name}</strong> has been minted to the
-          blockchain.
-        </p>
-        <div className="flex justify-center gap-4 pt-4">
-          <Button asChild variant="outline" size="lg">
-            <Link href="/manufacturer/batches">View All Batches</Link>
-          </Button>
-          <Button asChild size="lg" className="gap-2">
-            <Link href={`/manufacturer/batches/${successId}`}>
-              <QrCode className="h-5 w-5" />
-              Generate QR Codes
-            </Link>
+        <div>
+          <h1 className="text-4xl font-black tracking-tighter">Batch Enrolled!</h1>
+          <p className="text-muted-foreground font-medium mt-2">Units are now verifiable on the public ledger.</p>
+        </div>
+        <div className="flex justify-center gap-4">
+          <Button variant="outline" asChild className="rounded-full px-8"><Link href="/manufacturer/batches">Operations Hub</Link></Button>
+          <Button asChild className="rounded-full px-8 bg-primary shadow-lg shadow-primary/20">
+             <Link href={`/manufacturer/batches/${successId}`} className="gap-2"><QrCode className="h-4 w-4" /> Print QR Sheet</Link>
           </Button>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 max-w-4xl mx-auto w-full">
-      <div className="mb-6 flex-none">
-        <h1 className="text-3xl font-bold text-foreground">Create New Batch</h1>
-        <p className="text-muted-foreground">
-          Select a product from your catalogue, set batch details, and mint to
-          the blockchain.
-        </p>
-      </div>
-
-      {error && (
-        <div className="mb-6 p-4 rounded-md bg-destructive/10 text-destructive flex items-start gap-3 border border-destructive/20 shadow-sm">
-          <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
-          <p className="text-sm font-medium">{error}</p>
+    <div className="max-w-4xl mx-auto w-full space-y-8 pb-12">
+      {/* Step Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+           <Button variant="ghost" size="icon" asChild className="rounded-full"><Link href="/manufacturer/batches"><ArrowLeft className="h-5 w-5" /></Link></Button>
+           <div>
+              <h1 className="text-3xl font-black tracking-tighter">Mint New Batch</h1>
+              <p className="text-muted-foreground text-sm font-medium">Production Run Registration Wizard</p>
+           </div>
         </div>
-      )}
-
-      {/* Progress Steps */}
-      <div className="mb-8 relative px-4">
-        <div className="absolute left-10 right-10 top-1/2 w-[calc(100%-5rem)] h-0.5 bg-muted -z-10" />
-        <div
-          className="absolute left-10 top-1/2 h-0.5 bg-primary -z-10 transition-all duration-500 ease-in-out"
-          style={{
-            width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%`,
-            maxWidth: "calc(100% - 5rem)",
-          }}
-        />
-        <div className="flex items-center justify-between">
-          {steps.map((step) => {
-            const Icon = step.icon;
-            const isActive = currentStep >= step.number;
-            const isCompleted = currentStep > step.number;
-            return (
-              <div
-                key={step.number}
-                className="flex flex-col items-center gap-2 bg-background px-2"
-              >
-                <div
-                  className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors duration-300 shadow-sm",
-                    isActive
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-muted text-muted-foreground bg-background",
-                  )}
-                >
-                  {isCompleted ? (
-                    <Check className="h-5 w-5" />
-                  ) : (
-                    <Icon className="h-5 w-5" />
-                  )}
-                </div>
-                <span
-                  className={cn(
-                    "text-xs font-semibold whitespace-nowrap hidden sm:block",
-                    isActive ? "text-primary" : "text-muted-foreground",
-                  )}
-                >
-                  {step.title}
-                </span>
-              </div>
-            );
-          })}
+        <div className="flex gap-2">
+           {steps.map(s => (
+             <div key={s.number} className={cn("h-2 w-16 rounded-full transition-all duration-500", s.number <= currentStep ? "bg-primary shadow-lg shadow-primary/20" : "bg-muted")} />
+           ))}
         </div>
       </div>
 
-      {/* Step 1: Select Product */}
-      {currentStep === 1 && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="border-b pb-4">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <Package className="text-primary h-5 w-5" />
-              Select Product
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Choose a product from your catalogue to create a batch for.
-            </p>
-          </div>
-
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search products by name, SKU, or category..."
-              className="pl-9 h-10"
-              value={productSearch}
-              onChange={(e) => setProductSearch(e.target.value)}
-            />
-          </div>
-
-          {/* Product Grid */}
-          {productsLoading ? (
-            <div className="flex items-center justify-center p-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : filteredProducts.length > 0 ? (
-            <div className="flex-1 min-h-[300px] overflow-y-auto pb-2 pr-1 scrollbar-thin scrollbar-thumb-muted-foreground/10">
-              {filteredProducts.map((p) => (
-                <Card
-                  key={p._id}
-                  className={cn(
-                    "p-4 cursor-pointer border-2 transition-all hover:shadow-md",
-                    selectedProduct?._id === p._id
-                      ? "border-primary bg-primary/5 shadow-md"
-                      : "border-border hover:border-primary/40",
-                  )}
-                  onClick={() => setSelectedProduct(p)}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="h-12 w-12 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0 border border-border overflow-hidden">
-                      {p.images?.[0] ? (
-                        <img
-                          src={resolveMediaUrl(p.images[0])}
-                          alt={p.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <Package className="h-5 w-5 text-muted-foreground/50" />
-                      )}
+      <AnimatePresence mode="wait">
+        <motion.div
+           key={currentStep}
+           initial={{ opacity: 0, x: 20 }}
+           animate={{ opacity: 1, x: 0 }}
+           exit={{ opacity: 0, x: -20 }}
+        >
+          <Card className="p-1 rounded-[2.5rem] bg-gradient-to-br from-primary/10 via-background to-accent/10 border-none shadow-2xl overflow-hidden">
+             <div className="bg-background rounded-[2.4rem] p-6 lg:p-10 space-y-8">
+                
+                {currentStep === 1 && (
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-3 text-primary mb-2">
+                       <Package className="h-6 w-6" />
+                       <h2 className="text-xl font-bold">Select Product</h2>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-foreground truncate">
-                        {p.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground font-mono">
-                        {p.productId}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {p.brand} · {p.category}
-                      </p>
+                    <div className="relative">
+                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                       <Input 
+                         placeholder="Search your catalogue..." 
+                         value={productSearch}
+                         onChange={e => setProductSearch(e.target.value)}
+                         className="h-12 rounded-2xl border-primary/20 pl-11 shadow-inner"
+                       />
                     </div>
-                    {selectedProduct?._id === p._id && (
-                      <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">
-                        <Check className="h-3.5 w-3.5" />
+                    <ScrollArea className="h-[320px] pr-4">
+                      <div className="grid sm:grid-cols-2 gap-4">
+                         {filteredProducts.map(p => (
+                           <Card 
+                             key={p._id} 
+                             onClick={() => setSelectedProduct(p)}
+                             className={cn(
+                               "p-4 rounded-3xl border-2 transition-all cursor-pointer group flex items-center gap-4",
+                               selectedProduct?._id === p._id ? "bg-primary/5 border-primary shadow-lg shadow-primary/10" : "border-border/50 hover:border-primary/30"
+                             )}
+                           >
+                              <div className="h-12 w-12 rounded-2xl overflow-hidden bg-muted group-hover:scale-110 transition-transform shrink-0 border border-border">
+                                {p.images?.[0] ? <img src={resolveMediaUrl(p.images[0])} alt="" className="w-full h-full object-cover" /> : <Package className="w-full h-full p-3 opacity-20" />}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold text-sm truncate">{p.name}</p>
+                                <p className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">{p.productId}</p>
+                              </div>
+                           </Card>
+                         ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                )}
+
+                {currentStep === 2 && (
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-3 text-primary mb-2">
+                       <Calendar className="h-6 w-6" />
+                       <h2 className="text-xl font-bold">Batch Metrics</h2>
+                    </div>
+                    {selectedProduct && (
+                      <div className="p-4 bg-muted/30 rounded-2xl flex items-center gap-4 border border-border/50">
+                         <Badge className="bg-primary/20 text-primary border-none font-black uppercase text-[10px] tracking-widest">Targeting</Badge>
+                         <p className="font-bold text-sm">{selectedProduct.name} <span className="text-muted-foreground font-medium ml-1">({selectedProduct.productId})</span></p>
+                      </div>
+                    )}
+                    <div className="grid sm:grid-cols-2 gap-6">
+                       <div className="space-y-2">
+                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Batch Identifier</Label>
+                          <Input 
+                            placeholder="e.g. BATCH-2024-X91" 
+                            value={batchData.batchNumber} 
+                            onChange={e => setBatchData(prev => ({...prev, batchNumber: e.target.value}))}
+                            className="h-12 rounded-2xl border-primary/20 shadow-inner"
+                          />
+                       </div>
+                       <div className="space-y-2">
+                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Quantity (Units to Mint)</Label>
+                          <Input 
+                            type="number" 
+                            placeholder="e.g. 5000" 
+                            value={batchData.quantity} 
+                            onChange={e => setBatchData(prev => ({...prev, quantity: e.target.value}))}
+                            className="h-12 rounded-2xl border-primary/20 shadow-inner"
+                          />
+                       </div>
+                       <div className="space-y-2">
+                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Manufacture Date</Label>
+                          <Input 
+                            type="date" 
+                            value={batchData.manufactureDate} 
+                            onChange={e => setBatchData(prev => ({...prev, manufactureDate: e.target.value}))}
+                            className="h-12 rounded-2xl border-primary/20 shadow-inner"
+                          />
+                       </div>
+                       <div className="space-y-2">
+                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Expiry Date (Optional)</Label>
+                          <Input 
+                            type="date" 
+                            value={batchData.expiryDate} 
+                            onChange={e => setBatchData(prev => ({...prev, expiryDate: e.target.value}))}
+                            className="h-12 rounded-2xl border-primary/20 shadow-inner"
+                          />
+                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {currentStep === 3 && (
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-3 text-primary mb-2">
+                       <QrCode className="h-6 w-6" />
+                       <h2 className="text-xl font-bold">Review & Sync</h2>
+                    </div>
+                    
+                    <Card className="p-6 rounded-3xl border-border/50 bg-muted/10 grid sm:grid-cols-3 gap-6">
+                       <div className="space-y-1">
+                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Product</p>
+                          <p className="text-sm font-bold">{selectedProduct?.name}</p>
+                       </div>
+                       <div className="space-y-1">
+                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Batch Number</p>
+                          <p className="text-sm font-mono font-bold text-primary">{batchData.batchNumber}</p>
+                       </div>
+                       <div className="space-y-1">
+                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Units</p>
+                          <p className="text-sm font-bold">{parseInt(batchData.quantity).toLocaleString()}</p>
+                       </div>
+                    </Card>
+
+                    <div className="p-6 rounded-3xl bg-amber-500/5 border border-amber-500/20 flex gap-4">
+                       <AlertTriangle className="h-6 w-6 text-amber-500 shrink-0" />
+                       <p className="text-xs text-muted-foreground leading-relaxed">
+                         Minting is an immutable action on the public blockchain. Once verified, this batch details and unit salts cannot be deleted or modified.
+                       </p>
+                    </div>
+
+                    {loading && (
+                      <div className="space-y-4 pt-4">
+                         <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${mintProgress}%` }}
+                              className="h-full bg-primary shadow-[0_0_15px_rgba(var(--primary),0.5)]" 
+                            />
+                         </div>
+                         <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-primary">
+                            <span className="flex items-center gap-2"><Cpu className="h-3 w-3 animate-spin" /> Hardware Wallet Check</span>
+                            <span>{mintProgress}%</span>
+                         </div>
                       </div>
                     )}
                   </div>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center p-12 border border-dashed rounded-lg border-border">
-              <Package className="h-8 w-8 text-muted-foreground/50 mx-auto mb-3" />
-              <p className="text-foreground font-medium">No products found</p>
-              <p className="text-sm text-muted-foreground mt-1 mb-4">
-                Add a product to your catalogue first.
-              </p>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/manufacturer/products">Go to Products</Link>
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
+                )}
 
-      {/* Step 2: Batch Details */}
-      {currentStep === 2 && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="border-b pb-4">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <Calendar className="text-primary h-5 w-5" />
-              Batch Details
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Batch for: <strong>{selectedProduct?.name}</strong> (
-              {selectedProduct?.productId})
-            </p>
-          </div>
+                {/* Wizard Navigation */}
+                <div className="flex items-center justify-between pt-6 border-t border-border/50">
+                   {currentStep > 1 ? (
+                     <Button variant="ghost" onClick={() => setCurrentStep(s => s - 1)} disabled={loading} className="rounded-full px-6 text-muted-foreground font-bold">Back</Button>
+                   ) : <div />}
 
-          <div className="grid sm:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="batchNumber">
-                Batch Number <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="batchNumber"
-                placeholder="e.g. BATCH-2024-X91"
-                value={batchNumber}
-                onChange={(e) => setBatchNumber(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">Must be unique.</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="quantity">
-                Total Units <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="1"
-                placeholder="e.g. 5000"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Individual QR codes will be generated for each unit.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="manufactureDate">
-                Manufacture Date <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="manufactureDate"
-                type="date"
-                value={manufactureDate}
-                onChange={(e) => setManufactureDate(e.target.value)}
-                max={new Date().toISOString().split("T")[0]}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="expiryDate">Expiry Date (optional)</Label>
-              <Input
-                id="expiryDate"
-                type="date"
-                value={expiryDate}
-                onChange={(e) => setExpiryDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Notes (optional)</Label>
-            <Textarea
-              id="description"
-              placeholder="Batch-specific notes or instructions..."
-              className="resize-none h-20"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Review & Mint */}
-      {currentStep === 3 && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="border-b pb-4">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <QrCode className="text-primary h-5 w-5" />
-              Review & Mint
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Confirm the details and submit to the blockchain.
-            </p>
-          </div>
-
-          <Card className="p-6 border border-border space-y-4">
-            <div className="grid sm:grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-xs text-muted-foreground">Product</p>
-                <p className="font-semibold text-foreground">
-                  {selectedProduct?.name}
-                </p>
-                <p className="text-xs text-muted-foreground font-mono">
-                  {selectedProduct?.productId}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Brand / Category
-                </p>
-                <p className="font-medium text-foreground">
-                  {selectedProduct?.brand} · {selectedProduct?.category}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Batch Number</p>
-                <p className="font-mono font-semibold text-primary">
-                  {batchNumber}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Units</p>
-                <p className="font-semibold text-foreground">
-                  {parseInt(quantity).toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Manufacture Date
-                </p>
-                <p className="font-medium text-foreground">{manufactureDate}</p>
-              </div>
-              {expiryDate && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Expiry Date</p>
-                  <p className="font-medium text-foreground">{expiryDate}</p>
+                   <div className="flex items-center gap-3">
+                      <Button variant="outline" asChild className="rounded-full px-6">
+                         <Link href="/manufacturer/batches">Cancel</Link>
+                      </Button>
+                      {currentStep < 3 ? (
+                        <Button 
+                          onClick={() => setCurrentStep(s => s + 1)} 
+                          disabled={currentStep === 1 ? !selectedProduct : !batchData.batchNumber || !batchData.quantity}
+                          className="rounded-full px-10 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 font-black tracking-tight"
+                        >
+                           Next Step <ChevronRight className="ml-2 h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button 
+                          onClick={handleMint} 
+                          disabled={loading} 
+                          className="rounded-full px-10 bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20 font-black tracking-tight gap-2"
+                        >
+                           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4 fill-current" />}
+                           {loading ? "Syncing..." : "Mint Units"}
+                        </Button>
+                      )}
+                   </div>
                 </div>
-              )}
-            </div>
+
+             </div>
           </Card>
-
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 text-sm text-amber-700 dark:text-amber-400">
-            <p className="font-semibold">⚠️ Blockchain Transaction</p>
-            <p className="mt-1">
-              This will create an immutable record on the blockchain. Ensure all
-              details are correct.
-            </p>
-          </div>
-
-          {loading && (
-            <div className="space-y-2">
-              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                <div
-                  className="bg-primary h-full rounded-full transition-all duration-500"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground text-center">
-                {uploadProgress < 30
-                  ? "Generating secure salt..."
-                  : uploadProgress < 60
-                    ? "Awaiting blockchain confirmation..."
-                    : uploadProgress < 90
-                      ? "Saving to database..."
-                      : "Finalizing..."}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Navigation */}
-      <div className="flex-none flex justify-between mt-auto pt-4 border-t pb-2">
-        <Button
-          variant="outline"
-          onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}
-          disabled={currentStep === 1 || loading}
-        >
-          Back
-        </Button>
-
-        {currentStep < totalSteps ? (
-          <Button
-            onClick={() => setCurrentStep((s) => s + 1)}
-            disabled={!canAdvance()}
-          >
-            Continue
-          </Button>
-        ) : (
-          <Button
-            onClick={handleSubmit}
-            disabled={loading || !canAdvance()}
-            className="gap-2 min-w-[180px]"
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <QrCode className="h-4 w-4" />
-            )}
-            {loading ? "Minting..." : "Mint Batch to Blockchain"}
-          </Button>
-        )}
-      </div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

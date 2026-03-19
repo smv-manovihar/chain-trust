@@ -48,22 +48,23 @@ export function MobileSidebar({ isOpen, onClose, links }: MobileSidebarProps) {
         {/* Navigation Links */}
         <nav className="flex-1 flex flex-col gap-1 p-5 overflow-y-auto">
           {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={onClose}
-              className={cn(
-                "group flex items-center px-4 py-3.5",
-                "text-base font-medium text-foreground/75 hover:text-primary",
-                "rounded-2xl hover:bg-primary/5 active:scale-[0.97]",
-                "transition-all duration-200"
-              )}
-            >
-              <span className="relative">
-                {link.label}
-                <span className="absolute -bottom-0.5 left-0 w-0 h-px bg-primary transition-all duration-300 group-hover:w-full" />
-              </span>
-            </Link>
+            <div key={link.href}>
+              <Link
+                href={link.href}
+                onClick={onClose}
+                className={cn(
+                  "group flex items-center px-4 py-3.5",
+                  "text-base font-medium text-foreground/75 hover:text-primary",
+                  "rounded-2xl hover:bg-primary/5 active:scale-[0.97]",
+                  "transition-all duration-200"
+                )}
+              >
+                <span className="relative">
+                  {link.label}
+                  <span className="absolute -bottom-0.5 left-0 w-0 h-px bg-primary transition-all duration-300 group-hover:w-full" />
+                </span>
+              </Link>
+            </div>
           ))}
         </nav>
 

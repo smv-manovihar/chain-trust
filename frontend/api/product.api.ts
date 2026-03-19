@@ -8,6 +8,14 @@ export interface ProductDto {
 	price?: number;
 	description?: string;
 	images?: string[];
+	qrSettings?: {
+		qrSize: number;
+		columns: number;
+		showProductName: boolean;
+		showUnitIndex: boolean;
+		showBatchNumber: boolean;
+		labelPadding: number;
+	};
 }
 
 export const createProduct = async (data: ProductDto) => {

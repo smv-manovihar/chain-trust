@@ -1,10 +1,9 @@
 "use client";
 
-import { LogOut, LucideIcon } from "lucide-react";
+import { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "../ui/button";
-import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
 
 export interface NavItem {
@@ -32,7 +31,6 @@ export function SidebarContent({
   className,
 }: SidebarContentProps) {
   const pathname = usePathname();
-  const { logout } = useAuth();
 
   return (
     <div className={cn("flex h-full flex-col gap-4", className)}>
@@ -55,30 +53,34 @@ export function SidebarContent({
                     : pathname.startsWith(item.href);
 
                 return (
-                  <Button
-                    key={item.href}
-                    variant={isActive ? "secondary" : "ghost"}
-                    className={cn(
-                      "w-full justify-start transition-all duration-200",
-                      isActive
-                        ? "bg-primary/10 text-primary hover:bg-primary/20 font-medium"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                      isCollapsed ? "justify-center px-2" : "px-4",
-                    )}
-                    onClick={onNavigate}
-                    asChild
-                  >
-                    <Link href={item.href}>
-                      <Icon
-                        className={cn(
-                          "h-5 w-5",
-                          !isCollapsed && "mr-3",
-                          isActive ? "text-primary" : "text-muted-foreground"
-                        )}
-                      />
-                      {!isCollapsed && <span>{item.label}</span>}
-                    </Link>
-                  </Button>
+                  <div key={item.href}>
+                    <Button
+                      variant={isActive ? "secondary" : "ghost"}
+                      className={cn(
+                        "w-full justify-start transition-all duration-200 cursor-pointer",
+                        isActive
+                          ? "bg-primary/10 text-primary hover:bg-primary/20 font-medium"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        isCollapsed ? "justify-center px-2" : "px-4",
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onNavigate) onNavigate();
+                      }}
+                      asChild
+                    >
+                      <Link href={item.href}>
+                        <Icon
+                          className={cn(
+                            "h-5 w-5",
+                            !isCollapsed && "mr-3",
+                            isActive ? "text-primary" : "text-muted-foreground"
+                          )}
+                        />
+                        {!isCollapsed && <span>{item.label}</span>}
+                      </Link>
+                    </Button>
+                  </div>
                 );
               })}
             </div>
@@ -87,23 +89,6 @@ export function SidebarContent({
             )}
           </div>
         ))}
-      </div>
-
-      <div className="p-4 bg-muted/20 mt-auto">
-        <Button
-          variant="ghost"
-          className={cn(
-            "w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors",
-            isCollapsed && "justify-center px-2"
-          )}
-          onClick={() => {
-            if (onNavigate) onNavigate();
-            logout();
-          }}
-        >
-          <LogOut className={cn("h-[18px] w-[18px]", !isCollapsed && "mr-3")} />
-          {!isCollapsed && <span className="font-medium">Sign Out</span>}
-        </Button>
       </div>
     </div>
   );

@@ -18,19 +18,19 @@ export function BrandLogo({
 }: BrandLogoProps) {
   const sizes = {
     sm: {
-      container: "h-8 w-8 rounded-lg",
+      container: "h-8 w-8 rounded-full",
       text: "text-sm",
       gap: "gap-2",
       title: "text-lg",
     },
     md: {
-      container: "h-10 w-10 rounded-xl",
+      container: "h-10 w-10 rounded-full",
       text: "text-lg",
       gap: "gap-3",
       title: "text-xl",
     },
     lg: {
-      container: "h-12 w-12 rounded-xl",
+      container: "h-12 w-12 rounded-full",
       text: "text-xl",
       gap: "gap-3",
       title: "text-2xl",
@@ -51,11 +51,15 @@ export function BrandLogo({
     >
       <div
         className={cn(
-          "flex items-center justify-center bg-primary text-primary-foreground shadow-md transition-transform group-hover:scale-105",
+          "flex items-center justify-center bg-background p-0.5 shadow-sm transition-transform group-hover:scale-105 border border-border/50 overflow-hidden",
           currentSize.container,
         )}
       >
-        <span className={cn("font-bold", currentSize.text)}>C</span>
+        <img 
+          src="/chain-trust.png" 
+          alt="ChainTrust" 
+          className="h-full w-full object-cover rounded-full"
+        />
       </div>
       {withText && (
         <span

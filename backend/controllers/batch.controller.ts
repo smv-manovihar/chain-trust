@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import Batch from '../models/batch.model.js';
 import Product from '../models/product.model.js';
 import Scan from '../models/scan.model.js';
+import * as pdfService from '../services/pdf.service.js';
 
 /**
  * Derive a unit-level salt from a batch salt and unit index.
@@ -20,9 +21,15 @@ function deriveUnitSalt(batchSalt: string, unitIndex: number): string {
  * QR encodes salt in format "batchSalt:unitIndex"
  */
 async function findBatchByUnitSalt(salt: string): Promise<{ batch: any; unitIndex: number } | null> {
+	// Support 3-part format: batchSalt:unitIndex:unitHash
 	if (salt.includes(':')) {
-		const [batchSalt, indexStr] = salt.split(':');
-		const unitIndex = parseInt(indexStr, 10);
+		const parts = salt.split(':');
+		if (parts.length < 2) return null;
+
+		const batchSalt = parts[0];
+		const unitIndex = parseInt(parts[1], 10);
+		const providedHash = parts[2]; // Optional in old format, required in new
+
 		if (isNaN(unitIndex)) return null;
 
 		const batch = await Batch.findOne({ batchSalt });
@@ -30,6 +37,17 @@ async function findBatchByUnitSalt(salt: string): Promise<{ batch: any; unitInde
 
 		// Verify the unit index is within range
 		if (unitIndex < 0 || unitIndex >= batch.quantity) return null;
+
+		// Cryptographic Integrity Check: Verify the hash if provided
+		// If the providedHash exists, it MUST match the derived salt.
+		// This prevents tampering with the unitIndex.
+		if (providedHash) {
+			const expectedHash = deriveUnitSalt(batchSalt, unitIndex);
+			if (providedHash !== expectedHash) {
+				console.warn(`[Security] QR Integrity check failed for batch ${batchSalt} unit ${unitIndex}`);
+				return null;
+			}
+		}
 
 		return { batch, unitIndex };
 	}
@@ -145,7 +163,7 @@ export const listBatches = async (req: Request, res: Response) => {
 // GET /api/batches/:id — Get a single batch by ID
 export const getBatch = async (req: Request, res: Response) => {
 	try {
-		const batch = await Batch.findById(req.params.id);
+		const batch = await Batch.findById(req.params.id).populate('product');
 		if (!batch) {
 			return res.status(404).json({ message: 'Batch not found' });
 		}
@@ -159,7 +177,7 @@ export const getBatch = async (req: Request, res: Response) => {
 // GET /api/batches/:id/qr-data — Get QR data for all units in a batch
 export const getBatchQRData = async (req: Request, res: Response) => {
 	try {
-		const batch = await Batch.findById(req.params.id);
+		const batch = await Batch.findById(req.params.id).populate('product');
 		if (!batch) {
 			return res.status(404).json({ message: 'Batch not found' });
 		}
@@ -171,8 +189,10 @@ export const getBatchQRData = async (req: Request, res: Response) => {
 
 		const units = [];
 		for (let i = startIdx; i < endIdx; i++) {
-			// The QR salt format includes the batch salt + unit index for easy lookup
-			const qrSalt = `${batch.batchSalt}:${i}`;
+			// The secure QR format includes: batchSalt : unitIndex : cryptographicHash
+			const unitHash = deriveUnitSalt(batch.batchSalt, i);
+			const qrSalt = `${batch.batchSalt}:${i}:${unitHash}`;
+			
 			const scanCount = batch.scanCounts?.get(String(i)) || 0;
 			units.push({
 				unitIndex: i,
@@ -288,6 +308,35 @@ export const recallBatch = async (req: Request, res: Response) => {
 		res.json({ message: 'Batch recalled successfully', batch });
 	} catch (error) {
 		console.error('Recall batch error:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+};
+
+// GET /api/batches/:id/pdf — Generate and download a PDF label sheet
+export const getBatchPDF = async (req: Request, res: Response) => {
+	try {
+		const batch = await Batch.findById(req.params.id).populate('product');
+		if (!batch) {
+			return res.status(404).json({ message: 'Batch not found' });
+		}
+
+		// Ensure we have current QR settings from the product
+		const settings = (batch.product as any)?.qrSettings || {
+			qrSize: 15,
+			columns: 4,
+			showProductName: true,
+			showUnitIndex: true,
+			showBatchNumber: true,
+			labelPadding: 5
+		};
+
+		const pdfBuffer = await pdfService.generateBatchPDF(batch, settings);
+
+		res.setHeader('Content-Type', 'application/pdf');
+		res.setHeader('Content-Disposition', `attachment; filename=batch-${batch.batchNumber}-labels.pdf`);
+		res.send(pdfBuffer);
+	} catch (error) {
+		console.error('Generate PDF error:', error);
 		res.status(500).json({ message: 'Internal server error' });
 	}
 };

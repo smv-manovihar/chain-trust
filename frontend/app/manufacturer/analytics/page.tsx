@@ -213,7 +213,7 @@ export default function AnalyticsPage() {
                       </td>
                       <td className="py-3 px-4">
                         <span className="inline-flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                          <span className="h-2 w-2 rounded-full bg-red-500" />
                           <span className="text-red-500 font-medium">High</span>
                         </span>
                       </td>
