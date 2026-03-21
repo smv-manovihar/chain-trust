@@ -1,14 +1,14 @@
-# ⛓️ ChainTrust
+# ⛓️ Chain Trust
 
 **Blockchain-Powered Product Authentication & Anti-Counterfeiting Platform**
 
-ChainTrust is a full-stack web application that leverages the Ethereum blockchain to provide an immutable, transparent supply chain verification system. Manufacturers register products on-chain, and consumers can instantly verify authenticity by scanning or entering a product ID.
+Chain Trust is a full-stack web application that leverages the Ethereum blockchain to provide an immutable, transparent supply chain verification system. Manufacturers register products on-chain, and consumers can instantly verify authenticity by scanning or entering a product ID.
 
 ---
 
 ## 🏗️ Architecture
 
-```
+```text
 ChainTrust/
 ├── frontend/         → Next.js 16 (React 19, TailwindCSS, Web3.js)
 ├── backend/          → Express 5 (TypeScript, MongoDB, Nodemailer)
@@ -31,13 +31,13 @@ ChainTrust/
 
 Make sure you have the following installed:
 
-- [Node.js](https://nodejs.org/) (v18+)
+- [Node.js](https://nodejs.org/)
 - [pnpm](https://pnpm.io/) (Package Manager)
 - [Python](https://www.python.org/) (v3.11+) & [uv](https://docs.astral.sh/uv/) (for AI service)
 - [MongoDB](https://www.mongodb.com/) (running locally or Atlas)
 - [Ganache](https://trufflesuite.com/ganache/) (local blockchain for development)
-- [MinIO](https://dl.min.io/community/server/minio/release/) (Local binary `minio.exe` is already provided in `./refs/`)
-- [MetaMask](https://metamask.io/) (browser extension — optional for dev)
+- [MinIO](https://dl.min.io/community/server/minio/release/)
+- [MetaMask](https://metamask.io/) (browser extension — required for UI transactions)
 
 ---
 
@@ -46,13 +46,13 @@ Make sure you have the following installed:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/ChainTrust.git
-cd ChainTrust
+git clone [https://github.com/smv-manovihar/chain-trust.git](https://github.com/smv-manovihar/chain-trust.git)
+cd chain-trust
 ```
 
 ### 2. Setup Environment Variables
 
-Copy the example files and fill in your values:
+Copy the example files. Most values for the blockchain will be **automatically populated** by the deployment script later.
 
 ```bash
 # Backend
@@ -62,44 +62,21 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-### 3. Setup & Start Ganache (Local Blockchain)
+> [!NOTE] 
+> You only need to manually add the `PRIVATE_KEY` (Step 3) and any external API keys (Google, Email, etc.). The `CONTRACT_ADDRESS` and `RPC_URL` are handled by `deploy.js`.
+
+### 3. Start Ganache (Local Blockchain)
 
 Ganache provides a personal Ethereum blockchain for development. This project is configured to work with the **Ganache UI (Desktop Application)**.
 
-1. **Download & Install:** Download Ganache from the [official website](https://trufflesuite.com/ganache/).
-2. **Launch & Quickstart:** Open Ganache and select **"Quickstart"** (or create a New Workspace).
-3. **Verify Port:**
-   - Ganache UI typically defaults to port **`7545`** (which matches this project's configuration).
-   - If your server is running on a different port, click the **Gear Icon (Settings)** in the top right.
-   - Go to the **Server** tab and change the **Port Number** to `7545`, then click **Save and Restart**.
-4. **Retrieve Private Key:**
-   - In the **Accounts** tab, you will see 10 addresses.
-   - Click the **Key Icon** on the right side of the first account.
-   - **Copy the Private Key** and paste it into `backend/.env` under `PRIVATE_KEY`.
+1. **Launch & Quickstart:** Open Ganache and select **"Quickstart"**.
+2. **Verify Port:** The app defaults to port **`7545`**.
+   - _If your server is running on a different port, click the Gear Icon (Settings) -> Server tab -> Change Port Number to `7545` -> Save and Restart._
+3. **Retrieve Deployer Key:** In the Accounts tab, click the Key Icon next to the **first account (Index 0)**. Copy this Private Key and paste it into `backend/.env` under `PRIVATE_KEY`.
 
-> **Connecting MetaMask to Ganache (Optional):**
->
-> 1. Open MetaMask → Settings → Networks → Add Network
-> 2. Fill in:
->    - **Network Name:** Ganache Local
->    - **RPC URL:** `http://127.0.0.1:7545`
->    - **Chain ID:** `1337`
->    - **Currency Symbol:** ETH
-> 3. To use a Ganache account in MetaMask, click **Import Account** and paste the private key you copied from the Ganache UI.
+### 4. Deploy the Smart Contract (Initial Setup)
 
-### 4. Start Other Services
-
-```bash
-# MongoDB (default port 27017)
-mongod
-
-# MinIO (S3-compatible storage on port 9000, console on 9090)
-./minio.exe server ./data --console-address :9090
-```
-
-### 4. Deploy the Smart Contract
-
-This compiles `ChainTrust.sol`, deploys it to Ganache, and auto-updates your `.env` files with the new contract address.
+Before starting the main app, you **must** deploy the smart contract. This compiles `ChainTrust.sol`, deploys it to Ganache, and **automatically configures your `.env` files** with the new address.
 
 ```bash
 cd backend
@@ -107,27 +84,47 @@ pnpm install
 node scripts/deploy.js
 ```
 
-### 5. Start the Backend
+### 5. MetaMask Configuration (Crucial for Local Dev)
+
+To interact with the local blockchain through the frontend, MetaMask must be configured correctly.
+
+1. **Add the Local Network:**
+   - Open MetaMask -> Go to settings -> Click the Networks -> **Add Custom Network**.
+   - **Network Name:** Ganache Local
+   - **New RPC URL:** `http://127.0.0.1:7545`
+   - **Chain ID:** `1337`
+   - **Currency Symbol:** ETH
+   - Click **Save** and switch to this network.
+
+2. **Import the Ganache Account (Deployer/Manufacturer):**
+   - Click the **Account Circle Icon** (top right) -> **Import Account**.
+   - Paste the **Private Key** you copied from Ganache (Step 3.3).
+   - Click **Import**. You now have the funds needed to register products.
+
+3. **The "Nonce" Reset (Fixing Stuck Transactions):**
+   - If transactions fail silently or get stuck pending after a Ganache restart, go to MetaMask **Settings -> Advanced -> Clear activity tab data** to reset the internal counter.
+
+### 6. Start the Services
+
+Now that the contract is deployed and configured, you can start the backend and frontend.
 
 ```bash
+# Terminal 1: MongoDB & MinIO
+mongod
+./minio.exe server ./data --console-address :9090
+
+# Terminal 2: Backend
 cd backend
-pnpm install
 pnpm dev
-```
 
-The backend API will be running at **http://localhost:5000**.
-
-### 6. Start the Frontend
-
-```bash
+# Terminal 3: Frontend
 cd frontend
-pnpm install
 pnpm dev
 ```
 
 The frontend will be running at **http://localhost:3000**.
 
-### 7. Start the AI Service (Optional)
+### 9. Start the AI Service (Optional)
 
 ```bash
 cd ai-service
@@ -189,3 +186,4 @@ The AI service will be running at **http://localhost:8000**.
 ## 📄 License
 
 This project is for educational and development purposes.
+
