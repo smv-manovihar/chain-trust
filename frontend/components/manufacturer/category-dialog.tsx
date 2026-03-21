@@ -15,16 +15,33 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Loader2, Plus, Pencil, Trash2, FolderEdit, Settings2 } from "lucide-react";
-import { Category, createCategory, fetchCategories, updateCategory, deleteCategory } from "@/api/category.api";
+import {
+  Loader2,
+  Plus,
+  Pencil,
+  Trash2,
+  FolderEdit,
+  Settings2,
+} from "lucide-react";
+import {
+  Category,
+  createCategory,
+  fetchCategories,
+  updateCategory,
+  deleteCategory,
+} from "@/api/category.api";
 import { toast } from "sonner";
+import { EmptyState } from "../ui/empty-state";
 
 interface CategoryManagementDialogProps {
   onCategoriesChange?: () => void;
   trigger?: React.ReactNode;
 }
 
-export function CategoryManagementDialog({ onCategoriesChange, trigger }: CategoryManagementDialogProps) {
+export function CategoryManagementDialog({
+  onCategoriesChange,
+  trigger,
+}: CategoryManagementDialogProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -55,8 +72,8 @@ export function CategoryManagementDialog({ onCategoriesChange, trigger }: Catego
     }
   }, [open]);
 
-  const openNewDialog = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const openNewDialog = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setEditingId(null);
     setFormName("");
     setFormDescription("");
@@ -79,7 +96,10 @@ export function CategoryManagementDialog({ onCategoriesChange, trigger }: Catego
     setSaving(true);
     try {
       if (editingId) {
-        await updateCategory(editingId, { name: formName, description: formDescription });
+        await updateCategory(editingId, {
+          name: formName,
+          description: formDescription,
+        });
         toast.success("Category updated");
       } else {
         await createCategory({ name: formName, description: formDescription });
@@ -109,55 +129,67 @@ export function CategoryManagementDialog({ onCategoriesChange, trigger }: Catego
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          {trigger || (
-            <Button variant="outline" size="sm" className="gap-2">
-              <Settings2 className="h-4 w-4" />
-              Manage Categories
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 rounded-full h-12 px-6"
+          >
+            <Settings2 className="h-4 w-4" />
+            Manage Categories
+          </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="p-6 pb-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <DialogTitle className="text-2xl">Manage Categories</DialogTitle>
-                <DialogDescription>
-                  Create and organize categories for your products.
-                </DialogDescription>
-              </div>
-              <Button onClick={openNewDialog} size="sm" className="h-9">
-                <Plus className="h-4 w-4 mr-2" /> Add New
-              </Button>
-            </div>
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="text-2xl tracking-tighter">
+              Manage Categories
+            </DialogTitle>
+            <DialogDescription>
+              Create and organize categories for your products to better
+              structure your inventory.
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto p-6 pt-2">
+          <div className="px-6 py-4 border-b bg-muted/20 flex items-center justify-between">
+            <span className="text-[10px] tracking-widest text-muted-foreground">
+              {categories.length} Categories Defined
+            </span>
+            <Button
+              onClick={() => openNewDialog()}
+              size="sm"
+              className="h-9 rounded-full px-4 font-bold shadow-lg shadow-primary/20"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Category
+            </Button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6">
             {loading ? (
               <div className="py-12 flex justify-center items-center">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : categories.length === 0 ? (
-              <div className="py-12 text-center flex flex-col items-center justify-center space-y-3 border-2 border-dashed rounded-xl bg-muted/20">
-                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                  <FolderEdit className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-medium">No categories found</h3>
-                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                  You haven't created any categories yet. Add one to better organize your catalog.
-                </p>
-                <Button variant="outline" size="sm" className="mt-2" onClick={openNewDialog}>
-                  <Plus className="mr-2 h-4 w-4" /> Create First Category
-                </Button>
-              </div>
+              <EmptyState
+                icon={FolderEdit}
+                title="No Categories Yet"
+                description="You haven't created any Categories. Categorize your products for a more structured inventory and enhanced consumer data."
+                action={{
+                  label: "Create First Category",
+                  onClick: openNewDialog,
+                }}
+                className="py-12 border-none bg-transparent"
+              />
             ) : (
               <div className="grid gap-3">
                 {categories.map((cat) => (
                   <div
                     key={cat._id}
-                    className="group bg-card border border-border rounded-lg p-4 flex items-center justify-between hover:border-primary/40 transition-all hover:shadow-sm"
+                    className="group bg-card border border-border rounded-2xl p-4 flex items-center justify-between hover:border-primary/40 transition-all hover:shadow-sm"
                   >
                     <div className="flex-1 min-w-0 pr-4">
-                      <h3 className="font-semibold text-foreground truncate">{cat.name}</h3>
+                      <h3 className="font-semibold text-foreground truncate">
+                        {cat.name}
+                      </h3>
                       {cat.description && (
                         <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
                           {cat.description}
@@ -168,7 +200,7 @@ export function CategoryManagementDialog({ onCategoriesChange, trigger }: Catego
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-8 w-8 rounded-full"
                         onClick={() => openEditDialog(cat)}
                       >
                         <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
@@ -176,7 +208,7 @@ export function CategoryManagementDialog({ onCategoriesChange, trigger }: Catego
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
                         onClick={() => handleDelete(cat._id)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -187,12 +219,6 @@ export function CategoryManagementDialog({ onCategoriesChange, trigger }: Catego
               </div>
             )}
           </div>
-          
-          <DialogFooter className="p-4 bg-muted/30 border-t">
-            <Button variant="outline" onClick={() => setOpen(false)} className="w-full sm:w-auto">
-              Close
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -200,9 +226,13 @@ export function CategoryManagementDialog({ onCategoriesChange, trigger }: Catego
       <Dialog open={formDialogOpen} onOpenChange={setFormDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>{editingId ? "Edit Category" : "New Category"}</DialogTitle>
+            <DialogTitle>
+              {editingId ? "Edit Category" : "New Category"}
+            </DialogTitle>
             <DialogDescription>
-              {editingId ? "Update your category details." : "Create a new product category."}
+              {editingId
+                ? "Update your category details."
+                : "Create a new product category."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -213,28 +243,47 @@ export function CategoryManagementDialog({ onCategoriesChange, trigger }: Catego
                 placeholder="e.g. Antibiotics"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
+                className="rounded-full"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="description" className="flex items-center justify-between">
+              <Label
+                htmlFor="description"
+                className="flex items-center justify-between"
+              >
                 <span>Description</span>
-                <span className="text-[10px] text-muted-foreground font-normal uppercase tracking-wider">Optional</span>
+                <span className="text-[10px] text-muted-foreground font-normal tracking-wider">
+                  Optional
+                </span>
               </Label>
               <Textarea
                 id="description"
                 placeholder="Brief description of this category..."
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
-                className="resize-none min-h-[100px]"
+                className="resize-none min-h-[100px] rounded-2xl"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFormDialogOpen(false)} disabled={saving}>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setFormDialogOpen(false)}
+              disabled={saving}
+              className="rounded-full px-6"
+            >
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={saving} className="min-w-[80px]">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="min-w-[100px] rounded-full px-6"
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

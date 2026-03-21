@@ -16,8 +16,8 @@ export const createBatch = async (data: CreateBatchDto) => {
 	return response.data;
 };
 
-export const listBatches = async () => {
-	const response = await client.get('/batches');
+export const listBatches = async (params?: { search?: string; categories?: string | string[] }) => {
+	const response = await client.get('/batches', { params });
 	return response.data;
 };
 
@@ -47,5 +47,17 @@ export const downloadBatchPDF = async (id: string) => {
 	const response = await client.get(`/batches/${id}/pdf`, {
 		responseType: 'blob'
 	});
+	return response.data;
+};
+
+export const getScanHistory = async (days = 30) => {
+	const response = await client.get('/batches/scan-history', {
+		params: { days }
+	});
+	return response.data;
+};
+
+export const getBatchScanDetails = async (id: string) => {
+	const response = await client.get(`/batches/${id}/scan-details`);
 	return response.data;
 };

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -10,50 +11,113 @@ import {
   TrendingUp,
   AlertTriangle,
   Plus,
-  ArrowUpRight,
+  ArrowRight,
   ShieldCheck,
   Activity,
-  ArrowRight,
+  Users,
+  BarChart3,
+  Bell,
+  Loader2,
 } from "lucide-react";
+import { StatCard } from "@/components/ui/stat-card";
 import { useAuth } from "@/contexts/auth-context";
-import {
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-} from "recharts";
-
-const data = [
-  { name: "Jan", scans: 400 },
-  { name: "Feb", scans: 300 },
-  { name: "Mar", scans: 600 },
-  { name: "Apr", scans: 800 },
-  { name: "May", scans: 500 },
-  { name: "Jun", scans: 900 },
-];
+import { listProducts } from "@/api/product.api";
+import { listBatches, getScanHistory } from "@/api/batch.api";
+import { getNotifications, Notification } from "@/api/notification.api";
+import { format } from "date-fns";
+import { toast } from "sonner";
 
 export default function ManufacturerDashboard() {
   const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState({
+    products: 0,
+    batches: 0,
+    scansToday: 0,
+    unreadNotifications: 0,
+  });
+  const [recentNotifications, setRecentNotifications] = useState<
+    Notification[]
+  >([]);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      setIsLoading(true);
+      try {
+        const todayStr = format(new Date(), "yyyy-MM-dd");
+
+        const [productsRes, batchesRes, historyRes, notificationsRes] =
+          await Promise.all([
+            listProducts(),
+            listBatches(),
+            getScanHistory(7),
+            getNotifications(5),
+          ]);
+
+        const products = productsRes.products || [];
+        const batches = batchesRes.batches || [];
+        const history = historyRes.history || [];
+        const notifications = notificationsRes.notifications || [];
+        const unreadCount = notificationsRes.unreadCount || 0;
+
+        // Find today's scans in the history array
+        const todayData = history.find((h: any) => h.date === todayStr);
+
+        setStats({
+          products: products.length,
+          batches: batches.length,
+          scansToday: todayData ? todayData.count : 0,
+          unreadNotifications: unreadCount,
+        });
+        setRecentNotifications(notifications);
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+        toast.error("Could not load dashboard metrics.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="h-[60vh] flex flex-col items-center justify-center gap-4 text-muted-foreground">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm font-medium">Initializing command center...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 lg:space-y-8 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-8 lg:space-y-10 animate-in fade-in duration-500 pb-12">
+      {/* Header / Welcome Banner */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tighter text-foreground uppercase">
-            Operations <span className="text-primary">Overview</span>
+          <h1 className="text-2xl sm:text-4xl font-black tracking-tighter text-foreground leading-none">
+            Welcome,{" "}
+            <span className="text-primary">
+              {user?.name?.split(" ")[0] || "Manufacturer"}
+            </span>
           </h1>
-          <p className="text-muted-foreground text-sm font-medium mt-0.5">
-            Welcome, {user?.name || "Manufacturer"}. Here's what's happening
-            across your product line.
+          <p className="text-muted-foreground text-sm sm:text-base font-medium mt-2">
+            Here's what's happening across your company today.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <Button
-            className="rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+            variant="outline"
+            className="rounded-full border-primary/20 hover:bg-primary/5 px-6"
+            asChild
+          >
+            <Link href="/manufacturer/analytics">
+              <Bell className="mr-2 h-4 w-4" />
+              View Alerts
+            </Link>
+          </Button>
+          <Button
+            className="rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 px-6 font-bold"
             asChild
           >
             <Link href="/manufacturer/batches/new">
@@ -64,212 +128,172 @@ export default function ManufacturerDashboard() {
         </div>
       </div>
 
-      {/* High-Level Stats Bento */}
+      {/* Bento KPI Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-        <Card className="p-6 rounded-[2rem] border-none bg-primary/5 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
-            <Package className="h-12 w-12" />
-          </div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">
-            Total Products
-          </p>
-          <h3 className="text-3xl font-black">24</h3>
-          <div className="mt-4 flex items-center gap-1 text-[10px] font-bold text-green-600">
-            <ArrowUpRight className="h-3 w-3" /> +2 this month
-          </div>
-        </Card>
+        <StatCard
+          title="Products Enrolled"
+          value={stats.products}
+          icon={Package}
+          description="Catalogue size"
+          color="blue"
+        />
 
-        <Card className="p-6 rounded-[2rem] border-none bg-blue-500/5 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform text-blue-500">
-            <Boxes className="h-12 w-12" />
-          </div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-1">
-            Active Batches
-          </p>
-          <h3 className="text-3xl font-black">156</h3>
-          <div className="mt-4 flex items-center gap-1 text-[10px] font-bold text-blue-600">
-            <Activity className="h-3 w-3" /> Healthy distribution
-          </div>
-        </Card>
+        <StatCard
+          title="Active Batches"
+          value={stats.batches}
+          icon={Boxes}
+          description="Production runs"
+          color="primary"
+        />
 
-        <Card className="p-6 rounded-[2rem] border-none bg-green-500/5 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform text-green-500">
-            <TrendingUp className="h-12 w-12" />
-          </div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-green-600 mb-1">
-            Total Verified Scans
-          </p>
-          <h3 className="text-3xl font-black">12.4k</h3>
-          <div className="mt-4 flex items-center gap-1 text-[10px] font-bold text-green-600">
-            <ArrowUpRight className="h-3 w-3" /> +15.2% vs last week
-          </div>
-        </Card>
+        <StatCard
+          title="Scans Today"
+          value={stats.scansToday}
+          icon={TrendingUp}
+          tendency="+12%"
+          description="Since midnight"
+          color="green"
+        />
 
-        <Card className="p-6 rounded-[2rem] border-none bg-destructive/5 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform text-destructive">
-            <AlertTriangle className="h-12 w-12" />
-          </div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-destructive mb-1">
-            Recalled Units
-          </p>
-          <h3 className="text-3xl font-black text-destructive">0</h3>
-          <div className="mt-4 flex items-center gap-1 text-[10px] font-bold text-muted-foreground">
-            <ShieldCheck className="h-3 w-3" /> No safety incidents
-          </div>
-        </Card>
+        <StatCard
+          title="Unread Alerts"
+          value={stats.unreadNotifications}
+          icon={AlertTriangle}
+          description="Security items"
+          color={stats.unreadNotifications > 0 ? "destructive" : "primary"}
+        />
       </div>
 
-      {/* Main Insights Grid */}
-      <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
-        {/* Chart Section */}
-        <Card className="lg:col-span-2 p-6 lg:p-8 rounded-[2.5rem] bg-card/50 backdrop-blur-sm border-border/40 flex flex-col">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h3 className="text-xl font-bold tracking-tight">
-                Consumer Engagement
-              </h3>
-              <p className="text-xs text-muted-foreground font-medium">
-                Scan activity across all batches
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Badge
-                variant="outline"
-                className="rounded-full px-3 py-1 bg-background"
-              >
-                7 Days
-              </Badge>
-              <Badge
-                variant="outline"
-                className="rounded-full px-3 py-1 opacity-50"
-              >
-                30 Days
-              </Badge>
-            </div>
+      <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+        {/* Quick Actions Navigation Grid */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-black tracking-tight">Quick Actions</h2>
           </div>
-          <div className="flex-1 min-h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
-                <defs>
-                  <linearGradient id="colorScans" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor="hsl(var(--primary))"
-                      stopOpacity={0.3}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor="hsl(var(--primary))"
-                      stopOpacity={0}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="hsl(var(--border))"
-                  opacity={0.5}
-                />
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: "16px",
-                    border: "none",
-                    boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
-                    background: "hsl(var(--background))",
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="scans"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={3}
-                  fillOpacity={1}
-                  fill="url(#colorScans)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[
+              {
+                title: "Manage Products",
+                desc: "View and edit your product catalogue.",
+                icon: Package,
+                href: "/manufacturer/products",
+                color: "bg-blue-500/10 text-blue-600",
+              },
+              {
+                title: "Enroll Batch",
+                desc: "Register a new production run.",
+                icon: Plus,
+                href: "/manufacturer/batches/new",
+                color: "bg-primary/10 text-primary",
+              },
+              {
+                title: "View Analytics",
+                desc: "Deep dive into scan locations and trends.",
+                icon: BarChart3,
+                href: "/manufacturer/analytics",
+                color: "bg-purple-500/10 text-purple-600",
+              },
+              {
+                title: "Team Management",
+                desc: "Invite and manage company employees.",
+                icon: Users,
+                href: "/manufacturer/team",
+                color: "bg-amber-500/10 text-amber-600",
+              },
+            ].map((action, i) => (
+              <div key={i} className="flex flex-col h-full">
+                <Link href={action.href} className="flex-1">
+                  <Card className="p-5 rounded-[2rem] border-border/40 bg-card/40 backdrop-blur-md hover:bg-muted/40 transition-all group h-full flex flex-col">
+                    <div
+                      className={`h-12 w-12 rounded-2xl ${action.color} flex items-center justify-center mb-4 transition-transform group-hover:scale-110`}
+                    >
+                      <action.icon className="h-6 w-6" />
+                    </div>
+                    <h4 className="font-bold text-base mb-1 group-hover:text-primary transition-colors">
+                      {action.title}
+                    </h4>
+                    <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+                      {action.desc}
+                    </p>
+                  </Card>
+                </Link>
+              </div>
+            ))}
           </div>
-        </Card>
+        </section>
 
-        {/* Right Column: Mini Tables / Alerts */}
-        <div className="space-y-6">
-          <Card className="p-6 rounded-[2.5rem] border-border/40 bg-card/30 flex flex-col">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-bold">Recent Alerts</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-auto p-0 text-primary font-bold"
-              >
-                Clear All
-              </Button>
-            </div>
-            <div className="space-y-4">
-              {[
-                {
-                  type: "safety",
-                  text: "Batch #AMX-120 reached 500 scans",
-                  time: "2m ago",
-                },
-                {
-                  type: "system",
-                  text: "New product enrolled: Vitamin X",
-                  time: "1h ago",
-                },
-              ].map((alert, i) => (
-                <div key={i} className="flex gap-3 justify-between items-start">
-                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                    <Activity className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold leading-tight">
-                      {alert.text}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      {alert.time}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* Recent Activity Feed */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-black tracking-tight">Recent Activity</h2>
             <Button
-              variant="outline"
-              className="mt-8 rounded-2xl w-full border-primary/10 hover:bg-primary/5"
-            >
-              View Activity Log
-            </Button>
-          </Card>
-
-          <Card className="p-6 rounded-[2.5rem] bg-gradient-to-br from-primary to-accent border-none text-primary-foreground shadow-2xl relative overflow-hidden shadow-primary/30 group">
-            <div className="absolute -bottom-4 -right-4 opacity-10 group-hover:scale-110 transition-transform">
-              <ShieldCheck className="h-24 w-24" />
-            </div>
-            <h3 className="text-xl font-bold mb-2">Trust Certified</h3>
-            <p className="text-xs opacity-90 leading-relaxed mb-6">
-              Your manufacturer nodes are perfectly synchronized with the
-              blockchain. All product lineages are secure.
-            </p>
-            <Button
-              className="w-full rounded-xl bg-white text-primary hover:bg-white/90 font-black tracking-tight self-end"
+              variant="link"
+              className="text-xs text-primary p-0 h-auto"
               asChild
             >
-              <Link href="/manufacturer/batches">
-                Manage Batches <ArrowRight className="ml-2 h-4 w-4" />
+              <Link href="/manufacturer/analytics">
+                View All <ArrowRight className="ml-1 h-3 w-3" />
               </Link>
             </Button>
+          </div>
+
+          <Card className="rounded-[2.5rem] border-border/40 bg-card/20 backdrop-blur-sm p-6 overflow-hidden">
+            <div className="space-y-4">
+              {recentNotifications.length > 0 ? (
+                recentNotifications.map((notif, i) => (
+                  <div key={i} className="flex gap-4 items-start group">
+                    <div className="h-10 w-10 rounded-2xl bg-muted/50 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-primary/10 transition-colors">
+                      <Activity className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0 border-b border-border/40 pb-4 last:border-0 last:pb-0">
+                      <div className="flex justify-between items-start mb-1 gap-2">
+                        <p className="text-sm font-bold truncate group-hover:text-primary transition-colors">
+                          {notif.title}
+                        </p>
+                        <span className="text-[10px] text-muted-foreground font-bold shrink-0">
+                          {format(new Date(notif.createdAt), "HH:mm")}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-1 font-medium italic opacity-80">
+                        {notif.message}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-12 flex flex-col items-center justify-center text-center opacity-40">
+                  <ShieldCheck className="h-12 w-12 mb-4" />
+                  <p className="text-xs tracking-tight">All systems green</p>
+                  <p className="text-[10px] font-medium mt-1">
+                    No recent activity to report.
+                  </p>
+                </div>
+              )}
+            </div>
           </Card>
-        </div>
+
+          {/* Quick Help / Info Card */}
+          <Card className="p-6 rounded-[2.5rem] bg-zinc-900 border-none text-white relative overflow-hidden group">
+            <div className="absolute -bottom-6 -right-6 opacity-10 group-hover:scale-110 transition-transform">
+              <ShieldCheck className="h-32 w-32" />
+            </div>
+            <div className="relative z-10">
+              <h3 className="text-lg font-black tracking-tight mb-2">
+                Operational Integrity
+              </h3>
+              <p className="text-xs text-zinc-400 leading-relaxed font-medium mb-4">
+                Your manufacturing nodes are synchronized. All product scans are
+                being tracked in real-time across the secure blockchain network.
+              </p>
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-bold tracking-tight text-emerald-500">
+                  Online & Secure
+                </span>
+              </div>
+            </div>
+          </Card>
+        </section>
       </div>
     </div>
   );

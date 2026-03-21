@@ -1,35 +1,44 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Check,
   Package,
-  Calendar,
   QrCode,
   Loader2,
-  AlertCircle,
   Search,
-  ArrowRight,
   ArrowLeft,
-  ChevronRight,
+  ArrowRight,
   Zap,
-  ShieldCheck,
-  Cpu
+  Wallet,
+  Boxes,
+  Plus,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createBatch } from "@/api/batch.api";
 import { listProducts } from "@/api/product.api";
-import { requestExecutionAccounts } from "@/api/web3-client";
+import { CategoryFilter } from "@/components/manufacturer/category-filter";
+import { registerBatchOnChain } from "@/api/web3-client";
+import { useWeb3 } from "@/contexts/web3-context";
 import Link from "next/link";
 import { resolveMediaUrl } from "@/lib/media-url";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { format } from "date-fns";
+import { useDebounce } from "@/hooks/use-debounce";
 
 interface CatalogueProduct {
   _id: string;
@@ -41,82 +50,106 @@ interface CatalogueProduct {
   images: string[];
 }
 
-const steps = [
-  { number: 1, title: "Identity", icon: Package },
-  { number: 2, title: "Batch Metrics", icon: Calendar },
-  { number: 3, title: "Blockchain Mint", icon: QrCode },
-];
-
-export default function EnrollBatchWizard() {
-  const [currentStep, setCurrentStep] = useState(1);
+export default function CreateBatchWizard() {
+  const [step, setStep] = useState(1);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [mintProgress, setMintProgress] = useState(0);
   const [successId, setSuccessId] = useState<string | null>(null);
 
+  const {
+    address: walletAddress,
+    connect: connectWallet,
+    status: walletStatus,
+  } = useWeb3();
+  const isConnecting = walletStatus === "connecting";
+
   // Data
   const [products, setProducts] = useState<CatalogueProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
-  const [selectedProduct, setSelectedProduct] = useState<CatalogueProduct | null>(null);
+  const [selectedProduct, setSelectedProduct] =
+    useState<CatalogueProduct | null>(null);
   const [productSearch, setProductSearch] = useState("");
+  const debouncedSearch = useDebounce(productSearch, 500);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
   // Form
   const [batchData, setBatchData] = useState({
     batchNumber: "",
     quantity: "",
-    manufactureDate: "",
-    expiryDate: "",
-    description: ""
+    manufactureDate: undefined as Date | undefined,
+    expiryDate: undefined as Date | undefined,
+    description: "",
   });
 
+  const currentYear = new Date().getFullYear();
+
   useEffect(() => {
-    listProducts()
-      .then(res => setProducts(res.products || []))
-      .catch(err => console.error("Failed to load products", err))
+    setProductsLoading(true);
+    listProducts({
+      search: debouncedSearch,
+      categories:
+        selectedCategories.length > 0
+          ? selectedCategories.join(",")
+          : undefined,
+    })
+      .then((res) => {
+        setProducts(res.products || []);
+      })
+      .catch((err) => console.error("Failed to load products", err))
       .finally(() => setProductsLoading(false));
-  }, []);
+  }, [debouncedSearch, selectedCategories]);
 
-  const filteredProducts = useMemo(() => {
-    const q = productSearch.toLowerCase();
-    return products.filter(p => p.name.toLowerCase().includes(q) || p.productId.toLowerCase().includes(q));
-  }, [products, productSearch]);
+  const filteredProducts = products;
 
-  const handleMint = async () => {
-    if (!selectedProduct) return;
+  const handleCreate = async () => {
     setLoading(true);
     setError("");
     setMintProgress(20);
 
     try {
+      if (!selectedProduct) throw new Error("No product template selected.");
       const encoder = new TextEncoder();
       const saltInput = `${selectedProduct.productId}-${batchData.batchNumber}-${Date.now()}-${crypto.getRandomValues(new Uint8Array(8)).join("")}`;
-      const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(saltInput));
-      const batchSalt = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
-      
+      const hashBuffer = await crypto.subtle.digest(
+        "SHA-256",
+        encoder.encode(saltInput),
+      );
+      const batchSalt = Array.from(new Uint8Array(hashBuffer))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+
       setMintProgress(40);
-      const accounts = await requestExecutionAccounts();
-      if (!accounts?.[0]) throw new Error("Blockchain wallet not detected.");
-      
+      if (!walletAddress) throw new Error("Wallet disconnect detected.");
+
       setMintProgress(60);
-      const { registerBatchOnChain } = await import("@/api/web3-client");
-      const txResult = await registerBatchOnChain({
-        productId: selectedProduct.productId,
-        productName: selectedProduct.name,
-        brand: selectedProduct.brand,
-        batchNumber: batchData.batchNumber,
-        batchSalt: batchSalt,
-        manufactureDate: Math.floor(new Date(batchData.manufactureDate).getTime() / 1000),
-        expiryDate: batchData.expiryDate ? Math.floor(new Date(batchData.expiryDate).getTime() / 1000) : 0,
-        quantity: parseInt(batchData.quantity)
-      }, accounts[0]);
+      const txResult = await registerBatchOnChain(
+        {
+          productId: selectedProduct.productId,
+          productName: selectedProduct.name,
+          brand: selectedProduct.brand,
+          batchNumber: batchData.batchNumber,
+          batchSalt: batchSalt,
+          manufactureDate: Math.floor(
+            batchData.manufactureDate!.getTime() / 1000,
+          ),
+          expiryDate: batchData.expiryDate
+            ? Math.floor(batchData.expiryDate.getTime() / 1000)
+            : 0,
+          quantity: parseInt(batchData.quantity),
+        },
+        walletAddress!,
+      );
 
       setMintProgress(90);
       const savedBatch = await createBatch({
         productRef: selectedProduct._id,
         batchNumber: batchData.batchNumber,
         quantity: parseInt(batchData.quantity),
-        manufactureDate: new Date(batchData.manufactureDate).toISOString(),
-        expiryDate: batchData.expiryDate ? new Date(batchData.expiryDate).toISOString() : undefined,
+        manufactureDate: batchData.manufactureDate!.toISOString(),
+        expiryDate: batchData.expiryDate
+          ? batchData.expiryDate.toISOString()
+          : undefined,
         description: batchData.description,
         batchSalt,
         blockchainHash: txResult.transactionHash || txResult.blockHash,
@@ -124,244 +157,500 @@ export default function EnrollBatchWizard() {
 
       setMintProgress(100);
       setSuccessId(savedBatch.batch._id);
+      toast.success("Batch created successfully.");
     } catch (err: any) {
-      setError(err.message || "Failed to mint batch.");
+      setError(err.message || "Failed to create batch.");
+      toast.error(err.message || "Cryptographic commit failed.");
     } finally {
       setLoading(false);
     }
   };
 
+  const nextStep = () => {
+    if (step === 1 && !selectedProduct) {
+      toast.error("Please select a product template first.");
+      return;
+    }
+    if (
+      step === 2 &&
+      (!batchData.batchNumber ||
+        !batchData.quantity ||
+        !batchData.manufactureDate)
+    ) {
+      toast.error("Please fill in all mandatory details.");
+      return;
+    }
+    setStep((s) => s + 1);
+  };
+
+  const prevStep = () => setStep((s) => s - 1);
+
+  const canGoToStep = (targetStep: number) => {
+    if (targetStep <= step) return true;
+    if (targetStep === 2) return selectedProduct !== null;
+    if (targetStep === 3)
+      return (
+        selectedProduct &&
+        batchData.batchNumber &&
+        batchData.quantity &&
+        batchData.manufactureDate
+      );
+    return false;
+  };
+
+  if (!walletAddress) {
+    return (
+      <div className="max-w-md mx-auto mt-20 animate-in fade-in zoom-in-95 duration-500">
+        <Card className="p-8 text-center space-y-6">
+          <div className="mx-auto h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center relative">
+            <Wallet className="h-10 w-10 text-primary" />
+            <div className="absolute top-0 right-0 h-4 w-4 bg-destructive rounded-full" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold">
+              Wallet Connection Required
+            </h2>
+            <p className="text-sm text-muted-foreground mt-2">
+              To enroll product batches, authenticate with a Web3 wallet to
+              securely sign the transaction.
+            </p>
+          </div>
+          <div className="space-y-3 pt-4 border-t border-border/40">
+            <Button
+              onClick={connectWallet}
+              disabled={isConnecting}
+              className="w-full gap-2"
+            >
+              {isConnecting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4" />
+              )}
+              Connect Wallet
+            </Button>
+            <Button variant="outline" asChild className="w-full">
+              <Link href="/manufacturer/batches">Cancel</Link>
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   if (successId) {
     return (
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="max-w-2xl mx-auto py-12 text-center space-y-8"
-      >
-        <div className="relative inline-block">
-          <div className="absolute inset-0 bg-green-500 blur-2xl opacity-20 animate-pulse" />
-          <div className="relative w-24 h-24 bg-green-500 rounded-[2rem] flex items-center justify-center text-white shadow-2xl">
-            <Check className="h-12 w-12" />
+      <div className="max-w-md mx-auto mt-20 text-center space-y-6 animate-in fade-in zoom-in-95 duration-500">
+        <Card className="p-8 space-y-6 flex flex-col items-center">
+          <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center text-green-500">
+            <Check className="h-10 w-10" />
           </div>
-        </div>
-        <div>
-          <h1 className="text-4xl font-black tracking-tighter">Batch Enrolled!</h1>
-          <p className="text-muted-foreground font-medium mt-2">Units are now verifiable on the public ledger.</p>
-        </div>
-        <div className="flex justify-center gap-4">
-          <Button variant="outline" asChild className="rounded-full px-8"><Link href="/manufacturer/batches">Operations Hub</Link></Button>
-          <Button asChild className="rounded-full px-8 bg-primary shadow-lg shadow-primary/20">
-             <Link href={`/manufacturer/batches/${successId}`} className="gap-2"><QrCode className="h-4 w-4" /> Print QR Sheet</Link>
-          </Button>
-        </div>
-      </motion.div>
+          <div>
+            <h1 className="text-2xl font-bold">Batch Created</h1>
+            <p className="text-muted-foreground mt-2">
+              Batch {batchData.batchNumber} is now registered on the public
+              ledger.
+            </p>
+          </div>
+          <div className="flex flex-col w-full gap-3 pt-4 border-t border-border/40">
+            <Button asChild className="w-full gap-2">
+              <Link href={`/manufacturer/batches/${successId}`}>
+                <QrCode className="h-4 w-4" /> Print Evidence Sheet
+              </Link>
+            </Button>
+            <Button variant="outline" asChild className="w-full">
+              <Link href="/manufacturer/batches">Done</Link>
+            </Button>
+          </div>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto w-full space-y-8 pb-12">
-      {/* Step Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-           <Button variant="ghost" size="icon" asChild className="rounded-full"><Link href="/manufacturer/batches"><ArrowLeft className="h-5 w-5" /></Link></Button>
-           <div>
-              <h1 className="text-3xl font-black tracking-tighter">Mint New Batch</h1>
-              <p className="text-muted-foreground text-sm font-medium">Production Run Registration Wizard</p>
-           </div>
+    <div className="max-w-3xl mx-auto w-full space-y-6 pb-20 animate-in fade-in flex-1 min-h-0">
+      {/* Header & Steps */}
+      <div className="flex items-center gap-4 px-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          asChild
+          className="rounded-full flex-shrink-0"
+        >
+          <Link href="/manufacturer/batches">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            Create New Batch
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1 truncate">
+            {walletAddress.substring(0, 6)}...{walletAddress.substring(38)} •
+            Connected
+          </p>
         </div>
-        <div className="flex gap-2">
-           {steps.map(s => (
-             <div key={s.number} className={cn("h-2 w-16 rounded-full transition-all duration-500", s.number <= currentStep ? "bg-primary shadow-lg shadow-primary/20" : "bg-muted")} />
-           ))}
+        <div className="text-right hidden sm:block">
+          <p className="text-xs text-muted-foreground">Step</p>
+          <p className="text-xl font-medium">
+            {step} <span className="text-muted-foreground opacity-50">/ 3</span>
+          </p>
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-           key={currentStep}
-           initial={{ opacity: 0, x: 20 }}
-           animate={{ opacity: 1, x: 0 }}
-           exit={{ opacity: 0, x: -20 }}
-        >
-          <Card className="p-1 rounded-[2.5rem] bg-gradient-to-br from-primary/10 via-background to-accent/10 border-none shadow-2xl overflow-hidden">
-             <div className="bg-background rounded-[2.4rem] p-6 lg:p-10 space-y-8">
-                
-                {currentStep === 1 && (
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3 text-primary mb-2">
-                       <Package className="h-6 w-6" />
-                       <h2 className="text-xl font-bold">Select Product</h2>
-                    </div>
-                    <div className="relative">
-                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                       <Input 
-                         placeholder="Search your catalogue..." 
-                         value={productSearch}
-                         onChange={e => setProductSearch(e.target.value)}
-                         className="h-12 rounded-2xl border-primary/20 pl-11 shadow-inner"
-                       />
-                    </div>
-                    <ScrollArea className="h-[320px] pr-4">
-                      <div className="grid sm:grid-cols-2 gap-4">
-                         {filteredProducts.map(p => (
-                           <Card 
-                             key={p._id} 
-                             onClick={() => setSelectedProduct(p)}
-                             className={cn(
-                               "p-4 rounded-3xl border-2 transition-all cursor-pointer group flex items-center gap-4",
-                               selectedProduct?._id === p._id ? "bg-primary/5 border-primary shadow-lg shadow-primary/10" : "border-border/50 hover:border-primary/30"
-                             )}
-                           >
-                              <div className="h-12 w-12 rounded-2xl overflow-hidden bg-muted group-hover:scale-110 transition-transform shrink-0 border border-border">
-                                {p.images?.[0] ? <img src={resolveMediaUrl(p.images[0])} alt="" className="w-full h-full object-cover" /> : <Package className="w-full h-full p-3 opacity-20" />}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="font-bold text-sm truncate">{p.name}</p>
-                                <p className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">{p.productId}</p>
-                              </div>
-                           </Card>
-                         ))}
-                      </div>
-                    </ScrollArea>
+      <div className="flex gap-2 px-1">
+        {[1, 2, 3].map((i) => (
+          <button
+            key={i}
+            onClick={() => {
+              if (canGoToStep(i)) setStep(i);
+              else toast.error("Complete current phase first.");
+            }}
+            className={cn(
+              "h-1.5 flex-1 rounded-full transition-all duration-500",
+              i <= step ? "bg-primary" : "bg-muted",
+              canGoToStep(i)
+                ? "cursor-pointer"
+                : "cursor-not-allowed opacity-50",
+            )}
+          />
+        ))}
+      </div>
+
+      <Card className="overflow-hidden border-border/40 shadow-sm">
+        <div className="p-6 md:p-8">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {step === 1 && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-lg font-semibold">Select Product</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Choose a template to base this batch on.
+                    </p>
                   </div>
-                )}
-
-                {currentStep === 2 && (
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3 text-primary mb-2">
-                       <Calendar className="h-6 w-6" />
-                       <h2 className="text-xl font-bold">Batch Metrics</h2>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search products..."
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                        className="pl-9"
+                      />
                     </div>
-                    {selectedProduct && (
-                      <div className="p-4 bg-muted/30 rounded-2xl flex items-center gap-4 border border-border/50">
-                         <Badge className="bg-primary/20 text-primary border-none font-black uppercase text-[10px] tracking-widest">Targeting</Badge>
-                         <p className="font-bold text-sm">{selectedProduct.name} <span className="text-muted-foreground font-medium ml-1">({selectedProduct.productId})</span></p>
-                      </div>
-                    )}
-                    <div className="grid sm:grid-cols-2 gap-6">
-                       <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Batch Identifier</Label>
-                          <Input 
-                            placeholder="e.g. BATCH-2024-X91" 
-                            value={batchData.batchNumber} 
-                            onChange={e => setBatchData(prev => ({...prev, batchNumber: e.target.value}))}
-                            className="h-12 rounded-2xl border-primary/20 shadow-inner"
-                          />
-                       </div>
-                       <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Quantity (Units to Mint)</Label>
-                          <Input 
-                            type="number" 
-                            placeholder="e.g. 5000" 
-                            value={batchData.quantity} 
-                            onChange={e => setBatchData(prev => ({...prev, quantity: e.target.value}))}
-                            className="h-12 rounded-2xl border-primary/20 shadow-inner"
-                          />
-                       </div>
-                       <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Manufacture Date</Label>
-                          <Input 
-                            type="date" 
-                            value={batchData.manufactureDate} 
-                            onChange={e => setBatchData(prev => ({...prev, manufactureDate: e.target.value}))}
-                            className="h-12 rounded-2xl border-primary/20 shadow-inner"
-                          />
-                       </div>
-                       <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Expiry Date (Optional)</Label>
-                          <Input 
-                            type="date" 
-                            value={batchData.expiryDate} 
-                            onChange={e => setBatchData(prev => ({...prev, expiryDate: e.target.value}))}
-                            className="h-12 rounded-2xl border-primary/20 shadow-inner"
-                          />
-                       </div>
-                    </div>
+                    <CategoryFilter
+                      selectedCategories={selectedCategories}
+                      onCategoryChange={setSelectedCategories}
+                      className="gap-2 px-3 shrink-0"
+                      align="end"
+                    />
                   </div>
-                )}
-
-                {currentStep === 3 && (
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3 text-primary mb-2">
-                       <QrCode className="h-6 w-6" />
-                       <h2 className="text-xl font-bold">Review & Sync</h2>
-                    </div>
-                    
-                    <Card className="p-6 rounded-3xl border-border/50 bg-muted/10 grid sm:grid-cols-3 gap-6">
-                       <div className="space-y-1">
-                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Product</p>
-                          <p className="text-sm font-bold">{selectedProduct?.name}</p>
-                       </div>
-                       <div className="space-y-1">
-                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Batch Number</p>
-                          <p className="text-sm font-mono font-bold text-primary">{batchData.batchNumber}</p>
-                       </div>
-                       <div className="space-y-1">
-                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Units</p>
-                          <p className="text-sm font-bold">{parseInt(batchData.quantity).toLocaleString()}</p>
-                       </div>
-                    </Card>
-
-                    <div className="p-6 rounded-3xl bg-amber-500/5 border border-amber-500/20 flex gap-4">
-                       <AlertTriangle className="h-6 w-6 text-amber-500 shrink-0" />
-                       <p className="text-xs text-muted-foreground leading-relaxed">
-                         Minting is an immutable action on the public blockchain. Once verified, this batch details and unit salts cannot be deleted or modified.
-                       </p>
-                    </div>
-
-                    {loading && (
-                      <div className="space-y-4 pt-4">
-                         <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                            <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${mintProgress}%` }}
-                              className="h-full bg-primary shadow-[0_0_15px_rgba(var(--primary),0.5)]" 
-                            />
-                         </div>
-                         <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-primary">
-                            <span className="flex items-center gap-2"><Cpu className="h-3 w-3 animate-spin" /> Hardware Wallet Check</span>
-                            <span>{mintProgress}%</span>
-                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Wizard Navigation */}
-                <div className="flex items-center justify-between pt-6 border-t border-border/50">
-                   {currentStep > 1 ? (
-                     <Button variant="ghost" onClick={() => setCurrentStep(s => s - 1)} disabled={loading} className="rounded-full px-6 text-muted-foreground font-bold">Back</Button>
-                   ) : <div />}
-
-                   <div className="flex items-center gap-3">
-                      <Button variant="outline" asChild className="rounded-full px-6">
-                         <Link href="/manufacturer/batches">Cancel</Link>
-                      </Button>
-                      {currentStep < 3 ? (
-                        <Button 
-                          onClick={() => setCurrentStep(s => s + 1)} 
-                          disabled={currentStep === 1 ? !selectedProduct : !batchData.batchNumber || !batchData.quantity}
-                          className="rounded-full px-10 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 font-black tracking-tight"
-                        >
-                           Next Step <ChevronRight className="ml-2 h-4 w-4" />
-                        </Button>
+                  <ScrollArea className="h-[250px] sm:h-[300px] border rounded-lg overflow-hidden bg-muted/20">
+                    <div className="p-2 space-y-1">
+                      {productsLoading ? (
+                        <div className="flex h-32 items-center justify-center">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : filteredProducts.length === 0 ? (
+                        <div className="p-6 text-center text-sm text-muted-foreground">
+                          No products found.
+                        </div>
                       ) : (
-                        <Button 
-                          onClick={handleMint} 
-                          disabled={loading} 
-                          className="rounded-full px-10 bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20 font-black tracking-tight gap-2"
-                        >
-                           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4 fill-current" />}
-                           {loading ? "Syncing..." : "Mint Units"}
-                        </Button>
+                        filteredProducts.map((p) => (
+                          <div
+                            key={p._id}
+                            onClick={() => setSelectedProduct(p)}
+                            className={cn(
+                              "flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer",
+                              selectedProduct?._id === p._id
+                                ? "border-primary bg-primary/10"
+                                : "border-transparent hover:bg-muted/50",
+                            )}
+                          >
+                            <div className="h-10 w-10 rounded-md bg-muted overflow-hidden shrink-0 border border-border/50">
+                              {p.images?.[0] ? (
+                                <img
+                                  src={resolveMediaUrl(p.images[0])}
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <Package className="w-full h-full p-2 opacity-30" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-sm truncate">
+                                {p.name}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {p.productId}
+                              </p>
+                            </div>
+                            {selectedProduct?._id === p._id && (
+                              <Check className="h-4 w-4 text-primary shrink-0" />
+                            )}
+                          </div>
+                        ))
                       )}
-                   </div>
+                    </div>
+                  </ScrollArea>
                 </div>
+              )}
 
-             </div>
-          </Card>
-        </motion.div>
-      </AnimatePresence>
+              {step === 2 && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-lg font-semibold">Batch Details</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Specify the production metrics.
+                    </p>
+                  </div>
+                  {selectedProduct && (
+                    <div className="flex items-center justify-between p-4 bg-muted/40 rounded-xl border border-border/50">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Target Template
+                        </p>
+                        <p className="font-semibold text-sm">
+                          {selectedProduct.name}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="opacity-70">
+                        {selectedProduct.productId}
+                      </Badge>
+                    </div>
+                  )}
+                  <div className="grid sm:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label>Batch Number</Label>
+                      <Input
+                        placeholder="e.g. BATCH-001"
+                        value={batchData.batchNumber}
+                        onChange={(e) =>
+                          setBatchData((prev) => ({
+                            ...prev,
+                            batchNumber: e.target.value,
+                          }))
+                        }
+                        autoFocus
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Quantity (Units)</Label>
+                      <Input
+                        type="number"
+                        placeholder="e.g. 5000"
+                        value={batchData.quantity}
+                        onChange={(e) =>
+                          setBatchData((prev) => ({
+                            ...prev,
+                            quantity: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    {/* V9 COMPATIBLE MANUFACTURE DATE */}
+                    <div className="space-y-2 flex flex-col">
+                      <Label className="mb-1">Manufacture Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !batchData.manufactureDate &&
+                                "text-muted-foreground",
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {batchData.manufactureDate ? (
+                              format(batchData.manufactureDate, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-auto p-0 overflow-hidden"
+                          align="start"
+                        >
+                          <Calendar
+                            mode="single"
+                            selected={batchData.manufactureDate}
+                            onSelect={(date) =>
+                              setBatchData((prev) => ({
+                                ...prev,
+                                manufactureDate: date,
+                              }))
+                            }
+                            captionLayout="dropdown"
+                            startMonth={new Date(2000, 0)}
+                            endMonth={new Date(currentYear, 11)}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    {/* V9 COMPATIBLE EXPIRY DATE */}
+                    <div className="space-y-2 flex flex-col">
+                      <Label className="mb-1">Expiry Date (Optional)</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !batchData.expiryDate && "text-muted-foreground",
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {batchData.expiryDate ? (
+                              format(batchData.expiryDate, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-auto p-0 overflow-hidden"
+                          align="start"
+                        >
+                          <Calendar
+                            mode="single"
+                            selected={batchData.expiryDate}
+                            onSelect={(date) =>
+                              setBatchData((prev) => ({
+                                ...prev,
+                                expiryDate: date,
+                              }))
+                            }
+                            captionLayout="dropdown"
+                            startMonth={new Date(currentYear - 5, 0)}
+                            endMonth={new Date(currentYear + 20, 11)}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-lg font-semibold">Review & Submit</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Verify the details before committing to the blockchain.
+                    </p>
+                  </div>
+
+                  <div className="p-6 rounded-xl bg-muted/30 border border-border/50 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Product
+                        </p>
+                        <p className="text-sm font-medium">
+                          {selectedProduct?.name}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Batch Number
+                        </p>
+                        <p className="text-sm font-medium">
+                          {batchData.batchNumber}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Quantity
+                        </p>
+                        <p className="text-sm font-medium">
+                          {parseInt(batchData.quantity).toLocaleString()} Units
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Manufactured
+                        </p>
+                        <p className="text-sm font-medium">
+                          {batchData.manufactureDate
+                            ? format(batchData.manufactureDate, "PPP")
+                            : "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-lg bg-primary/10 text-primary flex items-start gap-3">
+                    <Boxes className="h-5 w-5 shrink-0 mt-0.5" />
+                    <p className="text-sm leading-relaxed">
+                      By committing this batch, you authorize the generation of{" "}
+                      {batchData.quantity || "0"} unique cryptographic
+                      signatures. This action is permanently recorded on the
+                      ledger.
+                    </p>
+                  </div>
+
+                  {loading && (
+                    <div className="space-y-2 pt-2">
+                      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${mintProgress}%` }}
+                          className="h-full bg-primary"
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground font-medium">
+                        <span>Writing to blockchain...</span>
+                        <span>{mintProgress}%</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Navigation Bar */}
+          <div className="flex justify-between items-center pt-8 mt-8 border-t border-border/40">
+            {step > 1 ? (
+              <Button variant="outline" onClick={prevStep} disabled={loading}>
+                Back
+              </Button>
+            ) : (
+              <div /> // Spacer
+            )}
+
+            {step < 3 ? (
+              <Button onClick={nextStep} className="gap-2">
+                Next <ArrowRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleCreate}
+                disabled={loading}
+                className="gap-2"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                {loading ? "Processing..." : "Create Batch"}
+              </Button>
+            )}
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }

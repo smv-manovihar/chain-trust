@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { verifyScan } from "@/api/batch.api";
 import { addToCabinet } from "@/api/customer.api";
-import { verifyOnBlockchain } from "@/lib/blockchain-utils";
+import { verifyOnBlockchain } from "@/api/web3-client";
 import { getVisitorId } from "@/lib/visitor";
 import { cn } from "@/lib/utils";
 import { AIChatEmbed } from "@/components/chat/AIChatEmbed";
@@ -80,7 +80,12 @@ function VerifyContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [product, setProduct] = useState<ScanResult["product"] | null>(null);
-  const [scanStats, setScanStats] = useState({ count: 0, blockchainHash: "", isSuspicious: false, suspiciousReason: "" });
+  const [scanStats, setScanStats] = useState({
+    count: 0,
+    blockchainHash: "",
+    isSuspicious: false,
+    suspiciousReason: "",
+  });
   const { user, isAuthenticated } = useAuth();
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [userInteracted, setUserInteracted] = useState(false);
@@ -163,10 +168,7 @@ function VerifyContent() {
 
       try {
         const visitorId = getVisitorId();
-        const result: ScanResult = await verifyScan(
-          saltToVerify,
-          visitorId,
-        );
+        const result: ScanResult = await verifyScan(saltToVerify, visitorId);
         if (result.isValid && result.product) {
           finalProduct = { ...finalProduct, ...result.product };
           finalStats = {
@@ -212,6 +214,8 @@ function VerifyContent() {
         batchNumber: product?.batchNumber,
         expiryDate: product?.expiryDate,
         images: product?.images,
+        salt: qrInput,
+        isUserAdded: false,
       });
       toast.success("Saved to My Medicines!");
       router.push("/customer/cabinet");
@@ -310,8 +314,10 @@ function VerifyContent() {
               exit={{ opacity: 0, y: -10 }}
               className={cn(
                 "flex-1 flex flex-col",
-                isMobileFullscreenCamera ? "p-0" : (!isAuthenticated && "p-4 lg:p-8"),
-                "min-h-0"
+                isMobileFullscreenCamera
+                  ? "p-0"
+                  : !isAuthenticated && "p-4 lg:p-8",
+                "min-h-0",
               )}
             >
               {isMobileFullscreenCamera ? (
@@ -352,7 +358,7 @@ function VerifyContent() {
                       />
                     )}
                   </div>
-                  <p className="text-center text-[10px] uppercase font-bold tracking-widest text-muted-foreground/50">
+                  <p className="text-center text-[10px] font-bold tracking-tight text-muted-foreground/50">
                     Secure Blockchain Verification • No-Storage Policy
                   </p>
                 </div>
@@ -365,7 +371,7 @@ function VerifyContent() {
               animate={{ opacity: 1, scale: 1 }}
               className={cn(
                 "flex flex-col flex-1 min-h-0",
-                !isAuthenticated && "p-4 lg:p-0"
+                !isAuthenticated && "p-4 lg:p-0",
               )}
             >
               <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col min-h-0 mt-4 lg:mt-8">
@@ -373,7 +379,7 @@ function VerifyContent() {
                   <div>
                     <Badge
                       variant="outline"
-                      className="mb-2 bg-green-500/10 text-green-600 border-green-200 px-3 py-1 font-black uppercase tracking-tighter"
+                      className="mb-2 bg-green-500/10 text-green-600 border-green-200 px-3 py-1 font-bold tracking-tighter"
                     >
                       Blockchain Verified
                     </Badge>
@@ -412,16 +418,22 @@ function VerifyContent() {
                   <div className="lg:col-span-2 flex flex-col gap-6 overflow-hidden">
                     <ScrollArea className="flex-1 pr-4">
                       <div className="space-y-6 pb-6">
-                        <Card className={cn(
-                          "p-6 border rounded-[2rem] flex items-center gap-6",
-                          scanStats.isSuspicious 
-                            ? "bg-gradient-to-br from-amber-500/10 via-background to-amber-500/5 border-amber-500/50 shadow-amber-500/10" 
-                            : "bg-gradient-to-br from-green-500/10 via-background to-primary/5 border-green-500/20"
-                        )}>
-                          <div className={cn(
-                            "h-16 w-16 rounded-full flex items-center justify-center shrink-0 shadow-inner",
-                            scanStats.isSuspicious ? "bg-amber-500/20" : "bg-green-500/20"
-                          )}>
+                        <Card
+                          className={cn(
+                            "p-6 border rounded-[2rem] flex items-center gap-6",
+                            scanStats.isSuspicious
+                              ? "bg-gradient-to-br from-amber-500/10 via-background to-amber-500/5 border-amber-500/50 shadow-amber-500/10"
+                              : "bg-gradient-to-br from-green-500/10 via-background to-primary/5 border-green-500/20",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "h-16 w-16 rounded-full flex items-center justify-center shrink-0 shadow-inner",
+                              scanStats.isSuspicious
+                                ? "bg-amber-500/20"
+                                : "bg-green-500/20",
+                            )}
+                          >
                             {scanStats.isSuspicious ? (
                               <AlertTriangle className="h-8 w-8 text-amber-600" />
                             ) : (
@@ -430,25 +442,33 @@ function VerifyContent() {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className={cn(
-                                "text-xs font-black uppercase tracking-widest leading-none",
-                                scanStats.isSuspicious ? "text-amber-600" : "text-green-600"
-                              )}>
+                              <span
+                                className={cn(
+                                  "text-xs font-bold tracking-tight leading-none",
+                                  scanStats.isSuspicious
+                                    ? "text-amber-600"
+                                    : "text-green-600",
+                                )}
+                              >
                                 {scanStats.isSuspicious ? "Warning" : "Status"}
                               </span>
-                              {scanStats.count > 5 && !scanStats.isSuspicious && (
-                                <Badge
-                                  variant="destructive"
-                                  className="h-4 text-[8px] px-1 font-black"
-                                >
-                                  High Scans
-                                </Badge>
-                              )}
+                              {scanStats.count > 5 &&
+                                !scanStats.isSuspicious && (
+                                  <Badge
+                                    variant="destructive"
+                                    className="h-4 text-[8px] px-1 font-bold"
+                                  >
+                                    High Scans
+                                  </Badge>
+                                )}
                             </div>
                             <p className="text-lg font-bold leading-tight">
-                              {scanStats.isSuspicious ? "Suspicious Scan Activity" : "Product is 100% Authentic"}
+                              {scanStats.isSuspicious
+                                ? "Suspicious Scan Activity"
+                                : "Product is 100% Authentic"}
                             </p>
-                            {scanStats.isSuspicious && scanStats.suspiciousReason ? (
+                            {scanStats.isSuspicious &&
+                            scanStats.suspiciousReason ? (
                               <p className="text-xs text-amber-600/80 mt-1 font-medium leading-tight">
                                 {scanStats.suspiciousReason}
                               </p>
@@ -459,10 +479,14 @@ function VerifyContent() {
                             )}
                           </div>
                           <div className="hidden sm:block text-right">
-                            <p className={cn(
-                              "text-xl font-black",
-                              scanStats.isSuspicious ? "text-amber-600" : "text-primary"
-                            )}>
+                            <p
+                              className={cn(
+                                "text-xl font-bold",
+                                scanStats.isSuspicious
+                                  ? "text-amber-600"
+                                  : "text-primary",
+                              )}
+                            >
                               {scanStats.count}
                             </p>
                             <p className="text-[10px] uppercase font-bold text-muted-foreground">
@@ -473,7 +497,7 @@ function VerifyContent() {
 
                         <div className="grid sm:grid-cols-2 gap-4">
                           <Card className="p-5 rounded-3xl border-border/50 bg-card/50">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">
+                            <p className="text-[10px] font-bold tracking-tight text-muted-foreground mb-3">
                               Manufacturer
                             </p>
                             <div className="flex items-center gap-3">
@@ -482,7 +506,7 @@ function VerifyContent() {
                             </div>
                           </Card>
                           <Card className="p-5 rounded-3xl border-border/50 bg-card/50">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">
+                            <p className="text-[10px] font-bold tracking-tight text-muted-foreground mb-3">
                               Expiration
                             </p>
                             <div className="flex items-center justify-between">
@@ -499,7 +523,7 @@ function VerifyContent() {
                             </div>
                           </Card>
                           <Card className="p-5 rounded-3xl border-border/50 bg-card/50">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">
+                            <p className="text-[10px] font-bold tracking-tight text-muted-foreground mb-3">
                               Batch ID
                             </p>
                             <div className="flex items-center gap-3">
@@ -509,23 +533,31 @@ function VerifyContent() {
                               </p>
                             </div>
                           </Card>
-                           {!isAuthenticated && (
-                             <Card className="p-5 rounded-3xl border-border/50 bg-card/50">
-                               <p className="text-sm text-muted-foreground text-center mb-4">
-                                 Log in to your member account to save this medicine and track your health journey.
-                               </p>
-                               <div className="flex flex-col gap-3">
-                                 <Button className="w-full rounded-2xl h-10 font-bold" asChild>
-                                   <Link href="/login">Login to Save</Link>
-                                 </Button>
-                                 <Button variant="outline" className="w-full rounded-2xl h-10 font-bold" asChild>
-                                   <Link href="/register">Become a Member</Link>
-                                 </Button>
-                               </div>
-                             </Card>
-                           )}
+                          {!isAuthenticated && (
+                            <Card className="p-5 rounded-3xl border-border/50 bg-card/50">
+                              <p className="text-sm text-muted-foreground text-center mb-4">
+                                Log in to your member account to save this
+                                medicine and track your health journey.
+                              </p>
+                              <div className="flex flex-col gap-3">
+                                <Button
+                                  className="w-full rounded-2xl h-10 font-bold"
+                                  asChild
+                                >
+                                  <Link href="/login">Login to Save</Link>
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  className="w-full rounded-2xl h-10 font-bold"
+                                  asChild
+                                >
+                                  <Link href="/register">Become a Member</Link>
+                                </Button>
+                              </div>
+                            </Card>
+                          )}
                           <Card className="p-5 rounded-3xl border-border/50 bg-card/50">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">
+                            <p className="text-[10px] font-bold tracking-tight text-muted-foreground mb-3">
                               Unit Tracking
                             </p>
                             <div className="flex items-center gap-3">
@@ -539,7 +571,7 @@ function VerifyContent() {
 
                         {product?.description && (
                           <Card className="p-6 rounded-[2rem] border-border/50 bg-card/50">
-                            <h3 className="text-sm font-black uppercase tracking-widest mb-4">
+                            <h3 className="text-sm font-black tracking-tight mb-4">
                               Patient Guide
                             </h3>
                             <div className="text-sm text-muted-foreground leading-relaxed">
@@ -554,13 +586,13 @@ function VerifyContent() {
                   <div className="flex flex-col gap-6 overflow-hidden">
                     <section className="flex-1 flex flex-col min-h-[300px] lg:min-h-0 bg-card/50 backdrop-blur-sm rounded-[2.5rem] border border-border/50 overflow-hidden shadow-sm">
                       <div className="p-5 border-b bg-muted/20 flex items-center justify-between">
-                        <h3 className="font-bold flex items-center gap-2">
+                        <h3 className="font-black flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                           Assistant
                         </h3>
                         <Badge
                           variant="outline"
-                          className="text-[8px] uppercase"
+                          className="text-[8px] font-bold"
                         >
                           Beta
                         </Badge>

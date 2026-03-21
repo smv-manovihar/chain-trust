@@ -6,16 +6,19 @@
    - Use multi-column grids (e.g., `grid-cols-1 lg:grid-cols-3`) to utilize horizontal space instead of stacking content vertically.
    - Use `flex-1` and `min-h-0` on container columns, applying `overflow-y-auto` only locally where inner content absolutely must scroll (like a table body or chat view), avoiding global page scroll.
    - **Padding Consistency**: All authenticated pages are wrapped in `AppShell`, which provides standard padding (`p-4 lg:p-8`). Pages should NOT add their own top-level padding to avoid double-spacing.
-2. **Component Density:**
+2. **Typography Principles**:
+   - **Case Sensitivity**: Avoid using `uppercase`, `capitalize`, or `tracking-widest` for general labels, headings, or body text. These should use standard sentence case or title case.
+   - **Exception**: "Stat Cards" (e.g., dashboard counters, KPI displays) MAY use uppercase for labels to provide structural emphasis.
+3. **Component Density:**
    - Reduce excessive padding (`p-8` -> `p-4` or `p-6`) when combining multiple cards on a single screen.
    - Use compact text sizes (`text-sm`, `text-xs`) for metadata to keep interfaces tight without losing readability.
-3. **Card-Based Layouts:**
+4. **Card-Based Layouts:**
    - Group related functions together in visually distinct boundaries (e.g., `Card` components).
    - Use subtle borders or slight background tints (`bg-muted/50`, `bg-green-500/10`) to delineate status without overwhelming the user.
-4. **Immediate Feedback:**
+5. **Immediate Feedback:**
    - Display loading states (`Loader2`, skeletons) prominently.
    - Provide clear, bold status indicators (e.g., Green checkmarks for Authentic, Red alerts for Counterfeit/Recalled).
-5. **Mobile-First Responsive Design:**
+6. **Mobile-First Responsive Design:**
    - **Page Headers:** Use `flex-col sm:flex-row` for headers. Titles should be `text-2xl` on mobile and `text-3xl` on desktops.
    - **Button Collapse:** Universally understood actions (Delete, Refresh, Print, Export) should collapse to icons or compact versions on `sm` screens. Use `hidden sm:inline` for button text.
    - **Sticky Headers:** Application layouts should use the `useScrollDirection` hook to auto-hide the header on scroll-down and show it on scroll-up for mobile users.

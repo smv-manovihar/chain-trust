@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import crypto from 'crypto';
 import Batch from '../models/batch.model.js';
 import Product from '../models/product.model.js';
@@ -7,6 +8,8 @@ import * as pdfService from '../services/pdf.service.js';
 import geoip from 'geoip-lite';
 import requestIp from 'request-ip';
 import { calculateSuspiciousness } from '../utils/suspicious.util.js';
+import { Alert } from '../models/alert.model.js';
+import { Notification } from '../models/notification.model.js';
 
 /**
  * Derive a unit-level salt from a batch salt and unit index.
@@ -103,7 +106,7 @@ export const createBatch = async (req: Request, res: Response) => {
 			// Cache product fields for fast access
 			productName: product.name,
 			productId: product.productId,
-			category: product.category,
+			categories: product.categories,
 			brand: product.brand,
 			images: product.images,
 			// Batch-specific
@@ -137,7 +140,23 @@ export const createBatch = async (req: Request, res: Response) => {
 export const listBatches = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
-		const batches = await Batch.find({ createdBy: userId })
+		const { search, categories } = req.query;
+
+		const matchQuery: any = { createdBy: new mongoose.Types.ObjectId(userId) };
+
+		if (search) {
+			matchQuery.$or = [
+				{ batchNumber: { $regex: search, $options: 'i' } },
+				{ productName: { $regex: search, $options: 'i' } },
+			];
+		}
+
+		if (categories) {
+			const catList = Array.isArray(categories) ? categories : (categories as string).split(',');
+			matchQuery.categories = { $in: catList };
+		}
+
+		const batches = await Batch.find(matchQuery)
 			.sort({ createdAt: -1 })
 			.lean();
 
@@ -264,6 +283,42 @@ export const verifyScan = async (req: Request, res: Response) => {
 		// Calculate Suspiciousness using the history of scans
 		const suspiciousResult = await calculateSuspiciousness(batch._id, unitIndex, ip, latitude, longitude);
 
+		// If suspicious, create an Alert for the manufacturer
+		if (suspiciousResult.isSuspicious) {
+			try {
+				await Alert.create({
+					type: 'suspicious_scan',
+					message: `Suspicious scan detected for ${batch.productName} (Batch: ${batch.batchNumber}). Reason: ${suspiciousResult.reason}`,
+					metadata: {
+						batchId: batch._id,
+						unitIndex,
+						ip,
+						visitorId: visitorId || `legacy-${ip}`
+					},
+					createdBy: batch.createdBy
+				});
+			} catch (alertError) {
+				console.error('Error creating suspicious scan alert:', alertError);
+			}
+
+			// Also create a Notification for the dashboard bell
+			try {
+				await Notification.create({
+					user: batch.createdBy,
+					type: 'alert',
+					title: 'Suspicious Scan Detected',
+					message: `A suspicious scan was flagged for ${batch.productName} (Batch: ${batch.batchNumber}).`,
+					link: `/manufacturer/analytics`, // Link to the security section
+					metadata: {
+						batchId: batch._id,
+						productId: batch.product
+					}
+				});
+			} catch (notifError) {
+				console.error('Error creating suspicious scan notification:', notifError);
+			}
+		}
+
 		// Attempt to record a unique scan
 		let newCount = batch.scanCounts?.get(String(unitIndex)) || 0;
 		try {
@@ -294,6 +349,28 @@ export const verifyScan = async (req: Request, res: Response) => {
 				newCount += 1;
 				batch.scanCounts.set(String(unitIndex), newCount);
 				await batch.save();
+
+				// Check for scan milestones (100, 500, 1000, etc.)
+				const totalScans = Array.from(batch.scanCounts.values()).reduce((a: number, b: any) => a + Number(b), 0);
+				const milestones = [100, 500, 1000, 5000, 10000];
+				
+				if (milestones.includes(totalScans)) {
+					try {
+						await Notification.create({
+							user: batch.createdBy,
+							type: 'scan_milestone',
+							title: 'Scan Milestone Reached',
+							message: `Batch ${batch.batchNumber} has reached ${totalScans} total scans!`,
+							link: `/manufacturer/batches/${batch._id}`,
+							metadata: {
+								batchId: batch._id,
+								productId: batch.product
+							}
+						});
+					} catch (milestoneError) {
+						console.error('Error creating milestone notification:', milestoneError);
+					}
+				}
 			}
 		} catch (scanError) {
 			console.error('Unique scan tracking error:', scanError);
@@ -304,7 +381,7 @@ export const verifyScan = async (req: Request, res: Response) => {
 			product: {
 				productId: batch.productId,
 				productName: batch.productName,
-				category: batch.category,
+				categories: batch.categories,
 				brand: batch.brand,
 				batchNumber: batch.batchNumber,
 				manufactureDate: batch.manufactureDate,
@@ -374,6 +451,81 @@ export const getBatchPDF = async (req: Request, res: Response) => {
 		res.send(pdfBuffer);
 	} catch (error) {
 		console.error('Generate PDF error:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+};
+
+// GET /api/batches/scan-history — Get aggregated scan counts by day
+export const getScanHistory = async (req: Request, res: Response) => {
+	try {
+		const userId = (req as any).user?.id;
+		const days = parseInt(req.query.days as string) || 30;
+
+		// Get all batch IDs owned by the user
+		const batches = await Batch.find({ createdBy: userId }).select('_id');
+		const batchIds = batches.map(b => b._id);
+
+		if (batchIds.length === 0) {
+			return res.json({ history: [] });
+		}
+
+		const startDate = new Date();
+		startDate.setDate(startDate.getDate() - days);
+
+		// Aggregate scans by day
+		const history = await Scan.aggregate([
+			{
+				$match: {
+					batch: { $in: batchIds },
+					createdAt: { $gte: startDate }
+				}
+			},
+			{
+				$group: {
+					_id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+					count: { $sum: 1 }
+				}
+			},
+			{ $sort: { _id: 1 } }
+		]);
+
+		// Map to expected format
+		const formattedHistory = history.map(item => ({
+			date: item._id,
+			count: item.count
+		}));
+
+		res.json({ history: formattedHistory });
+	} catch (error) {
+		console.error('Error fetching scan history:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+};
+
+// GET /api/batches/:id/scan-details — Get detailed scan records for a specific batch
+export const getBatchScanDetails = async (req: Request, res: Response) => {
+	try {
+		const userId = (req as any).user?.id;
+		const batchId = req.params.id;
+
+		// Verify batch ownership
+		const batch = await Batch.findOne({ _id: batchId, createdBy: userId });
+		if (!batch) {
+			return res.status(404).json({ message: 'Batch not found' });
+		}
+
+		// Get scan records
+		const scans = await Scan.find({ batch: batchId })
+			.sort({ createdAt: -1 })
+			.limit(100); // Limit to top 100 recent scans for deep dive
+
+		res.json({ scans, batch: {
+			batchNumber: batch.batchNumber,
+			productName: batch.productName,
+			totalScans: Array.from(batch.scanCounts?.values() || []).reduce((a: number, b: any) => a + Number(b), 0)
+		} });
+	} catch (error) {
+		console.error('Error fetching batch scan details:', error);
 		res.status(500).json({ message: 'Internal server error' });
 	}
 };

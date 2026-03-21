@@ -7,6 +7,7 @@ import {
   BarChart3,
   Boxes,
   PanelLeft,
+  Users,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { useState, useEffect } from "react";
@@ -52,6 +53,11 @@ export const navGroups = [
   {
     label: "Configuration",
     items: [
+      {
+        label: "Team Management",
+        href: "/manufacturer/team",
+        icon: Users,
+      },
       {
         label: "Settings",
         href: "/manufacturer/settings",

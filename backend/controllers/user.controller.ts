@@ -78,7 +78,7 @@ export const getPersonalCabinet = async (req: Request, res: Response): Promise<v
 	try {
 		const userId = (req as any).user.id;
 		const items = await CabinetItem.find({ userId });
-		res.json(items);
+		res.json({ cabinet: items });
 	} catch (err) {
 		console.error("Error getting cabinet:", err);
 		res.status(500).json({ message: 'Server error' });
@@ -90,7 +90,12 @@ export const addToCabinet = async (req: Request, res: Response): Promise<void> =
 		const userId = (req as any).user.id;
 		const productData = req.body;
 		
-		const existingItem = await CabinetItem.findOne({ userId, productId: productData.productId });
+		const existingItem = await CabinetItem.findOne({ 
+			userId, 
+			productId: productData.productId,
+			isUserAdded: !!productData.isUserAdded
+		});
+		
 		if (existingItem) {
 			res.status(400).json({ message: 'Product already in cabinet' });
 			return;
@@ -103,7 +108,9 @@ export const addToCabinet = async (req: Request, res: Response): Promise<void> =
 			productId: productData.productId,
 			batchNumber: productData.batchNumber,
 			expiryDate: productData.expiryDate,
-			images: productData.images
+			images: productData.images,
+			salt: productData.salt,
+			isUserAdded: !!productData.isUserAdded
 		});
 		await newItem.save();
 		
@@ -118,9 +125,14 @@ export const addToCabinet = async (req: Request, res: Response): Promise<void> =
 export const removeFromCabinet = async (req: Request, res: Response): Promise<void> => {
 	try {
 		const userId = (req as any).user.id;
-		const { productId } = req.body;
+		const { id } = req.params;
 		
-		await CabinetItem.findOneAndDelete({ userId, productId });
+		const result = await CabinetItem.findOneAndDelete({ userId, _id: id });
+		
+		if (!result) {
+			res.status(404).json({ message: 'Cabinet item not found' });
+			return;
+		}
 		
 		const items = await CabinetItem.find({ userId });
 		res.status(200).json({ message: 'Removed from cabinet', cabinet: items });

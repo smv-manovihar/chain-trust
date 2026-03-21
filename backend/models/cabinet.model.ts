@@ -8,6 +8,8 @@ export interface ICabinetItem extends Document {
 	batchNumber: string;
 	expiryDate?: string;
 	images?: string[];
+	salt?: string;
+	isUserAdded: boolean;
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -21,14 +23,17 @@ const cabinetItemSchema = new Schema<ICabinetItem>(
 		batchNumber: { type: String, required: true },
 		expiryDate: { type: String },
 		images: { type: [String], default: [] },
+		salt: { type: String },
+		isUserAdded: { type: Boolean, default: false },
 	},
 	{
 		timestamps: true,
-		collection: 'user-cabinets',
+		collection: 'cabinet-items',
 	},
 );
 
-// Ensure a user can't add the exact same product multiple times
-cabinetItemSchema.index({ userId: 1, productId: 1 }, { unique: true });
+// Unique across userId, productId AND isUserAdded to allow multiple entries for user-added vs verified if needed,
+// but usually we want to prevent duplicates for the same user-added item.
+cabinetItemSchema.index({ userId: 1, productId: 1, isUserAdded: 1 }, { unique: true });
 
 export default model<ICabinetItem>('CabinetItem', cabinetItemSchema);

@@ -81,7 +81,7 @@ export default function Home() {
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.8, ease: "easeOut" }}
         >
-          <h1 className="text-4xl md:text-7xl font-bold tracking-tight text-foreground max-w-4xl mx-auto text-balance mb-6">
+          <h1 className="text-4xl md:text-7xl font-black tracking-tight text-foreground max-w-4xl mx-auto text-balance mb-6">
             <TextAnimate animation="blurInUp" by="word" as="span" once>
               Uncompromising Integrity
             </TextAnimate>
@@ -169,7 +169,7 @@ export default function Home() {
           <div className="text-center max-w-3xl mx-auto mb-20">
             <TextAnimate
               as="h2"
-              className="text-3xl md:text-5xl font-bold tracking-tight mb-6"
+              className="text-3xl md:text-5xl font-black tracking-tight mb-6"
               animation="blurInUp"
               by="word"
               once
@@ -187,7 +187,7 @@ export default function Home() {
             <div>
               <div className="flex items-center justify-center gap-4 mb-10">
                 <div className="h-[1px] w-12 bg-primary/20" />
-                <h3 className="text-2xl font-bold tracking-tight text-foreground/80">For Members</h3>
+                <h3 className="text-2xl font-black tracking-tight text-foreground/80">For Members</h3>
                 <div className="h-[1px] w-12 bg-primary/20" />
               </div>
               <div className="grid md:grid-cols-3 gap-8">
@@ -210,7 +210,7 @@ export default function Home() {
                           <feature.icon className="relative z-10 h-7 w-7 text-primary group-hover:text-primary-foreground transition-colors duration-500" />
                         </div>
                         <div>
-                          <h3 className="text-xl font-bold mb-2 tracking-tight group-hover:text-primary transition-colors duration-300">{feature.title}</h3>
+                          <h3 className="text-xl font-black mb-2 tracking-tight group-hover:text-primary transition-colors duration-300">{feature.title}</h3>
                           <p className="text-muted-foreground leading-relaxed text-sm">{feature.desc}</p>
                         </div>
                       </div>
@@ -224,7 +224,7 @@ export default function Home() {
             <div>
               <div className="flex items-center justify-center gap-4 mb-10">
                 <div className="h-[1px] w-12 bg-blue-500/20" />
-                <h3 className="text-2xl font-bold tracking-tight text-foreground/80">For Manufacturers</h3>
+                <h3 className="text-2xl font-black tracking-tight text-foreground/80">For Manufacturers</h3>
                 <div className="h-[1px] w-12 bg-blue-500/20" />
               </div>
               <div className="grid md:grid-cols-3 gap-8">
@@ -247,7 +247,7 @@ export default function Home() {
                           <feature.icon className="relative z-10 h-7 w-7 text-blue-500 group-hover:text-primary-foreground transition-colors duration-500" />
                         </div>
                         <div>
-                          <h3 className="text-xl font-bold mb-2 tracking-tight group-hover:text-blue-500 transition-colors duration-300">{feature.title}</h3>
+                          <h3 className="text-xl font-black mb-2 tracking-tight group-hover:text-blue-500 transition-colors duration-300">{feature.title}</h3>
                           <p className="text-muted-foreground leading-relaxed text-sm">{feature.desc}</p>
                         </div>
                       </div>
@@ -270,7 +270,7 @@ export default function Home() {
           viewport={{ once: true }}
           transition={{ duration: 0.8, ease: "easeOut" }}
         >
-          <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-8 max-w-3xl mx-auto">
+          <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-8 max-w-3xl mx-auto">
             {isAuthenticated
               ? "Your Dashboard Awaits"
               : "Start Securing Your Supply Chain Today"}

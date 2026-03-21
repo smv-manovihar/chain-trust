@@ -154,11 +154,18 @@ async function deploy() {
         fs.writeFileSync(path.join(contractsDir, 'metadata.json'), JSON.stringify(metadata, null, 2));
         
         const frontendEnvPath = path.join(rootDir, 'frontend/.env');
+        const backendEnvPath = path.join(rootDir, 'backend/.env');
+
         updateEnvFile(frontendEnvPath, {
             'NEXT_PUBLIC_CONTRACT_ADDRESS': address,
             'NEXT_PUBLIC_RPC_URL': RPC_URL
         });
-        console.log('Metadata and Frontend .env successfully updated.');
+
+        updateEnvFile(backendEnvPath, {
+            'CONTRACT_ADDRESS': address,
+            'RPC_URL': RPC_URL
+        });
+        console.log('Metadata and both .env files successfully updated.');
 
     } catch (error) {
         console.error('\n❌ Deployment failed:');

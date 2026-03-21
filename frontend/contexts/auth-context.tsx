@@ -79,6 +79,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const userData = await getCurrentUser();
       setUser(userData);
+      
+      if (userData && !userData.isEmailVerified && typeof window !== "undefined") {
+        const path = window.location.pathname;
+        if (!path.startsWith("/verify-email") && !path.startsWith("/login") && !path.startsWith("/register") && !path.startsWith("/setup-account")) {
+            window.location.href = "/verify-email";
+        }
+      }
+
       if (typeof window !== "undefined" && userData?.avatar) {
         cacheAvatarBlob(userData.avatar);
       }
@@ -102,6 +110,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (data.user.mustChangePassword) {
         return "/auth/force-change-password";
+      }
+
+      if (!data.user.isEmailVerified) {
+        return "/verify-email";
       }
 
       return (

@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/auth-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/contexts/sidebar-context";
+import { Web3Provider } from "@/contexts/web3-context";
 
 const figtree = Figtree({
   subsets: ["latin"],
@@ -69,7 +70,9 @@ export default function RootLayout({
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <TooltipProvider delayDuration={300}>
                 <AuthProvider>
+                  <Web3Provider>
                   <SidebarProvider>{children}</SidebarProvider>
+                </Web3Provider>
                 </AuthProvider>
             </TooltipProvider>
             <Toaster />

@@ -6,7 +6,7 @@ export interface IBatch extends Document {
 	// Cached product fields for fast access without populate
 	productName: string;
 	productId: string; // The user-facing SKU/NDC from the Product
-	category: string;
+	categories: string[];
 	brand: string;
 	images: string[];
 	// Batch-specific fields
@@ -47,10 +47,9 @@ const batchSchema = new Schema<IBatch>(
 			required: true,
 			trim: true,
 		},
-		category: {
-			type: String,
-			required: true,
-			trim: true,
+		categories: {
+			type: [String],
+			default: [],
 		},
 		brand: {
 			type: String,

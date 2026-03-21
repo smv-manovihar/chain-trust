@@ -56,16 +56,6 @@ export async function updateRole(role: 'customer' | 'manufacturer'): Promise<Aut
   return response.data;
 }
 
-export async function updateProfile(data: Partial<User>): Promise<AuthResponse> {
-  const response = await client.put<AuthResponse>('/users/update', data);
-  return response.data;
-}
-
-export async function changePassword(data: { currentPassword?: string; newPassword: string }): Promise<AuthResponse> {
-  const response = await client.post<AuthResponse>('/users/change-password', data);
-  return response.data;
-}
-
 export async function getCurrentUser(): Promise<User | null> {
   try {
     const response = await client.get<{ user: User }>('/auth/me');

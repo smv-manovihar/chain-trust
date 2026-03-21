@@ -3,10 +3,10 @@
 import React, { useRef, useState } from "react";
 import { useScrollDirection } from "@/hooks/use-scroll-direction";
 import { cn } from "@/lib/utils";
-import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { UserNav } from "@/components/layout/user-nav";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { useSidebar } from "@/contexts/sidebar-context";
 
 import { usePathname } from "next/navigation";
@@ -62,15 +62,7 @@ export function AppShell({ children, sidebar, mobileSidebar }: AppShellProps) {
           </div>
 
           <div className="flex items-center justify-end gap-2 lg:gap-4 flex-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative text-muted-foreground hover:text-primary transition-colors rounded-full"
-            >
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary" />
-              <span className="sr-only">Notifications</span>
-            </Button>
+            <NotificationBell />
             
             <AnimatedThemeToggler className="rounded-full shadow-inner bg-muted/20" />
 

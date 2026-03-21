@@ -1,13 +1,14 @@
 import { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import Product from '../models/product.model.js';
 
 // POST /api/products — Create a new catalogue product
 export const createProduct = async (req: Request, res: Response) => {
 	try {
-		const { name, productId, category, brand, price, description, images } = req.body;
+		const { name, productId, categories, brand, price, description, images } = req.body;
 
-		if (!name || !productId || !category || !brand) {
-			return res.status(400).json({ message: 'Name, Product ID, Category, and Brand are required.' });
+		if (!name || !productId || !categories || !Array.isArray(categories) || categories.length === 0 || !brand) {
+			return res.status(400).json({ message: 'Name, Product ID, Categories (array), and Brand are required.' });
 		}
 
 		const userId = (req as any).user?.id;
@@ -21,7 +22,7 @@ export const createProduct = async (req: Request, res: Response) => {
 		const product = new Product({
 			name,
 			productId,
-			category,
+			categories,
 			brand,
 			price: price || 0,
 			description,
@@ -40,11 +41,63 @@ export const createProduct = async (req: Request, res: Response) => {
 	}
 };
 
-// GET /api/products — List all catalogue products for the manufacturer
+// GET /api/products — List all catalogue products for the manufacturer (with filtering)
 export const listProducts = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
-		const products = await Product.find({ createdBy: userId }).sort({ createdAt: -1 }).lean();
+		const { search, categories, skip, limit } = req.query;
+
+		const matchQuery: any = { createdBy: new Types.ObjectId(userId) };
+
+		if (search) {
+			matchQuery.$or = [
+				{ name: { $regex: search, $options: 'i' } },
+				{ productId: { $regex: search, $options: 'i' } },
+			];
+		}
+
+		if (categories) {
+			const catList = Array.isArray(categories) ? categories : (categories as string).split(',');
+			matchQuery.categories = { $in: catList };
+		}
+
+		const pipeline: any[] = [
+			{ $match: matchQuery },
+			{ $sort: { createdAt: -1 } },
+		];
+
+		if (skip) {
+			pipeline.push({ $skip: parseInt(skip as string) });
+		}
+		if (limit) {
+			pipeline.push({ $limit: parseInt(limit as string) });
+		} else {
+			pipeline.push({ $limit: 100 }); // Default limit
+		}
+
+		// Join with batches to get count
+		pipeline.push(
+			{
+				$lookup: {
+					from: 'batches',
+					localField: '_id',
+					foreignField: 'product',
+					as: 'productBatches',
+				},
+			},
+			{
+				$addFields: {
+					batchesCount: { $size: '$productBatches' },
+				},
+			},
+			{
+				$project: {
+					productBatches: 0,
+				},
+			},
+		);
+
+		const products = await Product.aggregate(pipeline);
 		res.json({ products });
 	} catch (error) {
 		console.error('List products error:', error);
@@ -79,11 +132,11 @@ export const updateProduct = async (req: Request, res: Response) => {
 			return res.status(403).json({ message: 'Not authorized' });
 		}
 
-		const { name, productId, category, brand, price, description, images, qrSettings } = req.body;
+		const { name, productId, categories, brand, price, description, images, qrSettings } = req.body;
 
 		if (name) product.name = name;
 		if (productId) product.productId = productId;
-		if (category) product.category = category;
+		if (categories) product.categories = categories;
 		if (brand) product.brand = brand;
 		if (price !== undefined) product.price = price;
 		if (description !== undefined) product.description = description;

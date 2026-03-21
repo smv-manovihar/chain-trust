@@ -14,6 +14,7 @@ import mediaRouter from './routers/media.router.js';
 import userRouter from './routers/user.router.js';
 import batchRouter from './routers/batch.router.js';
 import categoryRouter from './routers/category.router.js';
+import notificationRouter from './routers/notification.router.js';
 import { startCronJobs } from './jobs/cron.js';
 
 // Initialize Express
@@ -76,6 +77,7 @@ app.use('/api/batches', batchRouter);
 app.use('/api/media', mediaRouter);
 app.use('/api/users', userRouter);
 app.use('/api/categories', categoryRouter);
+app.use('/api/notifications', notificationRouter);
 
 // 404 handler
 app.use((_req, res) => {

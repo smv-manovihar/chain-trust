@@ -3,7 +3,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 export interface IProduct extends Document {
 	name: string;
 	productId: string; // SKU, NDC, or any identifier the manufacturer uses
-	category: string;
+	categories: string[];
 	brand: string;
 	price: number;
 	description?: string;
@@ -33,10 +33,9 @@ const productSchema = new Schema<IProduct>(
 			required: true,
 			trim: true,
 		},
-		category: {
-			type: String,
-			required: true,
-			trim: true,
+		categories: {
+			type: [String],
+			default: [],
 		},
 		brand: {
 			type: String,

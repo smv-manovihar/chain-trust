@@ -10,75 +10,78 @@ export const generateVerificationToken = (): string => {
 	return crypto.randomBytes(32).toString('hex');
 };
 
+const wrapTemplate = (title: string, content: string) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { margin: 0; padding: 0; background-color: #000000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #09090b; border: 1px solid #27272a; border-radius: 32px; overflow: hidden; color: #ffffff; }
+        .header { padding: 48px 40px; text-align: center; border-bottom: 1px solid #27272a; background: linear-gradient(to bottom, #111114, #09090b); }
+        .content { padding: 48px 40px; }
+        .footer { padding: 32px; text-align: center; background-color: #09090b; border-top: 1px solid #27272a; color: #52525b; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; }
+        .brand { font-size: 20px; font-weight: 900; letter-spacing: -0.05em; color: #ffffff; text-decoration: none; }
+        .accent { color: #10b981; }
+        .title { font-size: 24px; font-weight: 800; margin-bottom: 16px; letter-spacing: -0.03em; color: #ffffff; }
+        .text { color: #a1a1aa; line-height: 1.7; margin-bottom: 24px; font-size: 15px; }
+        .otp-container { background-color: #111114; border: 1px solid #27272a; border-radius: 20px; padding: 32px; text-align: center; margin: 32px 0; }
+        .otp-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #71717a; margin-bottom: 12px; }
+        .otp { font-size: 42px; font-weight: 900; letter-spacing: 0.25em; color: #10b981; margin: 0; }
+        .btn-container { text-align: center; margin: 32px 0; }
+        .btn { display: inline-block; background-color: #10b981; color: #000000 !important; padding: 16px 40px; border-radius: 100px; text-decoration: none; font-weight: 800; font-size: 14px; box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.3); }
+        .hash-box { background-color: #111114; border: 1px solid #27272a; border-radius: 12px; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; color: #10b981; word-break: break-all; }
+        .divider { height: 1px; background-color: #27272a; margin: 32px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="${FRONTEND_URL}" class="brand">CHAIN<span class="accent">TRUST</span></a>
+        </div>
+        <div class="content">
+            <h2 class="title">${title}</h2>
+            ${content}
+        </div>
+        <div class="footer">
+            &copy; 2026 CHAINTRUST &bull; SECURE BLOCKCHAIN INFRASTRUCTURE
+        </div>
+    </div>
+</body>
+</html>
+`;
+
 export const sendEmailVerification = async (
 	email: string,
 	otp: string,
 	token: string,
 	name: string,
 ): Promise<boolean> => {
-	const verificationUrl = `${FRONTEND_URL}/auth/verify-email?token=${token}`;
+	const verificationUrl = `${FRONTEND_URL}/verify-email?token=${token}`;
+
+	const content = `
+		<p class="text">Hello ${name}, welcome to the network. To activate your account and ensure secure access to ChainTrust, please verify your identity.</p>
+		
+		<div class="otp-container">
+			<div class="otp-label">Verification Passcode</div>
+			<h3 class="otp">${otp}</h3>
+			<p style="color: #71717a; font-size: 11px; margin-top: 12px;">Valid for 10 minutes</p>
+		</div>
+
+		<div class="divider"></div>
+
+		<p class="text">Alternatively, you can use the direct secure link below:</p>
+		<div class="btn-container">
+			<a href="${verificationUrl}" class="btn">VERIFY ACCOUNT</a>
+		</div>
+		<p style="color: #52525b; font-size: 11px; text-align: center;">This link remains active for 24 hours.</p>
+	`;
 
 	const mailOptions = {
 		from: EMAIL_FROM,
 		to: email,
-		subject: 'ChainTrust - Verify Your Email Address',
-		html: `
-			<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-				<div style="background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-					<h1 style="margin: 0; font-size: 28px;">ChainTrust</h1>
-					<p style="margin: 10px 0 0 0; opacity: 0.9;">Email Verification</p>
-				</div>
-
-				<div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
-					<h2 style="color: #333; margin-bottom: 20px;">Hello ${name}!</h2>
-
-					<p style="color: #666; line-height: 1.6; margin-bottom: 25px;">
-						Thank you for registering with ChainTrust! To complete your account verification,
-						you can use either of the following methods:
-					</p>
-
-					<div style="background: #fff; border: 2px solid #e9ecef; border-radius: 8px; padding: 20px; margin: 20px 0;">
-						<h3 style="color: #333; margin-bottom: 15px; font-size: 18px;">Method 1: OTP Verification</h3>
-						<p style="color: #666; margin-bottom: 15px;">Enter this 6-digit code in the verification form:</p>
-						<div style="background: #f8f9fa; border: 2px dashed #0ea5e9; border-radius: 8px; padding: 20px; text-align: center; margin: 15px 0;">
-							<h3 style="color: #0ea5e9; margin: 0; font-size: 32px; letter-spacing: 5px; font-weight: bold;">${otp}</h3>
-							<p style="color: #999; margin: 10px 0 0 0; font-size: 14px;">This OTP will expire in 10 minutes</p>
-						</div>
-					</div>
-
-					<div style="background: #fff; border: 2px solid #e9ecef; border-radius: 8px; padding: 20px; margin: 20px 0;">
-						<h3 style="color: #333; margin-bottom: 15px; font-size: 18px;">Method 2: Link Verification</h3>
-						<p style="color: #666; margin-bottom: 15px;">Click the button below to verify your email:</p>
-						<div style="text-align: center; margin: 15px 0;">
-							<a href="${verificationUrl}"
-							   style="background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
-							          color: white;
-							          padding: 15px 30px;
-							          text-decoration: none;
-							          border-radius: 25px;
-							          display: inline-block;
-							          font-weight: bold;
-							          box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);">
-								Verify Email Address
-							</a>
-						</div>
-						<p style="color: #999; font-size: 12px; margin: 10px 0 0 0;">
-							This link will expire in 24 hours.
-						</p>
-					</div>
-
-					<p style="color: #666; line-height: 1.6; margin-bottom: 25px;">
-						If you didn't create an account with ChainTrust, please ignore this email.
-					</p>
-
-					<div style="text-align: center; margin-top: 30px;">
-						<p style="color: #999; font-size: 12px; margin: 0;">
-							This is an automated email. Please do not reply to this message.
-						</p>
-					</div>
-				</div>
-			</div>
-		`,
+		subject: 'Verify your ChainTrust Account',
+		html: wrapTemplate('Finalizing Setup', content),
 	};
 
 	try {
@@ -95,41 +98,23 @@ export const sendPasswordResetOTP = async (
 	otp: string,
 	name: string,
 ): Promise<boolean> => {
+	const content = `
+		<p class="text">Hello ${name}, we received a request to reset your master password. Use the security code below to proceed.</p>
+		
+		<div class="otp-container">
+			<div class="otp-label">Reset Token</div>
+			<h3 class="otp">${otp}</h3>
+			<p style="color: #71717a; font-size: 11px; margin-top: 12px;">Security window: 10 minutes</p>
+		</div>
+
+		<p class="text">If you did not initiate this request, please secure your account immediately or ignore this message.</p>
+	`;
+
 	const mailOptions = {
 		from: EMAIL_FROM,
 		to: email,
-		subject: 'ChainTrust - Password Reset OTP',
-		html: `
-			<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-				<div style="background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-					<h1 style="margin: 0; font-size: 28px;">ChainTrust</h1>
-					<p style="margin: 10px 0 0 0; opacity: 0.9;">Password Reset</p>
-				</div>
-
-				<div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
-					<h2 style="color: #333; margin-bottom: 20px;">Hello ${name}!</h2>
-
-					<p style="color: #666; line-height: 1.6; margin-bottom: 25px;">
-						We received a request to reset your password. Use the following OTP to complete the process:
-					</p>
-
-					<div style="background: #fff; border: 2px dashed #0ea5e9; border-radius: 8px; padding: 20px; text-align: center; margin: 25px 0;">
-						<h3 style="color: #0ea5e9; margin: 0; font-size: 32px; letter-spacing: 5px; font-weight: bold;">${otp}</h3>
-						<p style="color: #999; margin: 10px 0 0 0; font-size: 14px;">This OTP will expire in 10 minutes</p>
-					</div>
-
-					<p style="color: #666; line-height: 1.6; margin-bottom: 25px;">
-						If you didn't request a password reset, please ignore this email and your password will remain unchanged.
-					</p>
-
-					<div style="text-align: center; margin-top: 30px;">
-						<p style="color: #999; font-size: 12px; margin: 0;">
-							This is an automated email. Please do not reply to this message.
-						</p>
-					</div>
-				</div>
-			</div>
-		`,
+		subject: 'Security Alert: Password Reset Requested',
+		html: wrapTemplate('Password Recovery', content),
 	};
 
 	try {
@@ -147,61 +132,27 @@ export const sendEmployeeInvitation = async (
 	otp: string,
 	companyName: string,
 ): Promise<boolean> => {
+	const content = `
+		<p class="text">You have been formally invited to join the <strong>${companyName}</strong> administrative console on ChainTrust.</p>
+		
+		<div class="otp-container">
+			<div class="otp-label">Invitation Code</div>
+			<h3 class="otp">${otp}</h3>
+		</div>
+
+		<div class="btn-container">
+			<a href="${inviteLink}" class="btn">ACCEPT INVITATION</a>
+		</div>
+
+		<p class="text">To complete your enrollment, use the code above on the setup page or click the secure link.</p>
+		<div class="hash-box">${inviteLink}</div>
+	`;
+
 	const mailOptions = {
 		from: EMAIL_FROM,
 		to: email,
-		subject: `Invitation to join ${companyName} on ChainTrust`,
-		html: `
-			<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-				<div style="background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-					<h1 style="margin: 0; font-size: 28px;">ChainTrust</h1>
-					<p style="margin: 10px 0 0 0; opacity: 0.9;">Employee Invitation</p>
-				</div>
-
-				<div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
-					<h2 style="color: #333; margin-bottom: 20px;">You've been invited!</h2>
-
-					<p style="color: #666; line-height: 1.6; margin-bottom: 25px;">
-						You have been invited to join <strong>${companyName}</strong> on ChainTrust. 
-						To accept this invitation and set up your account, please use the OTP or link below within the next 24 hours.
-					</p>
-
-					<div style="background: #fff; border: 2px solid #e9ecef; border-radius: 8px; padding: 20px; margin: 20px 0;">
-						<h3 style="color: #333; margin-bottom: 15px; font-size: 18px;">Verification Code</h3>
-						<p style="color: #666; margin-bottom: 15px;">Use this 6-digit code during setup:</p>
-						<div style="background: #f8f9fa; border: 2px dashed #0ea5e9; border-radius: 8px; padding: 20px; text-align: center; margin: 15px 0;">
-							<h3 style="color: #0ea5e9; margin: 0; font-size: 32px; letter-spacing: 5px; font-weight: bold;">${otp}</h3>
-						</div>
-					</div>
-
-					<div style="text-align: center; margin: 25px 0;">
-						<a href="${inviteLink}"
-						   style="background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
-								  color: white;
-								  padding: 15px 30px;
-								  text-decoration: none;
-								  border-radius: 25px;
-								  display: inline-block;
-								  font-weight: bold;
-								  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);">
-							Accept Invitation
-						</a>
-					</div>
-
-					<p style="color: #666; line-height: 1.6; margin-bottom: 25px;">
-						If the button doesn't work, copy and paste this link into your browser:
-						<br>
-						<a href="${inviteLink}" style="color: #0ea5e9; word-break: break-all;">${inviteLink}</a>
-					</p>
-
-					<div style="text-align: center; margin-top: 30px;">
-						<p style="color: #999; font-size: 12px; margin: 0;">
-							This works because you were invited by an administrator of ${companyName}.
-						</p>
-					</div>
-				</div>
-			</div>
-		`,
+		subject: `Action Required: Join ${companyName} on ChainTrust`,
+		html: wrapTemplate('Institutional Invite', content),
 	};
 
 	try {
@@ -218,54 +169,27 @@ export const sendExpiryAlert = async (
 	hash: string,
 	expiryDate: Date,
 ): Promise<boolean> => {
+	const content = `
+		<p class="text">Urgent synchronization alert: A product registered under your authority is approaching its expiration threshold.</p>
+		
+		<div style="background-color: #111114; border-radius: 20px; padding: 24px; margin-bottom: 24px;">
+			<p style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #71717a; margin-bottom: 8px;">Product Identification Hash</p>
+			<div class="hash-box">${hash}</div>
+			
+			<div style="margin-top: 20px;">
+				<p style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #71717a; margin-bottom: 4px;">Registry Expiry</p>
+				<p style="font-size: 18px; font-weight: 900; color: #f43f5e;">${new Date(expiryDate).toLocaleDateString()}</p>
+			</div>
+		</div>
+
+		<p class="text">We recommend auditing your supply chain nodes to prevent counterfeit infiltration or public health risks.</p>
+	`;
+
 	const mailOptions = {
 		from: EMAIL_FROM,
 		to: email,
-		subject: 'ChainTrust - Product Expiry Alert',
-		html: `
-			<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-				<div style="background: linear-gradient(135deg, #ef4444 0%, #f43f5e 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-					<h1 style="margin: 0; font-size: 28px;">ChainTrust</h1>
-					<p style="margin: 10px 0 0 0; opacity: 0.9;">Product Expiry Alert</p>
-				</div>
-
-				<div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
-					<h2 style="color: #333; margin-bottom: 20px;">Urgent: Product Expiring Soon</h2>
-
-					<p style="color: #666; line-height: 1.6; margin-bottom: 25px;">
-						This is an automated alert to inform you that a product tracked on the blockchain is nearing its expiry date.
-					</p>
-
-					<div style="background: #fff; border: 2px solid #e9ecef; border-radius: 8px; padding: 20px; margin: 20px 0;">
-						<h3 style="color: #333; margin-bottom: 15px; font-size: 18px;">Product Details</h3>
-						
-						<div style="margin-bottom: 15px;">
-							<p style="color: #666; margin: 0 0 5px 0; font-size: 14px;">Blockchain Hash:</p>
-							<div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px; font-family: monospace; word-break: break-all; color: #333;">
-								${hash}
-							</div>
-						</div>
-
-						<div style="margin-bottom: 15px;">
-							<p style="color: #666; margin: 0 0 5px 0; font-size: 14px;">Expiry Date:</p>
-							<div style="font-weight: bold; color: #ef4444; font-size: 18px;">
-								${new Date(expiryDate).toLocaleDateString()}
-							</div>
-						</div>
-					</div>
-
-					<p style="color: #666; line-height: 1.6; margin-bottom: 25px;">
-						Please take necessary actions regarding this product.
-					</p>
-
-					<div style="text-align: center; margin-top: 30px;">
-						<p style="color: #999; font-size: 12px; margin: 0;">
-							This is an automated email. Please do not reply to this message.
-						</p>
-					</div>
-				</div>
-			</div>
-		`,
+		subject: 'Critical Alert: Impending Product Expiry',
+		html: wrapTemplate('Supply Chain Alert', content),
 	};
 
 	try {

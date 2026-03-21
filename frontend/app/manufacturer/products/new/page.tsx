@@ -3,60 +3,98 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Loader2, 
-  X, 
-  Check, 
-  ImageIcon, 
-  ArrowLeft, 
-  ArrowRight,
+import { Badge } from "@/components/ui/badge";
+import {
+  Loader2,
+  X,
+  Check,
+  ArrowLeft,
   ChevronsUpDown,
   Zap,
-  Tag,
-  FileText,
-  Image as ImageIconIcon
+  Wallet,
+  ShieldAlert,
+  Plus,
+  Save,
+  ArrowRight,
+  PlusCircle,
 } from "lucide-react";
 import { createProduct } from "@/api/product.api";
 import { uploadImages } from "@/api/upload.api";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
 import { fetchCategories, Category } from "@/api/category.api";
+import { CategoryFilter } from "@/components/manufacturer/category-filter";
+import { requestExecutionAccounts } from "@/api/web3-client";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function NewProductWizard() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+
   // Form State
   const [form, setForm] = useState({
     name: "",
     productId: "",
-    category: "",
+    categories: [] as string[],
     brand: "",
     price: "",
     description: "",
-    images: [] as File[]
+    images: [] as File[],
   });
 
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [openCategory, setOpenCategory] = useState(false);
+    // Check if already connected
+    useEffect(() => {
+      const checkConn = async () => {
+        try {
+          const accounts = await (window as any).ethereum?.request({
+            method: "eth_accounts",
+          });
+          if (accounts?.[0]) setWalletAddress(accounts[0]);
+        } catch (e) {}
+      };
+      checkConn();
+    }, []);
 
-  useEffect(() => {
-    fetchCategories()
-      .then((data) => setCategories(data.categories))
-      .catch((err) => console.error("Could not fetch categories:", err));
-  }, []);
+  const connectWallet = async () => {
+    setIsConnecting(true);
+    try {
+      const accounts = await requestExecutionAccounts();
+      if (accounts?.[0]) {
+        setWalletAddress(accounts[0]);
+        toast.success("Wallet connected successfully.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Wallet connection failed.");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
 
-  const updateForm = (updates: Partial<typeof form>) => setForm(f => ({ ...f, ...updates }));
+  const updateForm = (updates: Partial<typeof form>) =>
+    setForm((f) => ({ ...f, ...updates }));
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -69,6 +107,10 @@ export default function NewProductWizard() {
   };
 
   const handleSave = async () => {
+    if (!walletAddress) {
+      toast.error("Wallet connection required.");
+      return;
+    }
     setSaving(true);
     try {
       let imageUrls: string[] = [];
@@ -81,229 +123,303 @@ export default function NewProductWizard() {
       await createProduct({
         ...form,
         price: parseFloat(form.price) || 0,
-        images: imageUrls
+        images: imageUrls,
       });
-      
-      toast.success("Product successfully enrolled!");
+
+      toast.success("Product created successfully.");
       router.push("/manufacturer/products");
     } catch (err: any) {
-      toast.error(err.message || "Enrollment failed.");
+      toast.error(err.message || "Failed to create product.");
     } finally {
       setSaving(false);
     }
   };
 
-  const nextStep = () => {
-    if (step === 1 && (!form.name || !form.productId || !form.category || !form.brand)) {
-        toast.error("Please fill in all identity fields.");
-        return;
-    }
-    setStep(s => s + 1);
+  const [products, setProducts] = useState<any[]>([]);
+
+  const canGoToStep = (targetStep: number) => {
+    if (targetStep <= step) return true;
+    if (targetStep === 2)
+      return form.name && form.productId && form.categories.length > 0 && form.brand;
+    if (targetStep === 3)
+      return (
+        form.name &&
+        form.productId &&
+        form.categories.length > 0 &&
+        form.brand &&
+        form.price &&
+        form.description
+      );
+    return false;
   };
 
-  const prevStep = () => setStep(s => s - 1);
+  const nextStep = () => {
+    if (step === 1 && (!form.name || !form.productId || form.categories.length === 0 || !form.brand)) {
+      toast.error("Please fill in all basic details.");
+      return;
+    }
+    setStep((s) => s + 1);
+  };
+
+  const prevStep = () => setStep((s) => s - 1);
+
+  if (!walletAddress) {
+    return (
+      <div className="max-w-md mx-auto mt-20 animate-in fade-in zoom-in-95 duration-500 flex-1 min-h-0">
+        <Card className="p-8 text-center space-y-6">
+          <div className="mx-auto h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center relative">
+            <Wallet className="h-10 w-10 text-primary" />
+            <div className="absolute top-0 right-0 h-4 w-4 bg-destructive rounded-full" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold">Wallet Connection Required</h2>
+            <p className="text-sm text-muted-foreground mt-2">
+              To enroll products on the ledger, you must authenticate with a Web3 wallet to sign the transaction.
+            </p>
+          </div>
+          <div className="space-y-3 pt-4 border-t border-border/40">
+            <Button
+              onClick={connectWallet}
+              disabled={isConnecting}
+              className="w-full gap-2"
+            >
+              {isConnecting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4" />
+              )}
+              Connect Wallet
+            </Button>
+            <Button variant="outline" asChild className="w-full">
+              <Link href="/manufacturer/products">Cancel</Link>
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-3xl mx-auto w-full space-y-8 pb-12">
+    <div className="max-w-3xl mx-auto w-full space-y-6 pb-20 animate-in fade-in flex-1 min-h-0">
       {/* Header & Progress */}
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-           <Button variant="ghost" size="icon" asChild className="rounded-full h-10 w-10">
-              <Link href="/manufacturer/products"><ArrowLeft className="h-5 w-5" /></Link>
-           </Button>
-           <div>
-              <h1 className="text-3xl font-black tracking-tighter text-foreground">Enroll Product</h1>
-              <p className="text-muted-foreground text-sm font-medium">Step {step} of 3: {step === 1 ? "Identity" : step === 2 ? "Specifications" : "Imagery"}</p>
-           </div>
+      <div className="flex items-center gap-4 px-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          asChild
+          className="rounded-full flex-shrink-0"
+        >
+          <Link href="/manufacturer/products">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Add New Product</h1>
+          <p className="text-sm text-muted-foreground mt-1 truncate">
+            {walletAddress.substring(0, 6)}...{walletAddress.substring(38)} • Connected
+          </p>
         </div>
-
-        <div className="flex gap-2">
-           {[1, 2, 3].map(i => (
-             <div key={i} className={cn("h-1.5 flex-1 rounded-full transition-all duration-500", i <= step ? "bg-primary shadow-[0_0_10px_rgba(var(--primary),0.3)]" : "bg-muted")} />
-           ))}
+        <div className="text-right hidden sm:block">
+          <p className="text-xs text-muted-foreground">Step</p>
+          <p className="text-xl font-medium">
+            {step} <span className="text-muted-foreground opacity-50">/ 3</span>
+          </p>
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-           key={step}
-           initial={{ opacity: 0, x: 20 }}
-           animate={{ opacity: 1, x: 0 }}
-           exit={{ opacity: 0, x: -20 }}
-           transition={{ duration: 0.3 }}
-        >
-          <Card className="p-1 rounded-[2.5rem] bg-gradient-to-br from-primary/10 via-background to-accent/10 border-none shadow-2xl overflow-hidden">
-             <div className="bg-background rounded-[2.4rem] p-6 lg:p-10 space-y-8">
-                
-                {step === 1 && (
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3 text-primary mb-2">
-                       <Tag className="h-6 w-6" />
-                       <h2 className="text-xl font-bold">Product Identity</h2>
+      <div className="flex gap-2 px-1">
+        {[1, 2, 3].map((i) => (
+          <button
+            key={i}
+            onClick={() => {
+              if (canGoToStep(i)) setStep(i);
+              else toast.error("Complete current phase first.");
+            }}
+            className={cn(
+              "h-1.5 flex-1 rounded-full transition-all duration-500",
+              i <= step ? "bg-primary" : "bg-muted",
+              canGoToStep(i) ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+            )}
+          />
+        ))}
+      </div>
+
+      <Card className="overflow-hidden border-border/40 shadow-sm">
+        <div className="p-6 md:p-8">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {step === 1 && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-lg font-semibold">Basic Details</h2>
+                    <p className="text-sm text-muted-foreground">Product identity and categorization</p>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label>Product Name</Label>
+                      <Input
+                        placeholder="e.g. Amoxicillin 500mg"
+                        value={form.name}
+                        onChange={(e) => updateForm({ name: e.target.value })}
+                        autoFocus
+                      />
                     </div>
-                    <div className="grid sm:grid-cols-2 gap-6">
-                       <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Product Name</Label>
-                          <Input 
-                            placeholder="e.g. Amoxicillin 500mg" 
-                            value={form.name} 
-                            onChange={e => updateForm({ name: e.target.value })}
-                            className="h-12 rounded-2xl border-primary/20 focus-visible:ring-primary shadow-inner"
-                          />
-                       </div>
-                       <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Unique Product ID (SKU)</Label>
-                          <Input 
-                            placeholder="e.g. NDC-12345-678" 
-                            value={form.productId} 
-                            onChange={e => updateForm({ productId: e.target.value })}
-                            className="h-12 rounded-2xl border-primary/20 focus-visible:ring-primary shadow-inner"
-                          />
-                       </div>
-                       <div className="space-y-2 flex flex-col">
-                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1 mb-2">Category</Label>
-                          <Popover open={openCategory} onOpenChange={setOpenCategory}>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" className="w-full justify-between h-12 rounded-2xl font-semibold border-primary/10 bg-muted/20">
-                                {form.category || "Select category..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[300px] p-0 rounded-2xl overflow-hidden shadow-2xl border-none">
-                              <Command>
-                                <CommandInput placeholder="Search categories..." />
-                                <CommandList>
-                                  <CommandEmpty>No category found.</CommandEmpty>
-                                  <CommandGroup>
-                                    {categories.map((cat) => (
-                                      <CommandItem
-                                        key={cat._id}
-                                        value={cat.name}
-                                        onSelect={(val) => {
-                                          updateForm({ category: val });
-                                          setOpenCategory(false);
-                                        }}
-                                        className="py-3 px-4 cursor-pointer"
-                                      >
-                                        <Check className={cn("mr-2 h-4 w-4", form.category === cat.name ? "opacity-100" : "opacity-0")} />
-                                        {cat.name}
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                       </div>
-                       <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Manufacturer Brand</Label>
-                          <Input 
-                            placeholder="e.g. PharmaCorp" 
-                            value={form.brand} 
-                            onChange={e => updateForm({ brand: e.target.value })}
-                            className="h-12 rounded-2xl border-primary/20 focus-visible:ring-primary shadow-inner"
-                          />
-                       </div>
+                    <div className="space-y-2">
+                      <Label>Product ID (SKU/UPC)</Label>
+                      <Input
+                        placeholder="e.g. NDC-12345"
+                        value={form.productId}
+                        onChange={(e) => updateForm({ productId: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2 flex flex-col justify-end">
+                      <Label className="mb-2">Categories</Label>
+                      <CategoryFilter
+                        selectedCategories={form.categories}
+                        onCategoryChange={(cats) => updateForm({ categories: cats })}
+                        canManage={true}
+                        placeholder="Select categories..."
+                        className="w-full justify-between h-auto min-h-[40px] px-3 py-2 rounded-md"
+                        align="start"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Brand / Manufacturer</Label>
+                      <Input
+                        placeholder="e.g. PharmaCorp"
+                        value={form.brand}
+                        onChange={(e) => updateForm({ brand: e.target.value })}
+                      />
                     </div>
                   </div>
-                )}
-
-                {step === 2 && (
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3 text-primary mb-2">
-                       <FileText className="h-6 w-6" />
-                       <h2 className="text-xl font-bold">Specifications</h2>
-                    </div>
-                    <div className="space-y-4">
-                       <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Market Price (Optional)</Label>
-                          <Input 
-                            type="number" 
-                            placeholder="0.00" 
-                            value={form.price} 
-                            onChange={e => updateForm({ price: e.target.value })}
-                            className="h-12 rounded-2xl border-primary/20 focus-visible:ring-primary shadow-inner w-full sm:w-1/2"
-                          />
-                       </div>
-                       <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1 underline decoration-primary/30 underline-offset-4">Patient Information Guide</Label>
-                          <Textarea 
-                            placeholder="Describe dosage instructions, side effects, or batch-specific details..." 
-                            value={form.description} 
-                            onChange={e => updateForm({ description: e.target.value })}
-                            className="min-h-[160px] rounded-3xl border-primary/10 focus-visible:ring-primary bg-muted/5 p-4"
-                          />
-                          <p className="text-[10px] text-muted-foreground font-medium italic">This info is presented instantly to consumers upon scanning the QR code.</p>
-                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {step === 3 && (
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3 text-primary mb-2">
-                       <ImageIconIcon className="h-6 w-6" />
-                       <h2 className="text-xl font-bold">Product Visuals</h2>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-4 min-h-[140px] p-6 bg-muted/10 rounded-3xl border-2 border-dashed border-primary/10">
-                       <AnimatePresence>
-                         {form.images.map((file, idx) => (
-                           <motion.div
-                             key={idx}
-                             initial={{ opacity: 0, scale: 0.8 }}
-                             animate={{ opacity: 1, scale: 1 }}
-                             exit={{ opacity: 0, scale: 0.8 }}
-                             className="relative w-28 h-28 rounded-2xl shadow-xl overflow-hidden group"
-                           >
-                              <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" />
-                              <button onClick={() => removeImage(idx)} className="absolute inset-0 bg-destructive/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
-                                 <X className="h-6 w-6" />
-                              </button>
-                           </motion.div>
-                         ))}
-                       </AnimatePresence>
-                       
-                       <Label 
-                         htmlFor="img-up" 
-                         className={cn("w-28 h-28 rounded-2xl border-2 border-dashed border-primary/20 flex flex-col items-center justify-center cursor-pointer hover:bg-primary/5 transition-colors", uploading && "opacity-50")}
-                       >
-                          {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Plus className="h-6 w-6 text-primary" />}
-                          <span className="text-[10px] font-black uppercase mt-2">Add</span>
-                          <input id="img-up" type="file" multiple accept="image/*" className="hidden" onChange={handleImageUpload} />
-                       </Label>
-                    </div>
-                    <p className="text-xs text-muted-foreground">High-resolution packaging images help consumers verify physical appearance.</p>
-                  </div>
-                )}
-
-                {/* Navigation Buttons */}
-                <div className="flex justify-between items-center pt-6">
-                   {step > 1 ? (
-                     <Button variant="ghost" onClick={prevStep} className="rounded-full px-6 font-bold text-muted-foreground hover:text-foreground">
-                        Back
-                     </Button>
-                   ) : <div />}
-                   
-                   {step < 3 ? (
-                     <Button onClick={nextStep} className="rounded-full px-8 h-12 bg-primary hover:bg-primary/90 font-black tracking-tight shadow-lg shadow-primary/20">
-                        Continue <ArrowRight className="ml-2 h-4 w-4" />
-                     </Button>
-                   ) : (
-                     <Button 
-                       onClick={handleSave} 
-                       disabled={saving} 
-                       className="rounded-full px-10 h-12 bg-green-500 hover:bg-green-600 font-black tracking-tight shadow-lg shadow-green-500/20 gap-2"
-                     >
-                        {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-4 w-4 fill-current" />}
-                        {saving ? "Enrolling..." : "Finish & Enroll"}
-                     </Button>
-                   )}
                 </div>
-             </div>
-          </Card>
-        </motion.div>
-      </AnimatePresence>
+              )}
+
+              {step === 2 && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-lg font-semibold">Specifications</h2>
+                    <p className="text-sm text-muted-foreground">Pricing and descriptive protocol</p>
+                  </div>
+                  <div className="space-y-6">
+                    <div className="space-y-2 sm:w-1/2">
+                      <Label>Price (USDT Equivalent)</Label>
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        value={form.price}
+                        onChange={(e) => updateForm({ price: e.target.value })}
+                        autoFocus
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Description</Label>
+                      <Textarea
+                        placeholder="Enter formulation details, dosage instructions..."
+                        value={form.description}
+                        onChange={(e) => updateForm({ description: e.target.value })}
+                        className="min-h-[160px] resize-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-lg font-semibold">Visual Identity</h2>
+                    <p className="text-sm text-muted-foreground">Upload product packaging imagery</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {form.images.map((file, idx) => (
+                      <div
+                        key={idx}
+                        className="relative aspect-square rounded-lg overflow-hidden group border border-border"
+                      >
+                        <img
+                          src={URL.createObjectURL(file)}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          onClick={() => removeImage(idx)}
+                          className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white"
+                        >
+                          <X className="h-6 w-6" />
+                        </button>
+                      </div>
+                    ))}
+                    <Label
+                      htmlFor="img-up"
+                      className={cn(
+                        "aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors",
+                        uploading && "opacity-50 pointer-events-none"
+                      )}
+                    >
+                      {uploading ? (
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      ) : (
+                        <Plus className="h-6 w-6 text-muted-foreground" />
+                      )}
+                      <span className="text-xs text-muted-foreground mt-2 font-medium">Upload</span>
+                      <input
+                        id="img-up"
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageUpload}
+                      />
+                    </Label>
+                  </div>
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/40 text-muted-foreground">
+                    <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" />
+                    <p className="text-sm">
+                      Provide high-quality images. Consumers use these specifically to verify physical authenticity against real packaging.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Navigation Bar */}
+          <div className="flex justify-between items-center pt-8 mt-8 border-t border-border/40">
+            {step > 1 ? (
+              <Button
+                variant="outline"
+                onClick={prevStep}
+              >
+                Back
+              </Button>
+            ) : (
+              <div /> // Spacer
+            )}
+
+            {step < 3 ? (
+              <Button onClick={nextStep} className="gap-2">
+                Next <ArrowRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSave}
+                disabled={saving}
+                className="gap-2"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {saving ? "Saving..." : "Create Product"}
+              </Button>
+            )}
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }

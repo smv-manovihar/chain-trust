@@ -18,6 +18,6 @@ router.put('/update', authenticate, updateUserDetails);
 // Personal Cabinet
 router.get('/cabinet/list', authenticate, getPersonalCabinet);
 router.post('/cabinet/add', authenticate, addToCabinet);
-router.post('/cabinet/remove', authenticate, removeFromCabinet);
+router.delete('/cabinet/:id', authenticate, removeFromCabinet);
 
 export default router;

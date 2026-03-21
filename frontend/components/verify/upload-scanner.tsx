@@ -98,9 +98,7 @@ export function UploadScanner({
       {/* Header & Camera Switch */}
       <div className="flex items-start justify-between gap-4 px-2 sm:px-0">
         <div className="hidden sm:block">
-          <h3 className="text-2xl font-black tracking-tight">
-            Upload QR Image
-          </h3>
+          <h3 className="text-2xl tracking-tight">Upload QR Image</h3>
           <p className="text-muted-foreground text-sm mt-1">
             Drag and drop a screenshot or photo of the product's QR code.
           </p>
@@ -159,7 +157,7 @@ export function UploadScanner({
                     <div className="absolute inset-0 border-2 border-primary/20 border-t-primary rounded-xl animate-spin" />
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-black tracking-wide text-foreground">
+                    <p className="text-sm tracking-wide text-foreground">
                       Decoding QR...
                     </p>
                     <p className="text-[10px] uppercase font-bold text-muted-foreground mt-0.5">
@@ -170,7 +168,7 @@ export function UploadScanner({
               ) : (
                 <>
                   <CheckCircle2 className="h-12 w-12 text-green-500" />
-                  <p className="text-sm font-black tracking-wide text-green-600">
+                  <p className="text-sm tracking-wide text-green-600">
                     Scan Complete!
                   </p>
                 </>
@@ -196,7 +194,7 @@ export function UploadScanner({
             </div>
 
             <div className="space-y-1.5">
-              <h4 className="text-base sm:text-xl font-black text-foreground">
+              <h4 className="text-base sm:text-xl text-foreground">
                 {dragActive ? "Drop to scan now" : "Select or drop a QR image"}
               </h4>
               <p className="text-xs sm:text-sm text-muted-foreground max-w-[260px] mx-auto">

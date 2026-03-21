@@ -168,8 +168,8 @@ export default function ProductDetailsPage() {
           </Button>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-foreground truncate">{product.name}</h1>
-              <Badge variant="outline" className="font-mono text-[10px] sm:text-xs uppercase px-2 py-0.5 bg-primary/5 border-primary/20 text-primary shrink-0">
+              <h1 className="text-xl sm:text-3xl font-black tracking-tight text-foreground truncate">{product.name}</h1>
+              <Badge variant="outline" className="font-mono text-[10px] sm:text-xs px-2 py-0.5 bg-primary/5 border-primary/20 text-primary shrink-0">
                 {product.productId}
               </Badge>
             </div>
@@ -202,36 +202,36 @@ export default function ProductDetailsPage() {
                 <Info className="h-5 w-5" />
               </div>
               <div className="flex-1">
-                <h2 className="text-lg font-semibold text-foreground">Core Information</h2>
+                <h2 className="text-lg font-black text-foreground">Core Information</h2>
                 <p className="text-sm text-muted-foreground">Update the fundamental details of this catalogue item.</p>
               </div>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="f-name" className="text-sm font-medium">Product Name <span className="text-destructive">*</span></Label>
+                <Label htmlFor="f-name" className="text-sm font-bold">Product Name <span className="text-destructive">*</span></Label>
                 <Input id="f-name" value={formName} onChange={(e) => setFormName(e.target.value)} className="h-10 bg-background/50 focus:ring-2 focus:ring-primary/20" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="f-pid" className="text-sm font-medium">Product ID (SKU/NDC) <span className="text-destructive">*</span></Label>
+                <Label htmlFor="f-pid" className="text-sm font-bold">Product ID (SKU/NDC) <span className="text-destructive">*</span></Label>
                 <Input id="f-pid" value={formProductId} onChange={(e) => setFormProductId(e.target.value)} className="h-10 bg-background/50 focus:ring-2 focus:ring-primary/20" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="f-cat" className="text-sm font-medium">Category <span className="text-destructive">*</span></Label>
+                <Label htmlFor="f-cat" className="text-sm font-bold">Category <span className="text-destructive">*</span></Label>
                 <Input id="f-cat" value={formCategory} onChange={(e) => setFormCategory(e.target.value)} className="h-10 bg-background/50 focus:ring-2 focus:ring-primary/20" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="f-brand" className="text-sm font-medium">Brand <span className="text-destructive">*</span></Label>
+                <Label htmlFor="f-brand" className="text-sm font-bold">Brand <span className="text-destructive">*</span></Label>
                 <Input id="f-brand" value={formBrand} onChange={(e) => setFormBrand(e.target.value)} className="h-10 bg-background/50 focus:ring-2 focus:ring-primary/20" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="f-price" className="text-sm font-medium">Retail Price (USD)</Label>
+                <Label htmlFor="f-price" className="text-sm font-bold">Retail Price (USD)</Label>
                 <Input id="f-price" type="number" step="0.01" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} className="h-10 bg-background/50 focus:ring-2 focus:ring-primary/20" />
               </div>
             </div>
 
             <div className="space-y-2 pt-2 border-t border-border/40">
-              <Label htmlFor="f-desc" className="text-sm font-medium">Description</Label>
+              <Label htmlFor="f-desc" className="text-sm font-bold">Description</Label>
               <Textarea 
                 id="f-desc" 
                 value={formDescription} 
@@ -241,7 +241,7 @@ export default function ProductDetailsPage() {
             </div>
 
             <div className="flex justify-end pt-4 border-t border-border/40">
-              <Button size="lg" onClick={handleSave} disabled={saving} className="gap-2 min-w-[180px] shadow-lg shadow-primary/20 transition-all active:scale-95">
+              <Button size="lg" onClick={handleSave} disabled={saving} className="gap-2 min-w-[180px] font-bold shadow-lg shadow-primary/20 transition-all active:scale-95">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {saving ? "Saving Changes..." : "Save Changes"}
               </Button>
@@ -254,7 +254,7 @@ export default function ProductDetailsPage() {
           <Card className="p-6 border-border/60 bg-card/50 shadow-sm space-y-6">
             <div className="flex items-center gap-3 border-b border-border/50 pb-4">
               <ImageIcon className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Imagery</h2>
+              <h2 className="text-sm font-black tracking-tight text-muted-foreground">Imagery</h2>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -302,7 +302,7 @@ export default function ProductDetailsPage() {
           <Card className="p-6 border-border/60 bg-muted/30 shadow-sm space-y-4">
             <div className="flex items-center gap-3 border-b border-border/50 pb-3">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">System Metadata</h2>
+              <h2 className="text-xs font-black tracking-tight text-muted-foreground">System Metadata</h2>
             </div>
             <div className="space-y-3">
               <div className="flex justify-between items-center text-xs">

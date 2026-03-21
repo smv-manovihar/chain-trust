@@ -3,7 +3,7 @@ import client from './client';
 export interface ProductDto {
 	name: string;
 	productId: string;
-	category: string;
+	categories: string[];
 	brand: string;
 	price?: number;
 	description?: string;
@@ -23,8 +23,8 @@ export const createProduct = async (data: ProductDto) => {
 	return response.data;
 };
 
-export const listProducts = async () => {
-	const response = await client.get('/products');
+export const listProducts = async (params?: { search?: string; categories?: string | string[] }) => {
+	const response = await client.get('/products', { params });
 	return response.data;
 };
 

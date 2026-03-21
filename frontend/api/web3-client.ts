@@ -13,16 +13,59 @@ let web3: Web3 | null = null;
 if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
     // Browser environment with MetaMask
     web3 = new Web3(window.ethereum);
+    
+    // Auto-switch network based on environment
+    const CLIENT_ID = process.env.NEXT_PUBLIC_CLIENT_ID;
+    const IS_LOCAL = process.env.NEXT_PUBLIC_IS_LOCAL === 'true';
+
+    setTimeout(() => {
+        if (IS_LOCAL || !CLIENT_ID) {
+            // Local Dev -> Ensure Ganache
+            switchNetwork('0x539').catch(console.error);
+        } else if (CLIENT_ID) {
+            // Production -> Ensure Mainnet (or other configured network)
+            switchNetwork('0x1').catch(console.error);
+        }
+    }, 500); 
 } else {
     // Fallback or Server-side (SSR) environment
-    const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'http://127.0.0.1:7545';
+    const CLIENT_ID = process.env.NEXT_PUBLIC_CLIENT_ID;
+    const IS_LOCAL = process.env.NEXT_PUBLIC_IS_LOCAL === 'true';
+
+    const RPC_URL = (IS_LOCAL || !CLIENT_ID)
+        ? (process.env.NEXT_PUBLIC_RPC_URL || 'http://127.0.0.1:7545')
+        : `https://mainnet.infura.io/v3/${CLIENT_ID}`;
+        
     web3 = new Web3(RPC_URL);
 }
 
+const GANACHE_CHAIN_ID = '0x539'; // 1337 in hex
+const GANACHE_RPC_URL = 'http://127.0.0.1:7545';
+
 // Contract Address - Should ideally come from env vars, but using the deployed address here
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xb26EBDe3BCAF04a449b82eb4bdd7505948E12c14';
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xfC6617A16Ff9f9AE967D51247Ab3540727215141';
 
 let chainTrustContract: any = null;
+
+export interface BlockchainRecord {
+  blockchainId: string;
+  batchId: string;
+  productName: string;
+  manufacturerName: string;
+  timestamp: number;
+  status: 'minted' | 'verified' | 'shipped' | 'delivered';
+  transactionHash: string;
+  blockNumber: number;
+  images: string[];
+}
+
+export interface VerificationResult {
+  isValid: boolean;
+  record: BlockchainRecord | null;
+  verificationDate: number;
+  trustScore: number;
+  warnings: string[];
+}
 
 export const getWeb3 = () => web3;
 
@@ -83,3 +126,125 @@ export const registerBatchOnChain = async (batchData: BatchData, deployerAccount
         batchData.quantity
     ).send({ from: deployerAccount, gas: '5000000' });
 };
+
+/**
+ * Real blockchain verification
+ * Interacts with the actual blockchain node via Web3
+ */
+export async function verifyOnBlockchain(batchSalt: string): Promise<VerificationResult> {
+  try {
+    const contract = getContract();
+    if (!contract) {
+        throw new Error('Web3 Contract instance not found');
+    }
+
+    try {
+      // Query the new smart contract method using the batchSalt
+      const batch: any = await contract.methods.getBatch(batchSalt).call();
+
+      // Check if it exists
+      if (!batch.exists) {
+        throw new Error("Batch data is marked as invalid/deleted.");
+      }
+
+      const trustScore = batch.isRecalled ? 0 : 100;
+      const warnings = batch.isRecalled ? ["THIS BATCH HAS BEEN RECALLED BY THE MANUFACTURER"] : [];
+
+      const record: BlockchainRecord = {
+        blockchainId: batch.productId, 
+        batchId: batch.batchNumber,
+        productName: batch.productName,
+        manufacturerName: batch.brand,
+        timestamp: Number(batch.manufactureDate) * 1000,
+        status: 'verified',
+        transactionHash: 'Verified On-Chain', 
+        blockNumber: 0,
+        images: [], 
+      }
+
+      return {
+        isValid: !batch.isRecalled,
+        record,
+        verificationDate: Date.now(),
+        trustScore,
+        warnings,
+      };
+
+    } catch (e: any) {
+        return {
+          isValid: false,
+          record: null,
+          verificationDate: Date.now(),
+          trustScore: 0,
+          warnings: ['Batch not found on the blockchain or is a counterfeit.'],
+        }
+    }
+  } catch (error) {
+    console.error("Blockchain Verification Error:", error);
+    return {
+      isValid: false,
+      record: null,
+      verificationDate: Date.now(),
+      trustScore: 0,
+      warnings: ['Failed to connect to the blockchain network to verify.'],
+    }
+  }
+}
+
+/**
+ * Recall a batch on the blockchain
+ */
+export async function recallProductOnChain(batchSalt: string, account: string): Promise<any> {
+  const contract = getContract();
+  if (!contract) {
+    throw new Error('Web3 Contract instance not found');
+  }
+
+  return await contract.methods.recallBatch(batchSalt).send({
+    from: account,
+    gas: "500000"
+  });
+}
+
+/**
+ * Switch MetaMask to a specific network
+ */
+export const switchNetwork = async (chainId: string) => {
+    if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
+        try {
+            await window.ethereum.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId }],
+            });
+        } catch (switchError: any) {
+            // This error code indicates that the chain has not been added to MetaMask.
+            if (switchError.code === 4902 && chainId === '0x539') {
+                try {
+                    await window.ethereum.request({
+                        method: 'wallet_addEthereumChain',
+                        params: [
+                            {
+                                chainId: '0x539',
+                                chainName: 'Ganache Local',
+                                rpcUrls: ['http://127.0.0.1:7545'],
+                                nativeCurrency: {
+                                    name: 'ETH',
+                                    symbol: 'ETH',
+                                    decimals: 18,
+                                },
+                            },
+                        ],
+                    });
+                } catch (addError) {
+                    throw addError;
+                }
+            }
+            throw switchError;
+        }
+    }
+};
+
+/**
+ * Switch MetaMask to Ganache network (Legacy wrapper)
+ */
+export const switchToGanache = () => switchNetwork('0x539');
