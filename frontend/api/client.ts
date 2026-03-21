@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { tokenStore } from '@/lib/token-store';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -9,6 +10,10 @@ const client = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+interface RefreshResponse {
+  accessToken: string;
+}
 
 // Flag to prevent multiple simultaneous refresh attempts
 let isRefreshing = false;
@@ -55,7 +60,13 @@ client.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        await client.post('/auth/refresh');
+        const response = await client.post<RefreshResponse>('/auth/refresh');
+        const newToken = response.data.accessToken;
+        
+        if (newToken) {
+          tokenStore.setToken(newToken);
+        }
+
         isRefreshing = false;
         processQueue(null);
         // Retry the original request

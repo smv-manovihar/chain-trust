@@ -21,7 +21,6 @@ import { addToCabinet } from "@/api/customer.api";
 import { verifyOnBlockchain } from "@/api/web3-client";
 import { getVisitorId } from "@/lib/visitor";
 import { cn } from "@/lib/utils";
-import { AIChatEmbed } from "@/components/chat/AIChatEmbed";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
 import {
@@ -581,29 +580,6 @@ function VerifyContent() {
                         )}
                       </div>
                     </ScrollArea>
-                  </div>
-
-                  <div className="flex flex-col gap-6 overflow-hidden">
-                    <section className="flex-1 flex flex-col min-h-[300px] lg:min-h-0 bg-card/50 backdrop-blur-sm rounded-[2.5rem] border border-border/50 overflow-hidden shadow-sm">
-                      <div className="p-5 border-b bg-muted/20 flex items-center justify-between">
-                        <h3 className="font-black flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                          Assistant
-                        </h3>
-                        <Badge
-                          variant="outline"
-                          className="text-[8px] font-bold"
-                        >
-                          Beta
-                        </Badge>
-                      </div>
-                      <div className="flex-1 relative">
-                        <AIChatEmbed
-                          productContext={product}
-                          currentPage="Verification Result"
-                        />
-                      </div>
-                    </section>
                   </div>
                 </div>
               </div>

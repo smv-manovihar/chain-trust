@@ -1,236 +1,135 @@
 import json
-from datetime import datetime, timezone
-from typing import Dict, Any
-
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
+
+import jwt
 import motor.motor_asyncio
 import uvicorn
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-
-from models import SessionCreate, ChatRequest, EditChatRequest
-from agent import get_chain_trust_agent
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from models import ChatRequest, EditChatRequest
 from sse import sse_manager
 from config import get_settings
 from store import ChatStore
+from service import ChatService
 
 settings = get_settings()
 
 # --- Globals ---
 db_client = None
 db = None
-agent = None
 chat_store = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db_client, db, agent, chat_store
+    global db_client, db, chat_store
     db_client = motor.motor_asyncio.AsyncIOMotorClient(settings.MONGO_URI)
     db = db_client["ChainTrust"]
-    agent = get_chain_trust_agent()
     chat_store = ChatStore(db)  # Initialize Store
     yield
     await sse_manager.shutdown()
     db_client.close()
 
 
+security = HTTPBearer()
+
+
+async def get_current_user_payload(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
+        if payload.get("id") is None:
+            raise HTTPException(
+                status_code=401, detail="Invalid token: user_id missing"
+            )
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
 app = FastAPI(title="ChainTrust AI Service", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://[::1]:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
 
 
-class ChatService:
-    @staticmethod
-    async def process_chat(
-        session_id: str,
-        req_context: dict,  # Passed as dict for easier extraction across different request models
-        assistant_message_id: str,
-    ):
-        sse_manager.clear_buffer(session_id)
-        await sse_manager.broadcast(
-            session_id, "chat_start", {"message_id": assistant_message_id}
-        )
-        sse_manager.mark_active(session_id)
-
-        try:
-            messages = []
-            context_parts = [
-                "You are an AI Medical Assistant for the ChainTrust platform. Help users understand their scanned medications."
-            ]
-            if req_context.get("current_page"):
-                context_parts.append(
-                    f"User is currently on the '{req_context['current_page']}' page."
-                )
-            if req_context.get("product_context"):
-                context_parts.append(
-                    f"User is looking at the following product: {json.dumps(req_context['product_context'])}."
-                )
-
-            messages.append(SystemMessage(content=" ".join(context_parts)))
-
-            # Fetch history exclusively via the Store
-            history = await chat_store.list_messages(session_id, sort_order=1)
-            for msg in history:
-                if msg["id"] == assistant_message_id:
-                    continue  # Skip the placeholder being generated
-                if msg["role"] == "user":
-                    messages.append(HumanMessage(content=msg["content"]))
-                elif msg["role"] == "assistant" and msg.get("content"):
-                    messages.append(AIMessage(content=msg["content"]))
-
-            # Note: Current user message is already stored in history, so we don't manually append it here.
-
-            def handle_token(state, data):
-                state["content"] += data.get("content", "")
-
-            def handle_tool_start(state, data):
-                pass
-
-            def handle_tool_end(state, data):
-                state["thoughts"].append(data)
-
-            sse_manager.register_accumulator(
-                identifier=session_id,
-                initial_state={
-                    "content": "",
-                    "thoughts": [],
-                    "message_id": assistant_message_id,
-                    "status": "generating",
-                },
-                event_handlers={
-                    "token": handle_token,
-                    "tool_start": handle_tool_start,
-                    "tool_end": handle_tool_end,
-                },
-            )
-
-            full_response = ""
-            thoughts_buffer = []
-            tool_event_buffers: Dict[str, Dict[str, Any]] = {}
-
-            async for event in agent.astream_events(
-                {"messages": messages}, version="v2"
-            ):
-                event_type = event["event"]
-                run_id = event.get("run_id")
-
-                if event_type == "on_chat_model_stream":
-                    chunk = event["data"]["chunk"]
-                    if isinstance(chunk.content, str) and chunk.content:
-                        full_response += chunk.content
-                        await sse_manager.broadcast(
-                            session_id,
-                            "token",
-                            {
-                                "content": chunk.content,
-                                "message_id": assistant_message_id,
-                            },
-                            save_to_buffer=True,
-                        )
-
-                elif event_type == "on_tool_start":
-                    if event["name"] == "_Exception":
-                        continue
-
-                    tool_name = event["name"]
-                    tool_input = event["data"].get("input", {})
-
-                    tool_event_buffers[run_id] = {
-                        "start_time": datetime.now(timezone.utc),
-                        "tool": tool_name,
-                        "input": tool_input,
-                    }
-
-                    await sse_manager.broadcast(
-                        session_id,
-                        "tool_start",
-                        {
-                            "tool": tool_name,
-                            "input": tool_input,
-                            "status": "running",
-                            "tool_call_id": run_id,
-                            "message_id": assistant_message_id,
-                        },
-                    )
-
-                elif event_type == "on_tool_end":
-                    if event["name"] == "_Exception":
-                        continue
-
-                    tool_name = event["name"]
-                    tool_output = event["data"].get("output")
-
-                    end_time = datetime.now(timezone.utc)
-                    execution_time_ms = 0
-                    if run_id in tool_event_buffers:
-                        start_time = tool_event_buffers[run_id]["start_time"]
-                        execution_time_ms = int(
-                            (end_time - start_time).total_seconds() * 1000
-                        )
-                        del tool_event_buffers[run_id]
-
-                    thought_payload = {
-                        "tool": tool_name,
-                        "result": tool_output,
-                        "status": "completed",
-                        "execution_time_ms": execution_time_ms,
-                        "tool_call_id": run_id,
-                    }
-                    thoughts_buffer.append(thought_payload)
-                    await sse_manager.broadcast(
-                        session_id,
-                        "tool_end",
-                        {**thought_payload, "message_id": assistant_message_id},
-                    )
-
-            # Save Output to DB using Store
-            await chat_store.update_message(
-                assistant_message_id,
-                {
-                    "content": full_response,
-                    "thoughts": thoughts_buffer,
-                    "status": "completed",
-                },
-            )
-            await sse_manager.broadcast(
-                session_id, "chat_done", {"message_id": assistant_message_id}
-            )
-
-        except Exception as e:
-            await sse_manager.broadcast(session_id, "error", {"message": str(e)})
-            await chat_store.update_message(
-                assistant_message_id,
-                {"status": "error", "content": "Error generating response."},
-            )
-        finally:
-            sse_manager.clear_accumulator(session_id)
-            sse_manager.mark_inactive(session_id)
-
-
-# --- Endpoints ---
-
-
 @app.post("/api/chat/session")
-async def create_session(req: SessionCreate):
-    session_id = await chat_store.create_session(req.user_id)
+async def create_session(payload: dict = Depends(get_current_user_payload)):
+    user_id = payload.get("id")
+    session_id = await chat_store.create_session(user_id)
     return {"session_id": session_id}
 
 
+@app.get("/api/chat/sessions")
+async def list_sessions(payload: dict = Depends(get_current_user_payload)):
+    user_id = payload.get("id")
+    sessions = await chat_store.list_sessions(user_id)
+    return sessions
+
+
+@app.put("/api/chat/sessions/{session_id}")
+async def rename_session(
+    session_id: str, name: str, payload: dict = Depends(get_current_user_payload)
+):
+    user_id = payload.get("id")
+    session = await chat_store.get_session(session_id)
+    if not session or session["user_id"] != user_id:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    success = await chat_store.update_session(session_id, {"name": name})
+    return {"success": success}
+
+
+@app.delete("/api/chat/sessions/{session_id}")
+async def delete_session(
+    session_id: str, payload: dict = Depends(get_current_user_payload)
+):
+    user_id = payload.get("id")
+    session = await chat_store.get_session(session_id)
+    if not session or session["user_id"] != user_id:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    success = await chat_store.delete_session(session_id)
+    return {"success": success}
+
+
+@app.get("/api/chat/{session_id}/messages")
+async def list_messages(
+    session_id: str, payload: dict = Depends(get_current_user_payload)
+):
+    user_id = payload.get("id")
+    session = await chat_store.get_session(session_id)
+    if not session or session["user_id"] != user_id:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    messages = await chat_store.list_messages(session_id)
+    return messages
+
+
 @app.get("/api/chat/{session_id}/stream")
-async def subscribe_stream(session_id: str):
+async def subscribe_stream(
+    session_id: str, payload: dict = Depends(get_current_user_payload)
+):
     """
     SSE endpoint for real-time updates with auto-resume capability.
     """
+    user_id = payload.get("id")
     session = await chat_store.get_session(session_id)
-    if not session:
+    if not session or session["user_id"] != user_id:
         raise HTTPException(status_code=404, detail="Session not found")
 
     # Check if session is already active in SSE manager
@@ -266,12 +165,32 @@ async def subscribe_stream(session_id: str):
     )
 
 
+async def run_chat_service(
+    session_id: str, req_data: dict, assistant_message_id: str, user_id: str, role: str
+):
+    """Bridge to instantiate ChatService and run process_chat in background."""
+    current_context = req_data.get("current_context")
+    service = ChatService(
+        user_id=user_id,
+        chat_store=chat_store,
+        role=role,
+        current_context=current_context,
+    )
+    await service.process_chat(session_id, req_data, assistant_message_id)
+
+
 @app.post("/api/chat/{session_id}/chat")
 async def send_chat_message(
-    session_id: str, req: ChatRequest, background_tasks: BackgroundTasks
+    session_id: str,
+    req: ChatRequest,
+    background_tasks: BackgroundTasks,
+    payload: dict = Depends(get_current_user_payload),
 ):
+    user_id = payload.get("id")
+    role = payload.get("role", "customer")
+
     session = await chat_store.get_session(session_id)
-    if not session:
+    if not session or session["user_id"] != user_id:
         raise HTTPException(status_code=404, detail="Session not found")
 
     if sse_manager.is_active(session_id):
@@ -284,7 +203,12 @@ async def send_chat_message(
     assistant_message_id = result["assistant_message"]["id"]
 
     background_tasks.add_task(
-        ChatService.process_chat, session_id, req.model_dump(), assistant_message_id
+        run_chat_service,
+        session_id,
+        req.model_dump(),
+        assistant_message_id,
+        user_id,
+        role,
     )
 
     return {"status": "processing", "message_id": assistant_message_id}
@@ -296,10 +220,14 @@ async def edit_chat_message(
     message_id: str,
     req: EditChatRequest,
     background_tasks: BackgroundTasks,
+    payload: dict = Depends(get_current_user_payload),
 ):
     """Edits a user message, prunes the downstream branch, and regenerates the response."""
+    user_id = payload.get("id")
+    role = payload.get("role", "customer")
+
     session = await chat_store.get_session(session_id)
-    if not session:
+    if not session or session["user_id"] != user_id:
         raise HTTPException(status_code=404, detail="Session not found")
 
     if sse_manager.is_active(session_id):
@@ -317,17 +245,20 @@ async def edit_chat_message(
         )
 
     background_tasks.add_task(
-        ChatService.process_chat, session_id, req.model_dump(), assist_msg["id"]
+        run_chat_service, session_id, req.model_dump(), assist_msg["id"], user_id, role
     )
 
     return {"status": "processing", "message_id": assist_msg["id"]}
 
 
 @app.delete("/api/chat/{session_id}/messages/{message_id}")
-async def delete_chat_message(session_id: str, message_id: str):
+async def delete_chat_message(
+    session_id: str, message_id: str, payload: dict = Depends(get_current_user_payload)
+):
     """Deletes a message and all subsequent messages in the conversation."""
+    user_id = payload.get("id")
     session = await chat_store.get_session(session_id)
-    if not session:
+    if not session or session["user_id"] != user_id:
         raise HTTPException(status_code=404, detail="Session not found")
 
     if sse_manager.is_active(session_id):
@@ -341,13 +272,41 @@ async def delete_chat_message(session_id: str, message_id: str):
             status_code=404, detail="Message not found or failed to delete."
         )
 
-    # Clear SSE history buffer just in case active clients hold old data
-    sse_manager.clear_buffer(session_id)
-    await sse_manager.broadcast(
-        session_id, "messages_deleted", {"deleted_from_message_id": message_id}
+    return {"status": "deleted"}
+
+
+@app.post("/api/chat/{session_id}/retry/{message_id}")
+async def retry_chat_message(
+    session_id: str,
+    message_id: str,
+    background_tasks: BackgroundTasks,
+    payload: dict = Depends(get_current_user_payload),
+):
+    """Retries a message generation by pruning from the target message and starting fresh."""
+    user_id = payload.get("id")
+    role = payload.get("role", "customer")
+
+    session = await chat_store.get_session(session_id)
+    if not session or session["user_id"] != user_id:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if sse_manager.is_active(session_id):
+        raise HTTPException(
+            status_code=429, detail="Wait for generation to finish before retrying."
+        )
+
+    assist_msg = await chat_store.retry_message(message_id)
+
+    if not assist_msg:
+        raise HTTPException(
+            status_code=404, detail="Message not found or failed to retry."
+        )
+
+    background_tasks.add_task(
+        run_chat_service, session_id, {}, assist_msg["id"], user_id, role
     )
 
-    return {"status": "deleted"}
+    return {"status": "processing", "message_id": assist_msg["id"]}
 
 
 if __name__ == "__main__":

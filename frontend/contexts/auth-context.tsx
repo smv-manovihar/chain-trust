@@ -14,6 +14,7 @@ import {
   register as apiRegister,
   User,
 } from "@/api";
+import { tokenStore } from "@/lib/token-store";
 
 interface AuthContextType {
   user: User | null;
@@ -77,22 +78,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const refreshUser = async () => {
     setIsLoading(true);
     try {
-      const userData = await getCurrentUser();
-      setUser(userData);
-      
-      if (userData && !userData.isEmailVerified && typeof window !== "undefined") {
-        const path = window.location.pathname;
-        if (!path.startsWith("/verify-email") && !path.startsWith("/login") && !path.startsWith("/register") && !path.startsWith("/setup-account")) {
-            window.location.href = "/verify-email";
+      const data = await getCurrentUser();
+      if (data) {
+        setUser(data.user);
+        if (data.accessToken) {
+          tokenStore.setToken(data.accessToken);
         }
-      }
+        
+        if (!data.user.isEmailVerified && typeof window !== "undefined") {
+          const path = window.location.pathname;
+          if (!path.startsWith("/verify-email") && !path.startsWith("/login") && !path.startsWith("/register") && !path.startsWith("/setup-account")) {
+              window.location.href = "/verify-email";
+          }
+        }
 
-      if (typeof window !== "undefined" && userData?.avatar) {
-        cacheAvatarBlob(userData.avatar);
+        if (typeof window !== "undefined" && data.user.avatar) {
+          cacheAvatarBlob(data.user.avatar);
+        }
+      } else {
+        setUser(null);
+        tokenStore.clearToken();
       }
       setError(null);
     } catch {
       setUser(null);
+      tokenStore.clearToken();
     } finally {
       setIsLoading(false);
     }
@@ -104,6 +114,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const data = await apiLogin(email, password);
       setUser(data.user);
+      if (data.accessToken) {
+        tokenStore.setToken(data.accessToken);
+      }
       if (typeof window !== "undefined" && data.user.avatar) {
         cacheAvatarBlob(data.user.avatar);
       }
@@ -147,6 +160,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const data = await apiRegister(userData);
       setUser(data.user);
+      if (data.accessToken) {
+        tokenStore.setToken(data.accessToken);
+      }
       return (
         data.redirectUrl ||
         (data.user.role === "manufacturer" ? "/manufacturer" : "/customer")
@@ -171,6 +187,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = async () => {
     await apiLogout();
     setUser(null);
+    tokenStore.clearToken();
     if (typeof window !== "undefined") {
       localStorage.removeItem("cached_avatar");
     }

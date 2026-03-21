@@ -6,6 +6,7 @@ import {
   Settings,
   PanelLeft,
   Pill,
+  Bot,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,11 @@ export const navGroups = [
         label: "Verify Product",
         href: "/verify",
         icon: QrCode,
+      },
+      {
+        label: "AI Agent",
+        href: "/customer/agent",
+        icon: Bot,
       },
     ],
   },

@@ -7,9 +7,9 @@ from langchain_core.runnables import Runnable
 from langchain_openai import ChatOpenAI
 
 from config import get_settings
-from prompts import SYSTEM_PROMPT
+from prompts import CUSTOMER_SYSTEM_PROMPT, MANUFACTURER_SYSTEM_PROMPT
 
-DEFAULT_OPENROUTER_MODEL = "google/gemini-2.5-flash"
+DEFAULT_OPENROUTER_MODEL = "minimax/minimax-m2.5:free"
 BASE_URL = "https://openrouter.ai/api/v1"
 
 
@@ -37,7 +37,7 @@ class Agent:
 
         settings = get_settings()
 
-        # Resolve OpenRouter API Key (fallback to generic LLM key if needed)
+        # Resolve OpenRouter API Key
         api_key = (
             settings.OPENROUTER_API_KEY
             or os.getenv("OPENROUTER_API_KEY")
@@ -48,10 +48,9 @@ class Agent:
         if not api_key:
             raise ValueError("OpenRouter API Key is missing. Set OPENROUTER_API_KEY.")
 
-        # We still use ChatOpenAI as the wrapper since OpenRouter is fully OpenAI API compatible
         self.llm = ChatOpenAI(
             temperature=temperature,
-            model=model_name,
+            model=model_name or DEFAULT_OPENROUTER_MODEL,
             api_key=api_key,
             base_url=BASE_URL,
             max_tokens=max_tokens,
@@ -87,10 +86,13 @@ class Agent:
         """
         Streams execution events from the underlying agent asynchronously.
         """
-        input_text = input_payload.get("input", "")
-        chat_history = input_payload.get("chat_history", [])
-
-        runnable_input = self._prepare_input(input_text, chat_history)
+        # Support both 'messages' format (from ChatService) and 'input' format
+        if "messages" in input_payload:
+            runnable_input = {"messages": input_payload["messages"]}
+        else:
+            input_text = input_payload.get("input", "")
+            chat_history = input_payload.get("chat_history", [])
+            runnable_input = self._prepare_input(input_text, chat_history)
 
         async for event in self.runnable.astream_events(
             runnable_input, version=version
@@ -169,12 +171,22 @@ class Agent:
         self.memory = []
 
 
-def get_chain_trust_agent(model_name: str = DEFAULT_OPENROUTER_MODEL):
+def get_chain_trust_agent(
+    role: str = "customer",
+    tools: List[Any] = None,
+    model_name: str = DEFAULT_OPENROUTER_MODEL
+):
     """
-    Factory function to create and return a configured Agent instance.
+    Factory function to create and return a configured Agent instance based on user role.
     """
+    if role == "manufacturer":
+        prompt = MANUFACTURER_SYSTEM_PROMPT
+    else:
+        prompt = CUSTOMER_SYSTEM_PROMPT
+
     return Agent(
         agent_name="ChainTrust_AI",
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=prompt,
         model_name=model_name,
+        tools=tools or [],
     )

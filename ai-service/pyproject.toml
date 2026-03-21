@@ -10,4 +10,5 @@ dependencies = [
     "langchain-openai>=1.1.10",
     "loguru>=0.7.3",
     "motor>=3.7.1",
+    "pyjwt>=2.10.1",
 ]

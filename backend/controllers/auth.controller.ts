@@ -524,11 +524,14 @@ export const refreshAccessToken = async (req: Request, res: Response): Promise<v
 	}
 };
 
+import { extractToken } from '../helpers/auth.helpers.js';
+
 export const verifyUser = async (req: Request, res: Response): Promise<void> => {
 	try {
 		res.json({
 			message: 'User verified',
 			user: publicUser((req as any).user),
+			accessToken: extractToken(req),
 		});
 	} catch (err) {
 		console.error('Verify user error:', err);

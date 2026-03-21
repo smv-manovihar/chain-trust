@@ -11,6 +11,7 @@ import { useSidebar } from "@/contexts/sidebar-context";
 
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { FloatingAgent } from "@/components/chat/floating-agent";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -103,6 +104,8 @@ export function AppShell({ children, sidebar, mobileSidebar }: AppShellProps) {
             </AnimatePresence>
           </div>
           
+          <FloatingAgent />
+
           {/* Optional background grid specific to the content area */}
           <div className="absolute inset-0 bg-grid-pattern-global pointer-events-none opacity-40 -z-10" />
         </main>

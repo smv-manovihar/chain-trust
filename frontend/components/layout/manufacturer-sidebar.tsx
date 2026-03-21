@@ -8,6 +8,7 @@ import {
   Boxes,
   PanelLeft,
   Users,
+  Bot,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { useState, useEffect } from "react";
@@ -32,6 +33,11 @@ export const navGroups = [
         label: "Analytics",
         href: "/manufacturer/analytics",
         icon: BarChart3,
+      },
+      {
+        label: "AI Agent",
+        href: "/manufacturer/agent",
+        icon: Bot,
       },
     ],
   },

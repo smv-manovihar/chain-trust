@@ -258,10 +258,6 @@ class SSEManager:
                     if oldest_event_type in handlers:
                         handlers[oldest_event_type](state, oldest_data)
 
-                logger.debug(
-                    f"Consumed overflow events for {identifier}, accumulated state updated"
-                )
-
         # Send to active connections
         queues = self.active_connections.get(identifier)
         if queues:
@@ -290,9 +286,6 @@ class SSEManager:
 
             # Sliding window: when buffer is full, clear it (accumulator preserved)
             if len(self.message_buffer[identifier]) >= self.buffer_size:
-                logger.debug(
-                    f"Message buffer full for {identifier}, clearing buffer (accumulator preserved)"
-                )
                 self.message_buffer[identifier] = []
 
         # Send to active connections

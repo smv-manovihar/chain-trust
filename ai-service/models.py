@@ -88,14 +88,12 @@ class SessionCreate(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    current_page: Optional[str] = None
-    product_context: Optional[Dict[str, Any]] = None
+    current_context: Optional[Dict[str, Any]] = None
 
 
 class EditChatRequest(BaseModel):
     message: str
-    current_page: Optional[str] = None
-    product_context: Optional[Dict[str, Any]] = None
+    current_context: Optional[Dict[str, Any]] = None
 
 
 class ChatSessionDB(BaseModel):

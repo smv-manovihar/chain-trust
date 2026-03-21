@@ -56,15 +56,15 @@ export async function updateRole(role: 'customer' | 'manufacturer'): Promise<Aut
   return response.data;
 }
 
-export async function getCurrentUser(): Promise<User | null> {
+export async function getCurrentUser(): Promise<{ user: User; accessToken?: string } | null> {
   try {
-    const response = await client.get<{ user: User }>('/auth/me');
-    return response.data.user;
+    const response = await client.get<{ user: User; accessToken?: string }>('/auth/me');
+    return response.data;
   } catch (error) {
     try {
         await client.post('/auth/refresh');
-        const retryRes = await client.get<{ user: User }>('/auth/me');
-        return retryRes.data.user;
+        const retryRes = await client.get<{ user: User; accessToken?: string }>('/auth/me');
+        return retryRes.data;
     } catch {
         return null;
     }
