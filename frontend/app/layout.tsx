@@ -68,9 +68,9 @@ export default function RootLayout({
         <div className="relative z-10">
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <TooltipProvider delayDuration={300}>
-              <AuthProvider>
-                <SidebarProvider>{children}</SidebarProvider>
-              </AuthProvider>
+                <AuthProvider>
+                  <SidebarProvider>{children}</SidebarProvider>
+                </AuthProvider>
             </TooltipProvider>
             <Toaster />
           </ThemeProvider>

@@ -4,6 +4,7 @@ export interface ICompany extends Document {
   _id: Types.ObjectId;
   name: string;
   domain: string;
+  industryRegistration?: string;
   policies: {
     require2FA: boolean;
     allowedIPs?: string[];
@@ -11,7 +12,6 @@ export interface ICompany extends Document {
     [key: string]: any;
   };
   adminId: Types.ObjectId;
-  employees: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,6 +26,7 @@ const companySchema = new Schema<ICompany>(
       lowercase: true, 
       trim: true 
     },
+    industryRegistration: { type: String, trim: true },
     policies: {
       type: Map,
       of: Schema.Types.Mixed,
@@ -35,10 +36,12 @@ const companySchema = new Schema<ICompany>(
       }
     },
     adminId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    employees: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    collection: 'companies',
+  }
 );
 
 
-export default model<ICompany>('Company', companySchema, 'Companies');
+export default model<ICompany>('Company', companySchema);

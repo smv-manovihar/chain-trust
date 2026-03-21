@@ -7,9 +7,10 @@ export function proxy(request: NextRequest) {
 
   // Paths that require manufacturer or employee role
   const isManufacturerRoute = path.startsWith('/manufacturer');
+  const isPublicRoute = path === '/manufacturer/register' || path === '/manufacturer/login';
   
   if (!token) {
-    if (isManufacturerRoute) {
+    if (isManufacturerRoute && !isPublicRoute) {
        return NextResponse.redirect(new URL('/login', request.url));
     }
     return NextResponse.next();
@@ -32,7 +33,7 @@ export function proxy(request: NextRequest) {
     }
   } catch (err) {
     // Invalid token format
-    if (isManufacturerRoute) {
+    if (isManufacturerRoute && !isPublicRoute) {
        return NextResponse.redirect(new URL('/login', request.url));
     }
   }

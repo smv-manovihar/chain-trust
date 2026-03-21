@@ -71,6 +71,7 @@ const productSchema = new Schema<IProduct>(
 	},
 	{
 		timestamps: true,
+		collection: 'products',
 	},
 );
 

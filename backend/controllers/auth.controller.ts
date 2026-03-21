@@ -58,8 +58,9 @@ const publicUser = (u: IUser): PublicUser => ({
 });
 
 // Google OAuth (server-side redirect flow)
-export const googleAuth = async (_req: Request, res: Response): Promise<void> => {
+export const googleAuth = async (req: Request, res: Response): Promise<void> => {
 	try {
+		const { returnTo } = req.query;
 		const oauth2Client = new OAuth2Client(
 			process.env.GOOGLE_CLIENT_ID,
 			process.env.GOOGLE_CLIENT_SECRET,
@@ -75,6 +76,7 @@ export const googleAuth = async (_req: Request, res: Response): Promise<void> =>
 			access_type: 'offline',
 			scope: scopes,
 			prompt: 'consent',
+			state: returnTo as string, // Pass returnTo as state
 		});
 
 		res.redirect(url);
@@ -126,7 +128,11 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
 		};
 
 		if (user) {
-			if (user.provider !== 'google' || user.providerId !== userInfo.sub) {
+			// If user exists but linked to different provider, allow linking if currently 'local'
+			if (user.provider !== 'google') {
+				user.provider = 'google';
+				user.providerId = userInfo.sub;
+			} else if (user.providerId !== userInfo.sub) {
 				res.redirect(
 					`${FRONTEND_URL}/register?error=provider_mismatch`,
 				);
@@ -166,11 +172,11 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
 
 			await user.save();
 			
-			// If new user and NO company match, redirect to role selection
+			// If new user and NO company match, default to customer and proceed to dashboard
 			if (!company) {
 				const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id, req);
 				attachTokens(accessToken, refreshToken, res);
-				res.redirect(`${FRONTEND_URL}/login/select-role`);
+				res.redirect(`${FRONTEND_URL}/customer`);
 				return;
 			}
 		}
@@ -179,15 +185,12 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
 			await generateAccessAndRefreshTokens(user._id, req);
 		attachTokens(accessToken, refreshToken, res);
 
-		if (user.role === 'manufacturer') {
-			res.redirect(`${FRONTEND_URL}/manufacturer`);
-		} else {
-			res.redirect(`${FRONTEND_URL}/customer`);
-		}
-
+		// Redirect back to state (returnTo) or default dashboard
+		const redirectPath = (req.query.state as string) || (user.role === 'manufacturer' ? '/manufacturer' : '/customer');
+		res.redirect(`${FRONTEND_URL}${redirectPath.startsWith('/') ? '' : '/'}${redirectPath}`);
 	} catch (err) {
 		console.error('Google callback error:', err);
-		res.redirect(`${FRONTEND_URL}/login?error=server_error`);
+		res.redirect(`${FRONTEND_URL}/login?error=callback_failed`);
 	}
 };
 
@@ -320,7 +323,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
 };
 
 export const registerUser = async (req: Request, res: Response): Promise<void> => {
-	const { email, password, name, role, phoneNumber, address, city, postalCode, country, companyName, website } = req.body;
+	const { email, password, name, role, phoneNumber, address, city, postalCode, country, companyName, website, industry_registration } = req.body;
 
 	if (!email || !password || !name) {
 		res.status(400).json({ message: 'Email, password, and name are required' });
@@ -394,6 +397,19 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
 		});
 
 		await newUser.save();
+
+		if (role === 'manufacturer') {
+			const newCompany = new Company({
+				name: companyName || emailDomain,
+				domain: emailDomain,
+				industryRegistration: industry_registration,
+				adminId: newUser._id,
+			});
+			await newCompany.save();
+			
+			newUser.companyId = newCompany._id;
+			await newUser.save();
+		}
 
 		const emailSent = await sendEmailVerification(
 			newUser.email,
@@ -963,3 +979,31 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
 		res.status(500).json({ message: 'Server error' });
 	}
 };
+
+export const deleteAccount = async (req: Request, res: Response): Promise<void> => {
+	const userId = (req as any).user.id;
+
+	try {
+		const user = await User.findById(userId);
+		if (!user) {
+			res.status(404).json({ message: 'User not found' });
+			return;
+		}
+
+		// If user is a manufacturer, we might need to handle their company
+		// For now, we'll just remove the user. If they are the company admin, 
+		// the company might become orphaned, but that's a policy decision.
+		
+		await User.findByIdAndDelete(userId);
+
+		// Clear cookies
+		res.clearCookie('accessToken');
+		res.clearCookie('refreshToken');
+
+		res.json({ message: 'Account deleted successfully' });
+	} catch (error) {
+		console.error('Delete account error:', error);
+		res.status(500).json({ message: 'Server error' });
+	}
+};
+

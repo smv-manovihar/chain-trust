@@ -22,10 +22,13 @@ const cabinetItemSchema = new Schema<ICabinetItem>(
 		expiryDate: { type: String },
 		images: { type: [String], default: [] },
 	},
-	{ timestamps: true },
+	{
+		timestamps: true,
+		collection: 'user-cabinets',
+	},
 );
 
 // Ensure a user can't add the exact same product multiple times
 cabinetItemSchema.index({ userId: 1, productId: 1 }, { unique: true });
 
-export default model<ICabinetItem>('CabinetItem', cabinetItemSchema, 'CabinetItems');
+export default model<ICabinetItem>('CabinetItem', cabinetItemSchema);

@@ -24,6 +24,7 @@ export async function register(userData: {
   country?: string;
   companyName?: string;
   website?: string;
+  industry_registration?: string;
 }): Promise<AuthResponse> {
   const response = await client.post<AuthResponse>('/auth/register', userData);
   return response.data;
@@ -56,12 +57,12 @@ export async function updateRole(role: 'customer' | 'manufacturer'): Promise<Aut
 }
 
 export async function updateProfile(data: Partial<User>): Promise<AuthResponse> {
-  const response = await client.put<AuthResponse>('/auth/profile', data);
+  const response = await client.put<AuthResponse>('/users/update', data);
   return response.data;
 }
 
 export async function changePassword(data: { currentPassword?: string; newPassword: string }): Promise<AuthResponse> {
-  const response = await client.post<AuthResponse>('/auth/change-password', data);
+  const response = await client.post<AuthResponse>('/users/change-password', data);
   return response.data;
 }
 
@@ -82,6 +83,10 @@ export async function getCurrentUser(): Promise<User | null> {
 
 export async function logout(): Promise<void> {
   await client.post('/auth/logout');
+}
+
+export async function deleteAccount(): Promise<void> {
+  await client.delete('/auth/me');
 }
 
 export async function verifyEmailWithOTP(data: EmailVerificationOTP): Promise<AuthResponse> {

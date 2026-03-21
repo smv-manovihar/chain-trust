@@ -104,7 +104,7 @@ export default function MyMedicinesPage() {
               <ShieldCheck className="h-7 w-7" />
             </div>
             <div>
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-0.5">Cabinet Integrity</p>
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-0.5">Medicine Integrity</p>
               <h3 className="text-xl lg:text-2xl font-black text-green-600 dark:text-green-400">100% Verified</h3>
             </div>
           </div>

@@ -4,6 +4,9 @@ import Batch from '../models/batch.model.js';
 import Product from '../models/product.model.js';
 import Scan from '../models/scan.model.js';
 import * as pdfService from '../services/pdf.service.js';
+import geoip from 'geoip-lite';
+import requestIp from 'request-ip';
+import { calculateSuspiciousness } from '../utils/suspicious.util.js';
 
 /**
  * Derive a unit-level salt from a batch salt and unit index.
@@ -221,7 +224,7 @@ export const getBatchQRData = async (req: Request, res: Response) => {
 // POST /api/batches/verify-scan — Public endpoint: verify a product and track scan count
 export const verifyScan = async (req: Request, res: Response) => {
 	try {
-		const { salt } = req.body;
+		const { salt, visitorId, lat, lng } = req.body;
 		if (!salt) {
 			return res.status(400).json({ message: 'Salt value is required' });
 		}
@@ -235,17 +238,42 @@ export const verifyScan = async (req: Request, res: Response) => {
 		}
 
 		const { batch, unitIndex } = result;
-		const ip = req.ip || req.socket.remoteAddress || 'unknown';
-		const viewerFingerprint = req.headers['x-viewer-id'] || '';
-		const viewerId = `${ip}-${viewerFingerprint}`;
+		// Extract request metadata
+		const ip = requestIp.getClientIp(req) || req.socket.remoteAddress || 'unknown';
+		const userAgent = req.headers['user-agent'] || '';
+		const user = (req as any).user;
+		const userId = user ? user._id : undefined;
+
+		let latitude = lat !== undefined ? Number(lat) : undefined;
+		let longitude = lng !== undefined ? Number(lng) : undefined;
+		let city, country;
+
+		if (ip && ip !== 'unknown' && ip !== '::1' && ip !== '127.0.0.1') {
+			const geo = geoip.lookup(ip);
+			if (geo) {
+				city = geo.city;
+				country = geo.country;
+				// Fallback to IP-geo if frontend didn't provide precise coords
+				if (latitude === undefined && longitude === undefined) {
+					latitude = geo.ll[0];
+					longitude = geo.ll[1];
+				}
+			}
+		}
+
+		// Calculate Suspiciousness using the history of scans
+		const suspiciousResult = await calculateSuspiciousness(batch._id, unitIndex, ip, latitude, longitude);
 
 		// Attempt to record a unique scan
 		let newCount = batch.scanCounts?.get(String(unitIndex)) || 0;
 		try {
+			// Require frontend to send visitorId (UUID). Fallback if old client.
+			const queryVisitorId = visitorId || `legacy-${ip}`;
+
 			const existingScan = await Scan.findOne({
 				batch: batch._id,
 				unitIndex,
-				viewerId,
+				visitorId: queryVisitorId,
 			});
 
 			if (!existingScan) {
@@ -253,7 +281,14 @@ export const verifyScan = async (req: Request, res: Response) => {
 				await Scan.create({
 					batch: batch._id,
 					unitIndex,
-					viewerId,
+					visitorId: queryVisitorId,
+					user: userId,
+					ip,
+					userAgent,
+					latitude,
+					longitude,
+					city,
+					country
 				});
 				// Increment cached count only for first-time unique scan
 				newCount += 1;
@@ -282,6 +317,8 @@ export const verifyScan = async (req: Request, res: Response) => {
 			scanCount: newCount,
 			isRecalled: batch.isRecalled,
 			blockchainHash: batch.blockchainHash,
+			isSuspicious: suspiciousResult.isSuspicious,
+			suspiciousReason: suspiciousResult.reason,
 		});
 	} catch (error) {
 		console.error('Verify scan error:', error);

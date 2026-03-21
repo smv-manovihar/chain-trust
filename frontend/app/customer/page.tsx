@@ -134,7 +134,7 @@ export default function CustomerDashboard() {
                 </div>
                 <div>
                   <h4 className="font-bold text-lg">Adherence Rate</h4>
-                  <p className="text-sm text-muted-foreground italic">You're doing better than 70% of patients!</p>
+                  <p className="text-sm text-muted-foreground italic">You're doing better than 70% of members!</p>
                 </div>
               </div>
               <Button variant="outline" className="rounded-2xl h-12 px-6 font-bold bg-background shadow-sm border-primary/20" asChild>

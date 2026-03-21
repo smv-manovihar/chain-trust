@@ -32,6 +32,7 @@ const alertSchema = new Schema<IAlert>(
 	},
 	{
 		timestamps: true,
+		collection: 'alerts',
 	},
 );
 

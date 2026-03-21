@@ -108,6 +108,7 @@ const batchSchema = new Schema<IBatch>(
 	},
 	{
 		timestamps: true,
+		collection: 'batches',
 	},
 );
 

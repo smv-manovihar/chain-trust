@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { hash } from 'bcrypt';
+import { hash, compare } from 'bcrypt';
 import User from '../models/user.model.js';
 import CabinetItem from '../models/cabinet.model.js';
 
@@ -18,16 +18,30 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
 };
 
 export const changeUserPassword = async (req: Request, res: Response): Promise<void> => {
-	const { id, newPassword } = req.body;
+	const userId = (req as any).user.id;
+	const { currentPassword, newPassword } = req.body;
 	try {
-		const user = await User.findById(id);
+		const user = await User.findById(userId);
 		if (!user) {
 			res.status(404).json({ message: 'User not found' });
 			return;
 		}
+		
+		if (currentPassword) {
+			if (!user.password) {
+				res.status(400).json({ message: 'Account has no password set. Please use password reset.' });
+				return;
+			}
+			const isMatch = await compare(currentPassword, user.password);
+			if (!isMatch) {
+				res.status(400).json({ message: 'Incorrect current password' });
+				return;
+			}
+		}
+
 		const hashedPassword = await hash(newPassword, 10);
 		await User.updateOne(
-			{ _id: id },
+			{ _id: userId },
 			{ $set: { password: hashedPassword } },
 		);
 		res.json({ message: 'Password changed successfully' });
@@ -37,15 +51,21 @@ export const changeUserPassword = async (req: Request, res: Response): Promise<v
 };
 
 export const updateUserDetails = async (req: Request, res: Response): Promise<void> => {
-	const { id, details } = req.body;
+	const userId = (req as any).user.id;
+	const details = req.body;
+	// Remove sensitive/unwanted fields from mass-assignment
+	delete details.password;
+	delete details.role;
+	delete details.email; // Usually shouldn't update email here
+
 	try {
-		const user = await User.findById(id);
+		const user = await User.findById(userId);
 		if (!user) {
 			res.status(404).json({ message: 'User not found' });
 			return;
 		}
 		await User.updateOne(
-			{ _id: id },
+			{ _id: userId },
 			{ $set: { ...details } },
 		);
 		res.json({ message: 'Details updated successfully' });

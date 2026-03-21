@@ -17,6 +17,7 @@ import {
 	googleLoginWithToken,
 	setupAccount,
 	updateUserRole,
+	deleteAccount,
 } from '../controllers/auth.controller.js';
 import { authenticateJWT } from '../middlewares/auth.middleware.js';
 import { trackUserActivity } from '../middlewares/activity.middleware.js';
@@ -54,5 +55,6 @@ router.delete('/devices/:deviceId', logoutDevice);
 router.delete('/devices', logoutAllDevices);
 
 router.post('/update-role', updateUserRole);
+router.delete('/me', deleteAccount);
 
 export default router;

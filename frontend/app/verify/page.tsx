@@ -14,10 +14,12 @@ import {
   BookmarkPlus,
   PackageCheck,
   ChevronLeft,
+  AlertTriangle,
 } from "lucide-react";
 import { verifyScan } from "@/api/batch.api";
 import { addToCabinet } from "@/api/customer.api";
 import { verifyOnBlockchain } from "@/lib/blockchain-utils";
+import { getVisitorId } from "@/lib/visitor";
 import { cn } from "@/lib/utils";
 import { AIChatEmbed } from "@/components/chat/AIChatEmbed";
 import { toast } from "sonner";
@@ -64,6 +66,8 @@ interface ScanResult {
   scanCount?: number;
   isRecalled?: boolean;
   blockchainHash?: string;
+  isSuspicious?: boolean;
+  suspiciousReason?: string | null;
 }
 
 type ScanView = "camera" | "upload";
@@ -76,7 +80,7 @@ function VerifyContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [product, setProduct] = useState<ScanResult["product"] | null>(null);
-  const [scanStats, setScanStats] = useState({ count: 0, blockchainHash: "" });
+  const [scanStats, setScanStats] = useState({ count: 0, blockchainHash: "", isSuspicious: false, suspiciousReason: "" });
   const { user, isAuthenticated } = useAuth();
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [userInteracted, setUserInteracted] = useState(false);
@@ -153,18 +157,23 @@ function VerifyContent() {
       let finalStats = {
         count: 1,
         blockchainHash: blockchainResult.record.transactionHash || "Verified",
+        isSuspicious: false,
+        suspiciousReason: "",
       };
 
       try {
+        const visitorId = getVisitorId();
         const result: ScanResult = await verifyScan(
           saltToVerify,
-          "browser_viewer",
+          visitorId,
         );
         if (result.isValid && result.product) {
           finalProduct = { ...finalProduct, ...result.product };
           finalStats = {
             count: result.scanCount || 1,
             blockchainHash: result.blockchainHash || finalStats.blockchainHash,
+            isSuspicious: result.isSuspicious || false,
+            suspiciousReason: result.suspiciousReason || "",
           };
         } else if (result.isRecalled) {
           throw new Error("RECALLED: This batch has been flagged as unsafe.");
@@ -301,7 +310,8 @@ function VerifyContent() {
               exit={{ opacity: 0, y: -10 }}
               className={cn(
                 "flex-1 flex flex-col",
-                isMobileFullscreenCamera ? "p-0" : "p-4 lg:p-8 min-h-0",
+                isMobileFullscreenCamera ? "p-0" : (!isAuthenticated && "p-4 lg:p-8"),
+                "min-h-0"
               )}
             >
               {isMobileFullscreenCamera ? (
@@ -353,7 +363,10 @@ function VerifyContent() {
               key="result-step"
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col p-4 lg:p-0 flex-1 min-h-0"
+              className={cn(
+                "flex flex-col flex-1 min-h-0",
+                !isAuthenticated && "p-4 lg:p-0"
+              )}
             >
               <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col min-h-0 mt-4 lg:mt-8">
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
@@ -399,33 +412,57 @@ function VerifyContent() {
                   <div className="lg:col-span-2 flex flex-col gap-6 overflow-hidden">
                     <ScrollArea className="flex-1 pr-4">
                       <div className="space-y-6 pb-6">
-                        <Card className="p-6 bg-gradient-to-br from-green-500/10 via-background to-primary/5 border-green-500/20 rounded-[2rem] flex items-center gap-6">
-                          <div className="h-16 w-16 rounded-full bg-green-500/20 flex items-center justify-center shrink-0 shadow-inner">
-                            <CheckCircle2 className="h-8 w-8 text-green-600" />
+                        <Card className={cn(
+                          "p-6 border rounded-[2rem] flex items-center gap-6",
+                          scanStats.isSuspicious 
+                            ? "bg-gradient-to-br from-amber-500/10 via-background to-amber-500/5 border-amber-500/50 shadow-amber-500/10" 
+                            : "bg-gradient-to-br from-green-500/10 via-background to-primary/5 border-green-500/20"
+                        )}>
+                          <div className={cn(
+                            "h-16 w-16 rounded-full flex items-center justify-center shrink-0 shadow-inner",
+                            scanStats.isSuspicious ? "bg-amber-500/20" : "bg-green-500/20"
+                          )}>
+                            {scanStats.isSuspicious ? (
+                              <AlertTriangle className="h-8 w-8 text-amber-600" />
+                            ) : (
+                              <CheckCircle2 className="h-8 w-8 text-green-600" />
+                            )}
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-black text-green-600 uppercase tracking-widest leading-none">
-                                Status
+                              <span className={cn(
+                                "text-xs font-black uppercase tracking-widest leading-none",
+                                scanStats.isSuspicious ? "text-amber-600" : "text-green-600"
+                              )}>
+                                {scanStats.isSuspicious ? "Warning" : "Status"}
                               </span>
-                              {scanStats.count > 5 && (
+                              {scanStats.count > 5 && !scanStats.isSuspicious && (
                                 <Badge
                                   variant="destructive"
                                   className="h-4 text-[8px] px-1 font-black"
                                 >
-                                  Warning
+                                  High Scans
                                 </Badge>
                               )}
                             </div>
                             <p className="text-lg font-bold leading-tight">
-                              Product is 100% Authentic
+                              {scanStats.isSuspicious ? "Suspicious Scan Activity" : "Product is 100% Authentic"}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1 font-mono">
-                              HASH: {scanStats.blockchainHash.slice(0, 16)}...
-                            </p>
+                            {scanStats.isSuspicious && scanStats.suspiciousReason ? (
+                              <p className="text-xs text-amber-600/80 mt-1 font-medium leading-tight">
+                                {scanStats.suspiciousReason}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-muted-foreground mt-1 font-mono">
+                                HASH: {scanStats.blockchainHash.slice(0, 16)}...
+                              </p>
+                            )}
                           </div>
                           <div className="hidden sm:block text-right">
-                            <p className="text-xl font-black text-primary">
+                            <p className={cn(
+                              "text-xl font-black",
+                              scanStats.isSuspicious ? "text-amber-600" : "text-primary"
+                            )}>
                               {scanStats.count}
                             </p>
                             <p className="text-[10px] uppercase font-bold text-muted-foreground">
@@ -472,6 +509,21 @@ function VerifyContent() {
                               </p>
                             </div>
                           </Card>
+                           {!isAuthenticated && (
+                             <Card className="p-5 rounded-3xl border-border/50 bg-card/50">
+                               <p className="text-sm text-muted-foreground text-center mb-4">
+                                 Log in to your member account to save this medicine and track your health journey.
+                               </p>
+                               <div className="flex flex-col gap-3">
+                                 <Button className="w-full rounded-2xl h-10 font-bold" asChild>
+                                   <Link href="/login">Login to Save</Link>
+                                 </Button>
+                                 <Button variant="outline" className="w-full rounded-2xl h-10 font-bold" asChild>
+                                   <Link href="/register">Become a Member</Link>
+                                 </Button>
+                               </div>
+                             </Card>
+                           )}
                           <Card className="p-5 rounded-3xl border-border/50 bg-card/50">
                             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">
                               Unit Tracking

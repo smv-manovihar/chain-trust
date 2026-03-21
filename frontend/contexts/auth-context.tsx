@@ -27,8 +27,16 @@ interface AuthContextType {
     password: string;
     name: string;
     role?: "customer" | "manufacturer";
+    phoneNumber?: string;
+    address?: string;
+    city?: string;
+    postalCode?: string;
+    country?: string;
+    companyName?: string;
+    website?: string;
+    industry_registration?: string;
   }) => Promise<string>;
-  googleLogin: () => void;
+  googleLogin: (returnTo?: string) => void;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
 }
@@ -113,6 +121,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     password: string;
     name: string;
     role?: "customer" | "manufacturer";
+    phoneNumber?: string;
+    address?: string;
+    city?: string;
+    postalCode?: string;
+    country?: string;
+    companyName?: string;
+    website?: string;
+    industry_registration?: string;
   }) => {
     setIsLoading(true);
     setError(null);
@@ -131,11 +147,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const googleLogin = () => {
+  const googleLogin = (returnTo?: string) => {
     setIsLoading(true);
     setError(null);
     // Redirect to backend Google auth endpoint
-    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/auth/google`;
+    const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+    const query = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : "";
+    window.location.href = `${baseUrl}/api/auth/google${query}`;
   };
 
   const logout = async () => {

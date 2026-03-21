@@ -1,33 +1,115 @@
-from pydantic import BaseModel, Field, ConfigDict
-from pydantic.functional_validators import BeforeValidator
-from typing import Dict, Optional, Any
-from typing_extensions import Annotated
-from datetime import datetime
+from bson import ObjectId as BsonObjectId
+from typing import Optional, List, Dict, Any
+from datetime import datetime, timezone
 
-# Safely handle MongoDB ObjectIds in Pydantic v2
-PyObjectId = Annotated[str, BeforeValidator(str)]
+from pydantic import GetJsonSchemaHandler, BaseModel, Field
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import core_schema
 
-# --- API Schemas ---
+
+# Custom ObjectId wrapper that bridges MongoDB's BSON ObjectId with Pydantic v2 validation and serialization.
+class PyObjectId(BsonObjectId):
+    """
+    Custom ObjectId type for Pydantic v2
+    Compatible with MongoDB ObjectId
+    """
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: Any,
+    ) -> core_schema.CoreSchema:
+        """
+        Defines the Pydantic v2 core schema for ObjectId validation and serialization.
+        Args:
+            - _source_type (Any): The source type being validated.
+            - _handler (Any): The schema handler.
+        Returns:
+            - core_schema.CoreSchema: Union schema supporting ObjectId instance checking and string conversion.
+        """
+        return core_schema.union_schema(
+            [
+                # Check if it's an instance of ObjectId first
+                core_schema.is_instance_schema(BsonObjectId),
+                # If not, validate as a string and convert to ObjectId
+                core_schema.no_info_plain_validator_function(cls.validate),
+            ],
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda x: str(x)
+            ),
+        )
+
+    @classmethod
+    def validate(cls, v: Any) -> BsonObjectId:
+        """
+        Validates and converts input to a BSON ObjectId.
+        Args:
+            - v (Any): The value to validate (string or ObjectId instance).
+        Returns:
+            - BsonObjectId: The validated ObjectId instance.
+        """
+        # Direct pass-through for existing ObjectId instances
+        if isinstance(v, BsonObjectId):
+            return v
+
+        # Validate and convert string representations
+        if isinstance(v, str):
+            if BsonObjectId.is_valid(v):
+                return BsonObjectId(v)
+            raise ValueError(f"Invalid ObjectId: {v}")
+
+        raise ValueError(
+            f"ObjectId must be a string or ObjectId instance, not {type(v)}"
+        )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        """
+        Generates the JSON schema representation for API documentation.
+        Args:
+            - _core_schema (core_schema.CoreSchema): The core schema object.
+            - handler (GetJsonSchemaHandler): The JSON schema handler.
+        Returns:
+            - JsonSchemaValue: JSON schema definition with type, pattern, and examples.
+        """
+        return {
+            "type": "string",
+            "pattern": "^[a-f0-9]{24}$",
+            "examples": ["507f1f77bcf86cd799439011"],
+        }
+
+
 class SessionCreate(BaseModel):
     user_id: str
 
-class StreamRequest(BaseModel):
-    session_id: str
+
+class ChatRequest(BaseModel):
     message: str
     current_page: Optional[str] = None
     product_context: Optional[Dict[str, Any]] = None
 
-# --- Database Models ---
-class MongoBaseModel(BaseModel):
-    id: Optional[PyObjectId] = Field(alias="_id", default=None)
-    model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
 
-class ChatSessionDB(MongoBaseModel):
+class EditChatRequest(BaseModel):
+    message: str
+    current_page: Optional[str] = None
+    product_context: Optional[Dict[str, Any]] = None
+
+
+class ChatSessionDB(BaseModel):
     user_id: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-class ChatMessageDB(MongoBaseModel):
+
+class ChatMessageDB(BaseModel):
     session_id: str
-    role: str 
+    role: str
     content: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    thoughts: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    status: str = "completed"  # generating, completed, error
+    edited: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

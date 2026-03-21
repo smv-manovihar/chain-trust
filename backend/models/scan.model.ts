@@ -3,7 +3,14 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 export interface IScan extends Document {
 	batch: Types.ObjectId;
 	unitIndex: number;
-	viewerId: string; // Combination of IP + Fingerprint
+	visitorId: string; // Anonymous UUID from frontend
+	user?: Types.ObjectId; // Populated if logged in
+	ip?: string;
+	userAgent?: string;
+	latitude?: number;
+	longitude?: number;
+	city?: string;
+	country?: string;
 	createdAt: Date;
 }
 
@@ -18,18 +25,29 @@ const scanSchema = new Schema<IScan>(
 			type: Number,
 			required: true,
 		},
-		viewerId: {
+		visitorId: {
 			type: String,
 			required: true,
 			trim: true,
 		},
+		user: {
+			type: Schema.Types.ObjectId,
+			ref: 'User',
+		},
+		ip: { type: String, trim: true },
+		userAgent: { type: String, trim: true },
+		latitude: { type: Number },
+		longitude: { type: Number },
+		city: { type: String, trim: true },
+		country: { type: String, trim: true },
 	},
 	{
 		timestamps: { createdAt: true, updatedAt: false },
+		collection: 'scans',
 	},
 );
 
-// Unique index to ensure one viewer only counts as one scan for a specific unit
-scanSchema.index({ batch: 1, unitIndex: 1, viewerId: 1 }, { unique: true });
+// Unique index to ensure one visitor only counts as one scan for a specific unit
+scanSchema.index({ batch: 1, unitIndex: 1, visitorId: 1 }, { unique: true });
 
 export default mongoose.model<IScan>('Scan', scanSchema);

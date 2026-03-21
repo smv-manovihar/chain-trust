@@ -46,7 +46,10 @@ const refreshTokenSchema = new Schema<IRefreshToken>(
 			default: Date.now,
 		},
 	},
-	{ timestamps: true },
+	{
+		timestamps: true,
+		collection: 'refreshtokens',
+	},
 );
 
 refreshTokenSchema.index({ userId: 1 });
@@ -54,4 +57,4 @@ refreshTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 refreshTokenSchema.index({ userId: 1, 'deviceInfo.deviceId': 1 });
 refreshTokenSchema.index({ isActive: 1 });
 
-export default model<IRefreshToken>('RefreshToken', refreshTokenSchema, 'RefreshTokens');
+export default model<IRefreshToken>('RefreshToken', refreshTokenSchema);

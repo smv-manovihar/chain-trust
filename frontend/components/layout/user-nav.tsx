@@ -49,8 +49,8 @@ export function UserNav() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           className="gap-2.5 rounded-full w-10 md:w-auto h-10 p-0 md:p-2 md:pl-2 md:pr-4 border-border/60 hover:bg-muted/50 hover:border-primary/30 transition-all duration-300 shadow-sm flex items-center justify-center shrink-0"
         >
           {user.avatar || cachedAvatar ? (
@@ -66,13 +66,20 @@ export function UserNav() {
             </div>
           )}
           <div className="hidden md:flex flex-col items-start leading-none justify-center">
-            <span className="max-w-[100px] truncate text-sm font-semibold">{user.name}</span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium mt-0.5">{user.role || "User"}</span>
+            <span className="max-w-[100px] truncate text-sm font-semibold">
+              {user.name}
+            </span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium mt-0.5">
+              {user.role || "User"}
+            </span>
           </div>
           <ChevronDown className="hidden md:block h-3.5 w-3.5 text-muted-foreground ml-1" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64 p-2 rounded-3xl border-border/50 shadow-2xl bg-background/95 backdrop-blur-xl">
+      <DropdownMenuContent
+        align="end"
+        className="w-64 p-2 rounded-3xl border-border/50 shadow-2xl bg-background/95 backdrop-blur-xl"
+      >
         <DropdownMenuLabel className="font-normal px-2 py-3">
           <div className="flex items-center gap-3">
             {user.avatar || cachedAvatar ? (
@@ -110,7 +117,7 @@ export function UserNav() {
           </DropdownMenuItem>
           <DropdownMenuItem
             className="cursor-pointer rounded-full py-2.5 px-3 focus:bg-primary/10 transition-colors focus:text-primary group mt-1"
-            onSelect={() => router.push("/settings")}
+            onSelect={() => router.push(`/${user.role}/settings`)}
           >
             <div className="bg-background/50 p-1.5 rounded-full mr-3 group-hover:bg-primary/20 transition-colors shadow-sm border border-border/50">
               <User className="h-4 w-4" />

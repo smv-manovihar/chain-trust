@@ -16,6 +16,8 @@ export interface User {
   website?: string;
   companyId?: string;
   companyPolicies?: Record<string, any>;
+  provider?: string;
+  providerId?: string | null;
 }
 
 export interface InviteEmployeeData {

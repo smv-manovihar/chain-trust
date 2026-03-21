@@ -8,13 +8,13 @@ import {
 	recallBatch,
 	getBatchPDF,
 } from '../controllers/batch.controller.js';
-import { authenticateJWT, checkRole } from '../middlewares/auth.middleware.js';
+import { authenticateJWT, authenticateJWTOptional, checkRole } from '../middlewares/auth.middleware.js';
 
 const router: Router = express.Router();
 const checkManufacturer = checkRole(['manufacturer', 'employee']);
 
 // Public endpoint - verify product scan (no auth required for consumers)
-router.post('/verify-scan', verifyScan);
+router.post('/verify-scan', authenticateJWTOptional, verifyScan);
 
 // Protected endpoints - manufacturer only
 router.post('/', authenticateJWT, checkManufacturer, createBatch);

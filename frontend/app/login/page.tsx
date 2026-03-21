@@ -162,7 +162,7 @@ export default function LoginPage() {
   return (
     <AuthLayout
       title="Secure Verification"
-      subtitle="Access your pharmaceutical verification dashboard and stay connected with the entire supply chain."
+      subtitle="Access your dashboard and stay connected with the entire supply chain."
     >
       <div className="flex flex-col space-y-2 text-center mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
@@ -205,7 +205,16 @@ export default function LoginPage() {
           href="/register"
           className="text-primary font-semibold hover:underline"
         >
-          Create one
+          Sign up
+        </Link>
+      </p>
+      <p className="text-center text-sm text-muted-foreground mt-2">
+        Manufacturer?{" "}
+        <Link
+          href="/register?role=manufacturer"
+          className="text-primary font-semibold hover:underline"
+        >
+          Apply here
         </Link>
       </p>
     </AuthLayout>

@@ -23,7 +23,6 @@ export interface IUser extends Document {
 
 	// Company association
 	companyId?: Types.ObjectId;
-	companyPolicies?: Record<string, any>;
 
 	// Email verification
 	isEmailVerified: boolean;
@@ -83,7 +82,6 @@ const userSchema = new Schema<IUser>(
 
 		// Company association
 		companyId: { type: Schema.Types.ObjectId, ref: 'Company' },
-		companyPolicies: { type: Map, of: Schema.Types.Mixed, default: {} },
 
 		// Email verification fields
 		isEmailVerified: { type: Boolean, default: false },
@@ -106,7 +104,10 @@ const userSchema = new Schema<IUser>(
 		// Force password change
 		mustChangePassword: { type: Boolean, default: false },
 	},
-	{ timestamps: true },
+	{
+		timestamps: true,
+		collection: 'users',
+	},
 );
 
 userSchema.index(
@@ -114,4 +115,4 @@ userSchema.index(
 	{ unique: true, sparse: true },
 );
 
-export default model<IUser>('User', userSchema, 'Users');
+export default model<IUser>('User', userSchema);

@@ -9,6 +9,9 @@ import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { UserNav } from "@/components/layout/user-nav";
 import { useSidebar } from "@/contexts/sidebar-context";
 
+import { usePathname } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+
 interface AppShellProps {
   children: React.ReactNode;
   sidebar: React.ReactNode;
@@ -23,6 +26,7 @@ export function AppShell({ children, sidebar, mobileSidebar }: AppShellProps) {
   const mainRef = useRef<HTMLDivElement>(null);
   const { isMobileOpen, setIsMobileOpen } = useSidebar();
   const headerVisible = useScrollDirection(mainRef);
+  const pathname = usePathname();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground selection:bg-primary/20 font-sans">
@@ -42,9 +46,9 @@ export function AppShell({ children, sidebar, mobileSidebar }: AppShellProps) {
         {/* Top Header — Modern, Clinical, and Sticky */}
         <header
           className={cn(
-            "flex h-14 lg:h-16 shrink-0 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-md lg:px-8 shadow-sm z-30 transition-transform duration-300 ease-in-out",
-            "sticky top-0 left-0 right-0 lg:relative",
-            !headerVisible && !isMobileOpen && "-translate-y-full lg:translate-y-0",
+             "flex h-14 lg:h-16 shrink-0 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-md lg:px-8 shadow-sm z-30 transition-transform duration-300 ease-in-out",
+             "sticky top-0 left-0 right-0 lg:relative",
+             !headerVisible && !isMobileOpen && "-translate-y-full lg:translate-y-0",
           )}
         >
           {/* Mobile Menu Balance Spacer */}
@@ -87,9 +91,24 @@ export function AppShell({ children, sidebar, mobileSidebar }: AppShellProps) {
             ref={mainRef}
             className="h-full w-full overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/20"
           >
-            <div className="mx-auto max-w-7xl w-full p-4 lg:p-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-              {children}
-            </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={pathname}
+                variants={{
+                  initial: { opacity: 0, y: 10 },
+                  animate: { opacity: 1, y: 0 },
+                }}
+                initial="initial"
+                animate="animate"
+                transition={{ 
+                  duration: 0.25, 
+                  ease: "easeInOut" 
+                }}
+                className="mx-auto max-w-7xl w-full p-4 lg:p-8"
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
           </div>
           
           {/* Optional background grid specific to the content area */}

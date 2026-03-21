@@ -5,6 +5,7 @@
    - While not strictly enforced, applications and dashboards should aim to fit within the viewport height (`100vh` or `h-screen`) whenever possible for a superior UX.
    - Use multi-column grids (e.g., `grid-cols-1 lg:grid-cols-3`) to utilize horizontal space instead of stacking content vertically.
    - Use `flex-1` and `min-h-0` on container columns, applying `overflow-y-auto` only locally where inner content absolutely must scroll (like a table body or chat view), avoiding global page scroll.
+   - **Padding Consistency**: All authenticated pages are wrapped in `AppShell`, which provides standard padding (`p-4 lg:p-8`). Pages should NOT add their own top-level padding to avoid double-spacing.
 2. **Component Density:**
    - Reduce excessive padding (`p-8` -> `p-4` or `p-6`) when combining multiple cards on a single screen.
    - Use compact text sizes (`text-sm`, `text-xs`) for metadata to keep interfaces tight without losing readability.
