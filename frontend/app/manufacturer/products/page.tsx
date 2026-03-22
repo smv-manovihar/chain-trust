@@ -124,7 +124,7 @@ export default function ProductsPage() {
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 px-1">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">
             Products
           </h1>
           <div className="flex items-center gap-3 mt-3">

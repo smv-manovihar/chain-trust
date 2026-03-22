@@ -331,11 +331,20 @@ class ToolStore:
         return serialized
 
     async def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Fetch user profile excluding password."""
-        user = await self.db["users"].find_one(
-            {"_id": PyObjectId(user_id)}, {"password": 0, "_id": 0}
-        )
-        return user
+        """Fetch user profile excluding password and sensitive fields."""
+        user = await self.db["users"].find_one({"_id": PyObjectId(user_id)})
+        if not user:
+            return None
+
+        # Standard serialization
+        profile = self._serialize_doc(user, keep_id=True)
+        if "password" in profile:
+            del profile["password"]
+
+        # Add helper flags for the agent
+        profile["isGoogleConnected"] = profile.get("provider") == "google"
+
+        return profile
 
     async def add_medicine_to_cabinet(
         self,
@@ -397,14 +406,14 @@ class ToolStore:
                     return await self.get_verification_data(salt)
                 return "Ready to verify. Please scan a QR code or enter a product salt."
 
-            return f"Synchronized with route: {route}. Situational context is active."
+            return f"No data available for route: {route} Use get_page_details tool to get static page details."
         except Exception as e:
             return f"Error gathering situational view data: {str(e)}"
 
     async def get_manufacturer_dashboard_data(self, user_id: str) -> str:
         """Aggregates metrics and recent activity for the manufacturer dashboard."""
         u_id = PyObjectId(user_id)
-        
+
         # Core Stats
         product_count = await self.db.products.count_documents({"createdBy": u_id})
         batch_count = await self.db.batches.count_documents({"createdBy": u_id})
@@ -413,16 +422,19 @@ class ToolStore:
         )
 
         # Scans Today Logic
-        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        batches = await self.db.batches.find({"createdBy": u_id}, {"_id": 1}).to_list(length=None)
+        today_start = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        batches = await self.db.batches.find({"createdBy": u_id}, {"_id": 1}).to_list(
+            length=None
+        )
         batch_ids = [b["_id"] for b in batches]
-        
+
         scans_today = 0
         if batch_ids:
-            scans_today = await self.db.scans.count_documents({
-                "batch": {"$in": batch_ids},
-                "createdAt": {"$gte": today_start}
-            })
+            scans_today = await self.db.scans.count_documents(
+                {"batch": {"$in": batch_ids}, "createdAt": {"$gte": today_start}}
+            )
 
         # Recent Notifications
         notifications_cursor = (
@@ -442,7 +454,11 @@ class ToolStore:
         if notifications:
             for n in notifications:
                 n_type = n.get("type", "alert").replace("_", " ").title()
-                timestamp = n.get("createdAt").strftime("%H:%M") if n.get("createdAt") else "N/A"
+                timestamp = (
+                    n.get("createdAt").strftime("%H:%M")
+                    if n.get("createdAt")
+                    else "N/A"
+                )
                 summary.append(
                     f"- **[{n_type}]** {n.get('title')}: {n.get('message')} ({timestamp})"
                 )
@@ -487,7 +503,7 @@ class ToolStore:
     async def get_manufacturer_batches_data(self, user_id: str) -> str:
         """Returns a digest of production batches with scan volume."""
         batches = await self.list_batches(user_id, limit=20)
-        
+
         summary = ["## Production Batches List"]
         if not batches:
             summary.append("- No batches enrolled yet.")
@@ -497,16 +513,20 @@ class ToolStore:
             for b in batches:
                 # Sum up scan counts from the scanCounts map
                 scan_counts = b.get("scanCounts", {})
-                total_scans = sum(scan_counts.values()) if isinstance(scan_counts, dict) else 0
+                total_scans = (
+                    sum(scan_counts.values()) if isinstance(scan_counts, dict) else 0
+                )
                 status = "Recalled" if b.get("isRecalled") else "Active"
-                summary.append(f"| {b['batchNumber']} | {b['productName']} | {total_scans} | {status} |")
-        
+                summary.append(
+                    f"| {b['batchNumber']} | {b['productName']} | {total_scans} | {status} |"
+                )
+
         return "\n".join(summary)
 
     async def get_manufacturer_products_data(self, user_id: str) -> str:
         """Returns a digest of the manufacturer's product catalog."""
         products = await self.list_products(user_id, limit=20)
-        
+
         summary = ["## Product Catalog Management"]
         if not products:
             summary.append("- No products registered in catalog.")
@@ -514,8 +534,10 @@ class ToolStore:
             summary.append("| Product Name | Brand | Batches | Categories |")
             summary.append("| :--- | :--- | :--- | :--- |")
             for p in products:
-                summary.append(f"| {p['name']} | {p['brand']} | {p.get('batchCount', 0)} | {p.get('categories', 'N/A')} |")
-        
+                summary.append(
+                    f"| {p['name']} | {p['brand']} | {p.get('batchCount', 0)} | {p.get('categories', 'N/A')} |"
+                )
+
         return "\n".join(summary)
 
     async def get_verification_data(self, salt: str) -> str:
@@ -523,14 +545,20 @@ class ToolStore:
         # Handle internal salt (batchSalt:unitIndex)
         batch_salt = salt.split(":")[0] if ":" in salt else salt
         unit_idx = salt.split(":")[1] if ":" in salt else "0"
-        
+
         batch = await self.db.batches.find_one({"batchSalt": batch_salt})
         if not batch:
-            return f"Verification Failed: No record found for salt `{salt}` on ChainTrust."
+            return (
+                f"Verification Failed: No record found for salt `{salt}` on ChainTrust."
+            )
 
         scan_count = batch.get("scanCounts", {}).get(unit_idx, 0)
-        status = "RECALLED" if batch.get("isRecalled") else ("SUSPICIOUS" if scan_count > 5 else "AUTHENTIC")
-        
+        status = (
+            "RECALLED"
+            if batch.get("isRecalled")
+            else ("SUSPICIOUS" if scan_count > 5 else "AUTHENTIC")
+        )
+
         summary = [
             f"## Verification Result: {status}",
             f"- **Product:** {batch['productName']}",
@@ -539,9 +567,14 @@ class ToolStore:
             f"- **Unit Index:** {unit_idx}",
             f"- **Scan Count for this Unit:** {scan_count}",
             f"- **Blockchain Hash:** `{batch.get('blockchainHash', 'Verified')[:16]}...`",
-            "\n**Verdict:** " + ("This product has been flagged due to high scan counts or recall." if scan_count > 5 or batch.get("isRecalled") else "This product matches the secure blockchain record.")
+            "\n**Verdict:** "
+            + (
+                "This product has been flagged due to high scan counts or recall."
+                if scan_count > 5 or batch.get("isRecalled")
+                else "This product matches the secure blockchain record."
+            ),
         ]
-        
+
         return "\n".join(summary)
 
     async def get_batch_summary_by_id_or_number(self, identifier: str) -> str:
@@ -586,7 +619,9 @@ class ToolStore:
         product = await self.db.products.find_one({"productId": identifier})
         if not product:
             try:
-                product = await self.db.products.find_one({"_id": PyObjectId(identifier)})
+                product = await self.db.products.find_one(
+                    {"_id": PyObjectId(identifier)}
+                )
             except Exception:
                 pass
 
@@ -594,8 +629,10 @@ class ToolStore:
             return f"Synchronized with product route, but identifier '{identifier}' was not found."
 
         # Enrich with batch count
-        batch_count = await self.db.batches.count_documents({"productId": product["productId"]})
-        
+        batch_count = await self.db.batches.count_documents(
+            {"productId": product["productId"]}
+        )
+
         summary = [
             f"## Product Information: {product['name']}",
             f"- **Brand:** {product['brand']}",
@@ -607,6 +644,7 @@ class ToolStore:
         ]
 
         return "\n".join(summary)
+
 
 
 tool_store = ToolStore()

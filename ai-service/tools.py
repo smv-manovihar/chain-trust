@@ -440,10 +440,25 @@ class Tools:
             return "User profile not found."
 
         details = [
-            f"**Name:** {user.get('name')}",
-            f"**Email:** {user.get('email')}",
-            f"**Role:** {user.get('role').capitalize()}",
+            f"**Name:** {user.get('name', 'N/A')}",
+            f"**Email:** {user.get('email', 'N/A')} (Verified: {user.get('isEmailVerified', False)})",
+            f"**Role:** {user.get('role', 'N/A').capitalize()}",
+            f"**Google Connected:** {'Yes' if user.get('isGoogleConnected') else 'No'}",
         ]
+
+        if self.role == "manufacturer":
+            details.extend([
+                f"**Company Name:** {user.get('companyName', 'N/A')}",
+                f"**Business Website:** {user.get('website', 'N/A')}",
+                f"**Phone:** {user.get('phoneNumber', 'Not provided')}",
+            ])
+        else:
+            details.extend([
+                f"**Phone:** {user.get('phoneNumber', 'Not provided')}",
+                f"**Location:** {user.get('city', 'N/A')}, {user.get('country', 'N/A')}",
+                f"**Address:** {user.get('address', 'N/A')} ({user.get('postalCode', 'N/A')})",
+            ])
+
         return "### User Profile Details ###\n" + "\n".join(details)
 
     async def get_page_details(self) -> str:
@@ -457,6 +472,8 @@ class Tools:
             "/manufacturer/batches/new": "manufacturer-batches-new.md",
             "/manufacturer/products": "manufacturer-products.md",
             "/manufacturer/products/new": "manufacturer-products-new.md",
+            "/customer/settings": "customer-settings.md",
+            "/manufacturer/settings": "manufacturer-settings.md",
             "/verify": "verify.md",
         }
         filename = route_map.get(route)

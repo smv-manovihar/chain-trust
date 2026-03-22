@@ -214,7 +214,7 @@ export default function BatchesPage() {
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Batches</h1>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Batches</h1>
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <Badge variant="secondary" className="font-normal border-primary/20 bg-primary/10 text-primary">
               <Boxes className="w-3 h-3 mr-1.5 inline-block" />
@@ -247,7 +247,7 @@ export default function BatchesPage() {
       </div>
 
       <div className="flex gap-4 px-1 sticky top-4 z-30">
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search batches or products..."

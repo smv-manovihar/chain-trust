@@ -4,6 +4,9 @@ import { hash, compare } from 'bcrypt';
 import User, { IUser } from '../models/user.model.js';
 import Company from '../models/company.model.js';
 import RefreshToken from '../models/refreshToken.model.js';
+import CabinetItem from '../models/cabinet.model.js';
+import Product from '../models/product.model.js';
+import Batch from '../models/batch.model.js';
 import {
 	FRONTEND_URL,
 	JWT_SECRET,
@@ -987,26 +990,64 @@ export const deleteAccount = async (req: Request, res: Response): Promise<void> 
 	const userId = (req as any).user.id;
 
 	try {
-		const user = await User.findById(userId);
-		if (!user) {
+		const currentUser = await User.findById(userId);
+		if (!currentUser) {
 			res.status(404).json({ message: 'User not found' });
 			return;
 		}
 
-		// If user is a manufacturer, we might need to handle their company
-		// For now, we'll just remove the user. If they are the company admin, 
-		// the company might become orphaned, but that's a policy decision.
-		
-		await User.findByIdAndDelete(userId);
+		// Check if user is a company admin
+		const company = await Company.findOne({ adminId: userId });
 
-		// Clear cookies
-		res.clearCookie('accessToken');
-		res.clearCookie('refreshToken');
+		if (company) {
+			// CASCADE DELETE: ADMIN is deleting. Wipe the entire company.
+			
+			// 1. Find all users associated with this company
+			const companyUsers = await User.find({ companyId: company._id });
+			const userIds = companyUsers.map(u => u._id);
 
-		res.json({ message: 'Account deleted successfully' });
+			// 2. Delete all related data for all company users
+			await Promise.all([
+				CabinetItem.deleteMany({ userId: { $in: userIds } }),
+				RefreshToken.deleteMany({ userId: { $in: userIds } }),
+				Product.deleteMany({ createdBy: { $in: userIds } }),
+				Batch.deleteMany({ createdBy: { $in: userIds } })
+			]);
+
+			// 3. Delete all company users
+			await User.deleteMany({ companyId: company._id });
+
+			// 4. Delete the company itself
+			await Company.findByIdAndDelete(company._id);
+		} else {
+			// INDIVIDUAL DELETE: Standard customer or non-admin employee
+			
+			// 1. Delete associated data
+			await Promise.all([
+				CabinetItem.deleteMany({ userId }),
+				RefreshToken.deleteMany({ userId }),
+				// If they happen to have products/batches (e.g. employee), delete those too
+				Product.deleteMany({ createdBy: userId }),
+				Batch.deleteMany({ createdBy: userId })
+			]);
+
+			// 2. Delete the user
+			await User.findByIdAndDelete(userId);
+		}
+
+		// Clear cookies for the requester
+		const cookieOptions = {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			sameSite: (process.env.NODE_ENV === 'production' ? 'strict' : 'lax') as 'strict' | 'lax',
+		};
+		res.clearCookie('accessToken', cookieOptions);
+		res.clearCookie('refreshToken', cookieOptions);
+
+		res.json({ message: 'Account and associated data deleted successfully' });
 	} catch (error) {
 		console.error('Delete account error:', error);
-		res.status(500).json({ message: 'Server error' });
+		res.status(500).json({ message: 'Server error during account deletion' });
 	}
 };
 
