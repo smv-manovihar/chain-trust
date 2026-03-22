@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,18 +52,25 @@ export default function AnalyticsPage() {
     totalScans: 0,
     securityIncidents: 0,
   });
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const fetchAnalytics = async () => {
+      if (fetchAbortRef.current) fetchAbortRef.current.abort();
+      const controller = new AbortController();
+      fetchAbortRef.current = controller;
+
       setIsLoading(true);
       try {
         const [productsRes, batchesRes, historyRes, notificationsRes] =
           await Promise.all([
-            listProducts(),
-            listBatches(),
-            getScanHistory(timeRange),
-            getNotifications(50), // Get more for the feed
+            listProducts({}, controller.signal),
+            listBatches({}, controller.signal),
+            getScanHistory(timeRange, controller.signal),
+            getNotifications(50, 0, controller.signal),
           ]);
+        
+        if (controller.signal.aborted) return;
 
         const products = productsRes.products || [];
         const batches = batchesRes.batches || [];
@@ -105,15 +112,19 @@ export default function AnalyticsPage() {
         setScanHistory(history);
         setTopBatches(sortedBatches);
         setSecurityAlerts(notifications.filter((n: any) => n.type === "alert"));
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === 'AbortError') return;
         console.error("Failed to fetch analytics:", error);
         toast.error("Could not load intelligence data.");
       } finally {
-        setIsLoading(false);
+        if (fetchAbortRef.current === controller) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchAnalytics();
+    return () => fetchAbortRef.current?.abort();
   }, [timeRange]);
 
   if (isLoading && scanHistory.length === 0) {

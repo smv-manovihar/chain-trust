@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -88,6 +88,7 @@ function VerifyContent() {
   const { user, isAuthenticated } = useAuth();
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [userInteracted, setUserInteracted] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const { isMobileDevice, hasCameraAPI } = useDevice();
 
@@ -118,11 +119,16 @@ function VerifyContent() {
     if (!userInteracted) {
       setScanView(defaultView);
     }
+    return () => abortControllerRef.current?.abort();
   }, [isMobileDevice, searchParams, defaultView, userInteracted]);
 
   const handleScan = async (overrideSalt?: string) => {
     const saltToVerify = overrideSalt || qrInput;
     if (!saltToVerify) return;
+
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setLoading(true);
     setError("");
@@ -136,7 +142,7 @@ function VerifyContent() {
         : "0";
       const unitIndex = parseInt(unitIndexStr, 10);
 
-      const blockchainResult = await verifyOnBlockchain(batchSalt);
+      const blockchainResult = await verifyOnBlockchain(batchSalt, controller.signal);
       if (!blockchainResult.isValid || !blockchainResult.record) {
         throw new Error(
           blockchainResult.warnings?.[0] ||
@@ -167,7 +173,7 @@ function VerifyContent() {
 
       try {
         const visitorId = getVisitorId();
-        const result: ScanResult = await verifyScan(saltToVerify, visitorId);
+        const result: ScanResult = await verifyScan(saltToVerify, visitorId, undefined, undefined, controller.signal);
         if (result.isValid && result.product) {
           finalProduct = { ...finalProduct, ...result.product };
           finalStats = {
@@ -179,7 +185,8 @@ function VerifyContent() {
         } else if (result.isRecalled) {
           throw new Error("RECALLED: This batch has been flagged as unsafe.");
         }
-      } catch {
+      } catch (err: any) {
+        if (err.name === 'AbortError') throw err;
         console.warn("DB Metadata unavailable, using blockchain data.");
       }
 
@@ -192,11 +199,14 @@ function VerifyContent() {
         router.replace("/verify", { scroll: false });
       }
     } catch (err: any) {
+      if (err.name === 'AbortError') return;
       setError(err.message || "Verification failed.");
       toast.error(err.message || "Verification failed");
       setScanned(false);
     } finally {
-      setLoading(false);
+      if (abortControllerRef.current === controller) {
+        setLoading(false);
+      }
     }
   };
 

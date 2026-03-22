@@ -11,53 +11,56 @@ export interface CreateBatchDto {
 	blockchainHash: string;
 }
 
-export const createBatch = async (data: CreateBatchDto) => {
-	const response = await client.post('/batches', data);
+export const createBatch = async (data: CreateBatchDto, signal?: AbortSignal) => {
+	const response = await client.post('/batches', data, { signal });
 	return response.data;
 };
 
-export const listBatches = async (params?: { search?: string; categories?: string | string[] }) => {
-	const response = await client.get('/batches', { params });
+export const listBatches = async (params?: { search?: string; categories?: string | string[] }, signal?: AbortSignal) => {
+	const response = await client.get('/batches', { params, signal });
 	return response.data;
 };
 
-export const getBatch = async (id: string) => {
-	const response = await client.get(`/batches/${id}`);
+export const getBatch = async (id: string, signal?: AbortSignal) => {
+	const response = await client.get(`/batches/${id}`, { signal });
 	return response.data;
 };
 
-export const getBatchQRData = async (id: string, page = 1, limit = 50) => {
+export const getBatchQRData = async (id: string, page = 1, limit = 50, signal?: AbortSignal) => {
 	const response = await client.get(`/batches/${id}/qr-data`, {
-		params: { page, limit }
+		params: { page, limit },
+		signal
 	});
 	return response.data;
 };
 
-export const verifyScan = async (salt: string, visitorId: string, lat?: number, lng?: number) => {
-	const response = await client.post('/batches/verify-scan', { salt, visitorId, lat, lng });
+export const verifyScan = async (salt: string, visitorId: string, lat?: number, lng?: number, signal?: AbortSignal) => {
+	const response = await client.post('/batches/verify-scan', { salt, visitorId, lat, lng }, { signal });
 	return response.data;
 };
 
-export const recallBatch = async (id: string) => {
-	const response = await client.post(`/batches/${id}/recall`);
+export const recallBatch = async (id: string, signal?: AbortSignal) => {
+	const response = await client.post(`/batches/${id}/recall`, null, { signal });
 	return response.data;
 };
 
-export const downloadBatchPDF = async (id: string) => {
+export const downloadBatchPDF = async (id: string, signal?: AbortSignal) => {
 	const response = await client.get(`/batches/${id}/pdf`, {
-		responseType: 'blob'
+		responseType: 'blob',
+		signal
 	});
 	return response.data;
 };
 
-export const getScanHistory = async (days = 30) => {
+export const getScanHistory = async (days = 30, signal?: AbortSignal) => {
 	const response = await client.get('/batches/scan-history', {
-		params: { days }
+		params: { days },
+		signal
 	});
 	return response.data;
 };
 
-export const getBatchScanDetails = async (id: string) => {
-	const response = await client.get(`/batches/${id}/scan-details`);
+export const getBatchScanDetails = async (id: string, signal?: AbortSignal) => {
+	const response = await client.get(`/batches/${id}/scan-details`, { signal });
 	return response.data;
 };

@@ -21,7 +21,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   error: string | null;
-  refreshUser: () => Promise<void>;
+  refreshUser: (signal?: AbortSignal) => Promise<void>;
   login: (email: string, password: string) => Promise<string>;
   register: (userData: {
     email: string;
@@ -75,10 +75,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const refreshUser = async () => {
+  const refreshAbortRef = React.useRef<AbortController | null>(null);
+
+  const refreshUser = async (signal?: AbortSignal) => {
+    if (refreshAbortRef.current) refreshAbortRef.current.abort();
+    const controller = new AbortController();
+    refreshAbortRef.current = controller;
+
     setIsLoading(true);
     try {
-      const data = await getCurrentUser();
+      const data = await getCurrentUser(signal || controller.signal);
       if (data) {
         setUser(data.user);
         if (data.accessToken) {
@@ -100,11 +106,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         tokenStore.clearToken();
       }
       setError(null);
-    } catch {
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
       setUser(null);
       tokenStore.clearToken();
     } finally {
-      setIsLoading(false);
+      if (refreshAbortRef.current === controller) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -195,6 +204,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     refreshUser();
+    return () => refreshAbortRef.current?.abort();
   }, []);
 
   const value: AuthContextType = {

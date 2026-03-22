@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -39,19 +39,24 @@ export default function ManufacturerDashboard() {
   const [recentNotifications, setRecentNotifications] = useState<
     Notification[]
   >([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       setIsLoading(true);
       try {
         const todayStr = format(new Date(), "yyyy-MM-dd");
 
         const [productsRes, batchesRes, historyRes, notificationsRes] =
           await Promise.all([
-            listProducts(),
-            listBatches(),
-            getScanHistory(7),
-            getNotifications(5),
+            listProducts({}, controller.signal),
+            listBatches({}, controller.signal),
+            getScanHistory(7, controller.signal),
+            getNotifications(5, 0, controller.signal),
           ]);
 
         const products = productsRes.products || [];
@@ -70,15 +75,19 @@ export default function ManufacturerDashboard() {
           unreadNotifications: unreadCount,
         });
         setRecentNotifications(notifications);
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === 'AbortError') return;
         console.error("Failed to fetch dashboard data:", error);
         toast.error("Could not load dashboard metrics.");
       } finally {
-        setIsLoading(false);
+        if (abortControllerRef.current === controller) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchDashboardData();
+    return () => abortControllerRef.current?.abort();
   }, []);
 
   if (isLoading) {

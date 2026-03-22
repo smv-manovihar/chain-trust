@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   Bell,
   Check,
@@ -34,24 +34,35 @@ export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   const fetchNotifications = useCallback(async (isInitial = false) => {
+    if (fetchAbortRef.current) fetchAbortRef.current.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+
     if (isInitial) setIsLoading(true);
     try {
-      const data = await getNotifications(20);
+      const data = await getNotifications(20, 0, controller.signal);
       setNotifications(data.notifications || []);
       setUnreadCount(data.unreadCount || 0);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === "AbortError") return;
       console.error("Failed to fetch notifications:", error);
     } finally {
-      setIsLoading(false);
+      if (fetchAbortRef.current === controller) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     fetchNotifications(true);
     const interval = setInterval(() => fetchNotifications(), 30000); // 30s polling
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      fetchAbortRef.current?.abort();
+    }
   }, [fetchNotifications]);
 
   const handleMarkAllRead = async () => {

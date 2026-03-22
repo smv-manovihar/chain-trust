@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getBatch, getBatchQRData, downloadBatchPDF } from "@/api/batch.api";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ export default function BatchDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   const handleDownloadPDF = async () => {
     if (!batch) return;
@@ -112,22 +113,30 @@ export default function BatchDetailPage() {
     if (!batchId) return;
 
     const loadData = async () => {
+      if (fetchAbortRef.current) fetchAbortRef.current.abort();
+      const controller = new AbortController();
+      fetchAbortRef.current = controller;
+
       setLoading(true);
       try {
         const [batchRes, qrRes] = await Promise.all([
-          getBatch(batchId),
-          getBatchQRData(batchId, page, pageSize),
+          getBatch(batchId, controller.signal),
+          getBatchQRData(batchId, page, pageSize, controller.signal),
         ]);
         setBatch(batchRes.batch);
         setQrData(qrRes);
-      } catch (err) {
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
         console.error("Failed to load batch:", err);
       } finally {
-        setLoading(false);
+        if (fetchAbortRef.current === controller) {
+          setLoading(false);
+        }
       }
     };
 
     loadData();
+    return () => fetchAbortRef.current?.abort();
   }, [batchId, page, pageSize]);
 
   // Just standard client-side printing

@@ -18,7 +18,7 @@ interface RefreshResponse {
 // Flag to prevent multiple simultaneous refresh attempts
 let isRefreshing = false;
 let failedQueue: Array<{
-  resolve: (value?: unknown) => void;
+  resolve: (value?: any) => void;
   reject: (reason?: any) => void;
 }> = [];
 
@@ -33,6 +33,37 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
+// Centralized refresh function to prevent multiple simultaneous calls
+export const refreshToken = async (): Promise<string | null> => {
+  if (isRefreshing) {
+    return new Promise((resolve, reject) => {
+      failedQueue.push({ resolve, reject });
+    });
+  }
+
+  isRefreshing = true;
+  try {
+    const response = await axios.post<RefreshResponse>(
+      `${API_BASE_URL}/auth/refresh`,
+      {},
+      { withCredentials: true }
+    );
+    const newToken = response.data.accessToken;
+
+    if (newToken) {
+      tokenStore.setToken(newToken);
+    }
+
+    isRefreshing = false;
+    processQueue(null, newToken);
+    return newToken;
+  } catch (error) {
+    isRefreshing = false;
+    processQueue(error, null);
+    throw error;
+  }
+};
+
 client.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -41,40 +72,20 @@ client.interceptors.response.use(
     // If 401 and we haven't already retried
     if (error.response?.status === 401 && !originalRequest._retry) {
       // Don't intercept if the refresh itself failed
-      if (originalRequest.url === '/auth/refresh') {
+      if (originalRequest.url === '/auth/refresh' || originalRequest.url?.includes('/auth/refresh')) {
         return Promise.reject(error);
       }
 
-      if (isRefreshing) {
-        // Queue this request, wait for refresh to finish, then retry
-        return new Promise(function(resolve, reject) {
-          failedQueue.push({ resolve, reject });
-        }).then(() => {
-          return client(originalRequest);
-        }).catch((err) => {
-          return Promise.reject(err);
-        });
-      }
-
       originalRequest._retry = true;
-      isRefreshing = true;
 
       try {
-        const response = await client.post<RefreshResponse>('/auth/refresh');
-        const newToken = response.data.accessToken;
+        const newToken = await refreshToken();
         
-        if (newToken) {
-          tokenStore.setToken(newToken);
-        }
-
-        isRefreshing = false;
-        processQueue(null);
-        // Retry the original request
+        // If we are using standard axios headers for token, update them here
+        // But here we rely on cookies mostly, or tokenStore for other clients.
+        
         return client(originalRequest);
       } catch (refreshError) {
-        isRefreshing = false;
-        processQueue(refreshError);
-        // Refresh failed, user needs to relogin
         return Promise.reject(refreshError);
       }
     }

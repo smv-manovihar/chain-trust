@@ -4,10 +4,10 @@ from contextlib import asynccontextmanager
 import jwt
 import motor.motor_asyncio
 import uvicorn
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+# No longer using HTTPBearer as primary auth
 from models import ChatRequest, EditChatRequest
 from sse import sse_manager
 from config import get_settings
@@ -33,13 +33,19 @@ async def lifespan(app: FastAPI):
     db_client.close()
 
 
-security = HTTPBearer()
+async def get_current_user_payload(request: Request):
+    # Read token from cookies
+    token = request.cookies.get("accessToken")
+    
+    if not token:
+        # Fallback to Authorization header if present (for backward compatibility/testing)
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
 
-
-async def get_current_user_payload(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-):
-    token = credentials.credentials
+    if not token:
+        raise HTTPException(status_code=401, detail="Access token missing")
+        
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
         if payload.get("id") is None:

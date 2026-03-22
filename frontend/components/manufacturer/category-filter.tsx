@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Filter, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -42,16 +42,29 @@ export function CategoryFilter({
 }: CategoryFilterProps) {
   const [categoriesData, setCategoriesData] = useState<Category[]>([]);
   const [open, setOpen] = useState(false);
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
-  const loadCategories = () => {
-    fetchCategories()
-      .then((res) => setCategoriesData(res.categories || []))
-      .catch((err) => console.error("Failed to load categories", err));
-  };
+  const loadCategories = useCallback(() => {
+    if (fetchAbortRef.current) fetchAbortRef.current.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+
+    fetchCategories(controller.signal)
+      .then((res) => {
+        if (fetchAbortRef.current === controller) {
+          setCategoriesData(res.categories || []);
+        }
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError') return;
+        console.error("Failed to load categories", err);
+      });
+  }, []);
 
   useEffect(() => {
     loadCategories();
-  }, []);
+    return () => fetchAbortRef.current?.abort();
+  }, [loadCategories]);
 
   const toggleCategory = (catName: string) => {
     const nextList = selectedCategories.includes(catName)

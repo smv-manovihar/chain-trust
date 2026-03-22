@@ -18,27 +18,27 @@ export interface ProductDto {
 	};
 }
 
-export const createProduct = async (data: ProductDto) => {
-	const response = await client.post('/products', data);
+export const createProduct = async (data: ProductDto, signal?: AbortSignal) => {
+	const response = await client.post('/products', data, { signal });
 	return response.data;
 };
 
-export const listProducts = async (params?: { search?: string; categories?: string | string[] }) => {
-	const response = await client.get('/products', { params });
+export const listProducts = async (params?: { search?: string; categories?: string | string[] }, signal?: AbortSignal) => {
+	const response = await client.get('/products', { params, signal });
 	return response.data;
 };
 
-export const getProduct = async (id: string) => {
-	const response = await client.get(`/products/${id}`);
+export const getProduct = async (id: string, signal?: AbortSignal) => {
+	const response = await client.get(`/products/${id}`, { signal });
 	return response.data;
 };
 
-export const updateProduct = async (id: string, data: Partial<ProductDto>) => {
-	const response = await client.put(`/products/${id}`, data);
+export const updateProduct = async (id: string, data: Partial<ProductDto>, signal?: AbortSignal) => {
+	const response = await client.put(`/products/${id}`, data, { signal });
 	return response.data;
 };
 
-export const deleteProduct = async (id: string) => {
-	const response = await client.delete(`/products/${id}`);
+export const deleteProduct = async (id: string, signal?: AbortSignal) => {
+	const response = await client.delete(`/products/${id}`, { signal });
 	return response.data;
 };

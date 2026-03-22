@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,25 +52,35 @@ export function CategoryManagementDialog({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
+  const fetchAbortRef = useRef<AbortController | null>(null);
+  const saveAbortRef = useRef<AbortController | null>(null);
 
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
+    if (fetchAbortRef.current) fetchAbortRef.current.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+
     setLoading(true);
     try {
-      const data = await fetchCategories();
+      const data = await fetchCategories(controller.signal);
       setCategories(data.categories);
       onCategoriesChange?.();
     } catch (err: any) {
+      if (err.name === 'AbortError') return;
       toast.error(err.message || "Failed to load categories");
     } finally {
-      setLoading(false);
+      if (fetchAbortRef.current === controller) {
+        setLoading(false);
+      }
     }
-  };
+  }, [onCategoriesChange]);
 
   useEffect(() => {
     if (open) {
       loadCategories();
     }
-  }, [open]);
+    return () => fetchAbortRef.current?.abort();
+  }, [open, loadCategories]);
 
   const openNewDialog = (e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -93,24 +103,31 @@ export function CategoryManagementDialog({
       return;
     }
 
+    if (saveAbortRef.current) saveAbortRef.current.abort();
+    const controller = new AbortController();
+    saveAbortRef.current = controller;
+
     setSaving(true);
     try {
       if (editingId) {
         await updateCategory(editingId, {
           name: formName,
           description: formDescription,
-        });
+        }, controller.signal);
         toast.success("Category updated");
       } else {
-        await createCategory({ name: formName, description: formDescription });
+        await createCategory({ name: formName, description: formDescription }, controller.signal);
         toast.success("Category created");
       }
       setFormDialogOpen(false);
       loadCategories();
     } catch (err: any) {
+      if (err.name === 'AbortError') return;
       toast.error(err.message || "Failed to save category");
     } finally {
-      setSaving(false);
+      if (saveAbortRef.current === controller) {
+        setSaving(false);
+      }
     }
   };
 

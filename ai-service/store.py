@@ -2,9 +2,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from bson import ObjectId
 from bson.errors import InvalidId
-
-# In a real app, import your DB getter. For this example, we will pass the DB instance directly.
-# from core.database.mongodb import get_database
+from utils.json_helpers import serialize_datetime
 
 
 class ChatStore:
@@ -20,10 +18,17 @@ class ChatStore:
             return None
         doc["id"] = str(doc["_id"])
         del doc["_id"]
-        if isinstance(doc.get("created_at"), datetime):
-            doc["created_at"] = doc["created_at"].isoformat()
-        if isinstance(doc.get("updated_at"), datetime):
-            doc["updated_at"] = doc["updated_at"].isoformat()
+
+        for key, value in doc.items():
+            if isinstance(value, datetime):
+                doc[key] = serialize_datetime(value)
+            elif isinstance(value, list):
+                # Handle nested lists (e.g., thoughts)
+                for item in value:
+                    if isinstance(item, dict):
+                        for k, v in item.items():
+                            if isinstance(v, datetime):
+                                item[k] = serialize_datetime(v)
         return doc
 
     async def create_session(self, user_id: str) -> str:

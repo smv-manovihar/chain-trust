@@ -17,19 +17,20 @@ export interface Notification {
 	updatedAt: string;
 }
 
-export const getNotifications = async (limit = 20, skip = 0) => {
+export const getNotifications = async (limit = 20, skip = 0, signal?: AbortSignal) => {
 	const response = await client.get('/notifications', {
-		params: { limit, skip }
+		params: { limit, skip },
+		signal
 	});
 	return response.data;
 };
 
-export const markAsRead = async (id: string) => {
-	const response = await client.put(`/notifications/${id}/read`);
+export const markAsRead = async (id: string, signal?: AbortSignal) => {
+	const response = await client.put(`/notifications/${id}/read`, null, { signal });
 	return response.data;
 };
 
-export const markAllAsRead = async () => {
-	const response = await client.put('/notifications/read-all');
+export const markAllAsRead = async (signal?: AbortSignal) => {
+	const response = await client.put('/notifications/read-all', null, { signal });
 	return response.data;
 };

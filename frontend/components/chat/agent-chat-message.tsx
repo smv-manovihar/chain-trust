@@ -76,14 +76,14 @@ const AgentChatMessageBase = ({
     >
       {message.role === "assistant" ? (
         <div className={cn(
-          "flex w-full gap-3 px-1 group/assistant",
-          !compact && "max-w-4xl px-2 gap-4"
+          "flex w-full gap-2 sm:gap-3 px-1 group/assistant",
+          !compact && "max-w-4xl px-1 sm:px-2 gap-3 sm:gap-4"
         )}>
           <div className={cn(
             "shrink-0 rounded-xl bg-card border text-primary flex items-center justify-center shadow-sm mt-1",
-            compact ? "w-6 h-6 rounded-lg" : "w-8 h-8"
+            compact ? "w-5 h-5 sm:w-6 sm:h-6 rounded-lg" : "w-7 h-7 sm:w-8 sm:h-8"
           )}>
-            <Sparkles className={compact ? "w-3 h-3" : "w-4 h-4"} />
+            <Sparkles className={compact ? "w-2.5 h-2.5 sm:w-3 sm:h-3" : "w-3.5 h-3.5 sm:w-4 sm:h-4"} />
           </div>
 
           <div className="flex flex-col flex-1 min-w-0 mt-0.5">
@@ -102,37 +102,37 @@ const AgentChatMessageBase = ({
             )}
             <div className={cn(
               "text-foreground/90 w-full animate-in fade-in duration-300 relative",
-              compact ? "text-xs py-1" : "text-sm py-2"
+              compact ? "text-[11px] sm:text-xs py-1" : "text-sm py-1.5 sm:py-2"
             )}>
               <div className="relative">
                 <MarkdownRenderer content={message.content || ""} />
                 {message.status === "generating" && message.content && (
-                  <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-primary/50 animate-pulse align-middle rounded-full" />
+                  <span className="inline-block w-1 h-3 ml-0.5 bg-primary/50 animate-pulse align-middle rounded-full" />
                 )}
               </div>
               {message.status === "generating" && !message.content && (
-                <div className="flex items-center gap-2 text-muted-foreground text-[10px] mt-1 animate-pulse">
+                <div className="flex items-center gap-1.5 text-muted-foreground text-[9px] sm:text-[10px] mt-1 animate-pulse">
                   <Loader2 className="w-2.5 h-2.5 animate-spin" />
                   <span>Thinking...</span>
                 </div>
               )}
             </div>
             {message.content && message.status !== 'generating' && !compact && (
-              <div className="flex items-center gap-1 opacity-0 group-hover/assistant:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1 sm:opacity-0 group-hover/assistant:opacity-100 transition-opacity">
                 <CopyButton
                   value={message.content}
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 text-muted-foreground"
+                  className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground"
                 />
                 {onRetry && (
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-primary"
+                    className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground hover:text-primary"
                     onClick={() => onRetry(message.id)}
                   >
-                    <RotateCcw className="w-3 h-3" />
+                    <RotateCcw className="w-3.5 h-3.5" />
                   </Button>
                 )}
               </div>
@@ -142,10 +142,10 @@ const AgentChatMessageBase = ({
       ) : (
         <div className={cn(
           "flex flex-col items-end group/message",
-          compact ? "max-w-[90%] min-w-[120px]" : "max-w-[85%] min-w-[200px]"
+          compact ? "max-w-[95%] min-w-[100px]" : "max-w-[90%] sm:max-w-[85%] min-w-[150px] sm:min-w-[200px]"
         )}>
           {isEditing ? (
-            <div className="w-full bg-card border border-border shadow-sm rounded-xl p-3 relative">
+            <div className="w-full bg-card border border-border shadow-sm rounded-xl p-2 sm:p-3 relative">
               <Textarea
                 ref={textareaRef}
                 value={editValue}
@@ -156,48 +156,48 @@ const AgentChatMessageBase = ({
                     handleSaveEdit();
                   }
                 }}
-                className="resize-none bg-muted/30 border-transparent focus:border-ring focus:bg-background p-2 pb-10 text-sm leading-relaxed rounded-lg min-h-[80px]"
+                className="resize-none bg-muted/30 border-transparent focus:border-ring focus:bg-background p-2 pb-10 text-[13px] sm:text-sm leading-relaxed rounded-lg min-h-[70px] sm:min-h-[80px]"
               />
-              <div className="absolute bottom-4 right-4 flex items-center gap-2">
+              <div className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 flex items-center gap-1.5 sm:gap-2">
                 <Button size="icon" variant="outline" onClick={handleCancelEdit} className="h-7 w-7">
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 </Button>
                 <Button size="icon" onClick={handleSaveEdit} className="h-7 w-7">
-                  <Check className="w-3.5 h-3.5" />
+                  <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 </Button>
               </div>
             </div>
           ) : (
             <div className="w-full flex flex-col items-end gap-1">
               <div className={cn(
-                "px-4 py-2 rounded-2xl bg-primary text-primary-foreground shadow-sm rounded-tr-none text-sm leading-relaxed whitespace-pre-wrap border border-primary/20",
-                compact && "px-3 py-1.5 text-xs"
+                "px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl bg-primary text-primary-foreground shadow-sm rounded-tr-none text-[13px] sm:text-sm leading-relaxed whitespace-pre-wrap border border-primary/20",
+                compact && "px-2.5 py-1 text-[11px] sm:text-xs"
               )}>
                 {message.content}
               </div>
               {!compact && (
-                <div className="flex items-center gap-1 opacity-0 group-hover/message:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 sm:opacity-0 group-hover/message:opacity-100 transition-opacity">
                   <CopyButton
                     value={message.content}
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-muted-foreground"
+                    className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground"
                   />
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-muted-foreground"
+                    className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground"
                     onClick={() => setIsEditing(true)}
                   >
-                    <Pencil className="w-3 h-3" />
+                    <Pencil className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground hover:text-destructive"
                     onClick={() => setShowDeleteDialog(true)}
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   </Button>
                 </div>
               )}

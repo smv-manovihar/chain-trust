@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,11 +38,17 @@ export default function ScanAnalysisPage() {
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [scanData, setScanData] = useState<any>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const batchesAbortRef = useRef<AbortController | null>(null);
+  const detailsAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const fetchBatches = async () => {
+      if (batchesAbortRef.current) batchesAbortRef.current.abort();
+      const controller = new AbortController();
+      batchesAbortRef.current = controller;
+
       try {
-        const res = await listBatches();
+        const res = await listBatches({}, controller.signal);
         const batchList = res.batches || [];
         setBatches(batchList);
         if (batchList.length > 0) {
@@ -50,32 +56,42 @@ export default function ScanAnalysisPage() {
         } else {
           setIsLoading(false);
         }
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === 'AbortError') return;
         console.error("Failed to fetch batches:", error);
         toast.error("Could not load batches.");
         setIsLoading(false);
       }
     };
     fetchBatches();
+    return () => batchesAbortRef.current?.abort();
   }, []);
 
   useEffect(() => {
     if (!selectedBatchId) return;
 
     const fetchDetails = async () => {
+      if (detailsAbortRef.current) detailsAbortRef.current.abort();
+      const controller = new AbortController();
+      detailsAbortRef.current = controller;
+
       setDetailsLoading(true);
       try {
-        const res = await getBatchScanDetails(selectedBatchId);
+        const res = await getBatchScanDetails(selectedBatchId, controller.signal);
         setScanData(res);
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === 'AbortError') return;
         console.error("Failed to fetch batch details:", error);
         toast.error("Could not load scan details for this batch.");
       } finally {
-        setDetailsLoading(false);
-        setIsLoading(false);
+        if (detailsAbortRef.current === controller) {
+          setDetailsLoading(false);
+          setIsLoading(false);
+        }
       }
     };
     fetchDetails();
+    return () => detailsAbortRef.current?.abort();
   }, [selectedBatchId]);
 
   if (isLoading) {

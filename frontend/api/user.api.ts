@@ -10,12 +10,12 @@ export interface UserProfileUpdate {
   avatar?: string;
 }
 
-export const updateProfile = async (data: UserProfileUpdate) => {
-  const response = await client.put("/users/profile", data);
+export const updateProfile = async (data: UserProfileUpdate, signal?: AbortSignal) => {
+  const response = await client.put("/users/profile", data, { signal });
   return response.data;
 };
 
-export const changePassword = async (data: { currentPassword?: string; newPassword: string }) => {
-  const response = await client.post("/users/change-password", data);
+export const changePassword = async (data: { currentPassword?: string; newPassword: string }, signal?: AbortSignal) => {
+  const response = await client.post("/users/change-password", data, { signal });
   return response.data;
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,20 +33,30 @@ export default function MyMedicinesPage() {
   const [medications, setMedications] = useState<CabinetItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const fetchAbortRef = useRef<AbortController | null>(null);
+
   const fetchCabinet = async () => {
+    if (fetchAbortRef.current) fetchAbortRef.current.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+
     setIsLoading(true);
     try {
-      const data = await getCabinet();
+      const data = await getCabinet(controller.signal);
       setMedications(data);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === "AbortError") return;
       console.error("Failed to fetch cabinet:", error);
     } finally {
-      setIsLoading(false);
+      if (fetchAbortRef.current === controller) {
+        setIsLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     fetchCabinet();
+    return () => fetchAbortRef.current?.abort();
   }, []);
 
   const handleDelete = async (id: string, name: string) => {

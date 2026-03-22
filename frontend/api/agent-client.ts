@@ -1,7 +1,5 @@
 import axios from 'axios';
-import client from './client';
-
-import { tokenStore } from '@/lib/token-store';
+import { refreshToken } from './client';
 
 const AGENT_API_BASE_URL = process.env.NEXT_PUBLIC_AGENT_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -12,18 +10,6 @@ const agentClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
-
-// Interceptor to add the Authorization header
-agentClient.interceptors.request.use(
-  (config) => {
-    const token = tokenStore.getToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
 
 // Response interceptor for token refresh
 agentClient.interceptors.response.use(
@@ -36,15 +22,11 @@ agentClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        // Trigger a refresh call on the main client. 
-        // Our client.ts interceptor will handle queuing and updating tokenStore.
-        await client.post('/auth/refresh');
+        // Trigger a refresh call using the centralized logic.
+        // This will update the cookies on the backend.
+        await refreshToken();
         
-        // Pick up the new token from the shared store
-        const newToken = tokenStore.getToken();
-        if (newToken) {
-          originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        }
+        // Retry the original request (it will now have the updated cookie)
         
         return agentClient(originalRequest);
       } catch (refreshError) {

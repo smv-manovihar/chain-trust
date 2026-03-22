@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -52,6 +52,7 @@ export default function ProductDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   // Form state
   const [formName, setFormName] = useState("");
@@ -64,9 +65,13 @@ export default function ProductDetailsPage() {
 
   useEffect(() => {
     const fetchProduct = async () => {
+      if (fetchAbortRef.current) fetchAbortRef.current.abort();
+      const controller = new AbortController();
+      fetchAbortRef.current = controller;
+
       try {
         setLoading(true);
-        const res = await getProduct(id);
+        const res = await getProduct(id, controller.signal);
         const p = res.product;
         setProduct(p);
         setFormName(p.name);
@@ -77,13 +82,17 @@ export default function ProductDetailsPage() {
         setFormDescription(p.description || "");
         setFormImages(p.images || []);
       } catch (err: any) {
+        if (err.name === 'AbortError') return;
         toast.error("Failed to load product details.");
         router.push("/manufacturer/products");
       } finally {
-        setLoading(false);
+        if (fetchAbortRef.current === controller) {
+          setLoading(false);
+        }
       }
     };
     fetchProduct();
+    return () => fetchAbortRef.current?.abort();
   }, [id, router]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

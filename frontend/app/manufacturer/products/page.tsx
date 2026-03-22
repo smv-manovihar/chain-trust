@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,25 +40,33 @@ export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoriesCount, setCategoriesCount] = useState(0);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   const debouncedSearch = useDebounce(searchQuery, 500);
   const debouncedCategories = useDebounce(selectedCategories, 500);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
+    if (fetchAbortRef.current) fetchAbortRef.current.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+
     try {
       setLoading(true);
       const res = await listProducts({
         search: debouncedSearch,
         categories: debouncedCategories,
-      });
+      }, controller.signal);
       setProducts(res.products || []);
     } catch (err: any) {
+      if (err.name === 'AbortError') return;
       console.error("Failed to load products:", err);
       toast.error("Catalogue sync failed.");
     } finally {
-      setLoading(false);
+      if (fetchAbortRef.current === controller) {
+        setLoading(false);
+      }
     }
-  };
+  }, [debouncedSearch, debouncedCategories]);
 
   // Function to update categoriesCount, typically called after category management
   const updateCategoriesCount = (count: number) => {
@@ -67,7 +75,8 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchProducts();
-  }, [debouncedSearch, debouncedCategories]);
+    return () => fetchAbortRef.current?.abort();
+  }, [fetchProducts]);
 
   // The toggleCategory function is no longer needed as setSelectedCategories is passed directly to CategoryFilter
   // const toggleCategory = (catName: string) => {

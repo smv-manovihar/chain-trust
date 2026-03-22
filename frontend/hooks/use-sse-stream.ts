@@ -213,13 +213,11 @@ export function useSSEStream({
 
     try {
       const url = getUrlRef.current();
-      const token = tokenStore.getToken();
-      
       const response = await fetch(url, {
         signal: controller.signal,
+        credentials: "include", // Ensure cookies are sent
         headers: { 
           Accept: "text/event-stream",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
       
@@ -228,14 +226,13 @@ export function useSSEStream({
         try {
           // Trigger refresh through main client (handles queuing)
           await client.post('/auth/refresh');
-          const newToken = tokenStore.getToken();
           
-          // Retry the fetch with new token
+          // Retry the fetch (browser will now have the updated cookie)
           const retryResponse = await fetch(url, {
             signal: controller.signal,
+            credentials: "include",
             headers: { 
               Accept: "text/event-stream",
-              ...(newToken ? { Authorization: `Bearer ${newToken}` } : {}),
             },
           });
           

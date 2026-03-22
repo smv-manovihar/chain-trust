@@ -44,6 +44,8 @@ export const useAgentSession = ({
   const sessionRef = useRef<AgentSession | null>(null);
   const onChatEventRef = useRef(onChatEvent);
 
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const fetchSession = useCallback(async () => {
     if (!sessionId || sessionId === "undefined") {
       setIsNotFound(true);
@@ -51,10 +53,17 @@ export const useAgentSession = ({
       return;
     }
 
+    // Cancel any ongoing fetch
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       if (!sessionRef.current) setIsLoading(true);
 
-      const sessions = await agentApi.listSessions();
+      const sessions = await agentApi.listSessions(controller.signal);
       const currentSession = sessions.find(s => s.id === sessionId);
       
       if (!currentSession) {
@@ -66,15 +75,28 @@ export const useAgentSession = ({
       setError(null);
       setIsNotFound(false);
     } catch (err: any) {
+      if (err.name === 'AbortError') return;
+      
       if (err.status === 404) {
         setIsNotFound(true);
       } else if (!sessionRef.current) {
         setError(err as Error);
       }
     } finally {
-      setIsLoading(false);
+      if (abortControllerRef.current === controller) {
+        setIsLoading(false);
+      }
     }
   }, [sessionId]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const handleSSEEvent = useCallback((sseEvent: SSEEvent) => {
     const { event, data } = sseEvent;

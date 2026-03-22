@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Copy,
   QrCode,
@@ -111,32 +111,41 @@ export default function BatchesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   const debouncedSearch = useDebounce(searchTerm, 500);
   const debouncedCategories = useDebounce(selectedCategories, 500);
   const { address: walletAddress, connect: connectWallet } = useWeb3();
 
-  const fetchBatches = async () => {
+  const fetchBatches = useCallback(async () => {
+    if (fetchAbortRef.current) fetchAbortRef.current.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+
     try {
       setIsRefreshing(true);
       setError("");
       const res = await listBatches({
         search: debouncedSearch,
         categories: debouncedCategories,
-      });
+      }, controller.signal);
       setBatches(res.batches || []);
     } catch (err: any) {
+      if (err.name === 'AbortError') return;
       console.error("Failed to fetch batches:", err);
       toast.error("Failed to load batches.");
     } finally {
-      setLoading(false);
-      setIsRefreshing(false);
+      if (fetchAbortRef.current === controller) {
+        setLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  };
+  }, [debouncedSearch, debouncedCategories]);
 
   useEffect(() => {
     fetchBatches();
-  }, [debouncedSearch, debouncedCategories]);
+    return () => fetchAbortRef.current?.abort();
+  }, [fetchBatches]);
 
   const handleCopyHash = (hash: string) => {
     navigator.clipboard.writeText(hash);

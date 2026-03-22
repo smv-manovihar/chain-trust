@@ -1,6 +1,6 @@
 import client from './client';
 
-export const uploadImages = async (files: File[]): Promise<string[]> => {
+export const uploadImages = async (files: File[], signal?: AbortSignal): Promise<string[]> => {
   if (files.length === 0) return [];
 
   const formData = new FormData();
@@ -8,6 +8,7 @@ export const uploadImages = async (files: File[]): Promise<string[]> => {
 
   const response = await client.post('/media', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    signal
   });
 
   return response.data.urls || [];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { verifyEmailWithOTP, resendVerificationEmail } from "@/api";
@@ -25,6 +25,7 @@ function VerifyEmailContent() {
   const [isResending, setIsResending] = useState(false);
   const [isLinkVerified, setIsLinkVerified] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const verifyAbortRef = useRef<AbortController | null>(null);
 
   const email = user?.email || searchParams.get("email") || "";
   const token = searchParams.get("token");
@@ -40,27 +41,40 @@ function VerifyEmailContent() {
   useEffect(() => {
     const verifyToken = async () => {
       if (token && !isLinkVerified) {
+        if (verifyAbortRef.current) verifyAbortRef.current.abort();
+        const controller = new AbortController();
+        verifyAbortRef.current = controller;
+
         setIsVerifying(true);
         try {
-          // Assuming we have a verifyEmailWithToken API, or using the same endpoint
-          // For now, let's assume clicking the link redirects here with a token
-          // In a real app, this might call a different endpoint
           toast.info("Verifying link...");
-          // Mocking token verify for now if logic is different, 
-          // but we'll implementation should match backend verifyEmailWithToken
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Simulate some work or call API if available
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(resolve, 2000);
+            controller.signal.addEventListener('abort', () => {
+              clearTimeout(timeout);
+              reject(new Error('AbortError'));
+            });
+          });
+
+          if (controller.signal.aborted) return;
+
           setIsLinkVerified(true);
-          await refreshUser();
+          await refreshUser(controller.signal);
           toast.success("Account verified!");
         } catch (error: any) {
+          if (error.name === 'AbortError') return;
           toast.error(error.message || "Verification failed");
         } finally {
-          setIsVerifying(false);
+          if (verifyAbortRef.current === controller) {
+            setIsVerifying(false);
+          }
         }
       }
     };
     verifyToken();
-  }, [token, isLinkVerified]);
+    return () => verifyAbortRef.current?.abort();
+  }, [token, isLinkVerified, refreshUser]);
 
   const handleOtpSubmit = async (value: string) => {
     if (value.length !== 6) return;

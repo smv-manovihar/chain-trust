@@ -8,12 +8,12 @@ export interface Alert {
   createdAt: string;
 }
 
-export const getAlerts = async () => {
-  const response = await client.get("/alerts");
+export const getAlerts = async (signal?: AbortSignal) => {
+  const response = await client.get("/alerts", { signal });
   return response.data.alerts as Alert[];
 };
 
-export const markAlertAsRead = async (id: string) => {
-  const response = await client.put(`/alerts/${id}/read`);
+export const markAlertAsRead = async (id: string, signal?: AbortSignal) => {
+  const response = await client.put(`/alerts/${id}/read`, null, { signal });
   return response.data;
 };

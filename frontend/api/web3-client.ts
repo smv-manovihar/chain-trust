@@ -131,21 +131,25 @@ export const registerBatchOnChain = async (batchData: BatchData, deployerAccount
  * Real blockchain verification
  * Interacts with the actual blockchain node via Web3
  */
-export async function verifyOnBlockchain(batchSalt: string): Promise<VerificationResult> {
+export async function verifyOnBlockchain(batchSalt: string, signal?: AbortSignal): Promise<VerificationResult> {
   try {
     const contract = getContract();
     if (!contract) {
         throw new Error('Web3 Contract instance not found');
     }
 
-    try {
-      // Query the new smart contract method using the batchSalt
-      const batch: any = await contract.methods.getBatch(batchSalt).call();
+    if (signal?.aborted) throw new Error('AbortError');
 
-      // Check if it exists
-      if (!batch.exists) {
-        throw new Error("Batch data is marked as invalid/deleted.");
-      }
+      try {
+        // Query the new smart contract method using the batchSalt
+        const batch: any = await contract.methods.getBatch(batchSalt).call();
+
+        if (signal?.aborted) throw new Error('AbortError');
+
+        // Check if it exists
+        if (!batch.exists) {
+          throw new Error("Batch data is marked as invalid/deleted.");
+        }
 
       const trustScore = batch.isRecalled ? 0 : 100;
       const warnings = batch.isRecalled ? ["THIS BATCH HAS BEEN RECALLED BY THE MANUFACTURER"] : [];
