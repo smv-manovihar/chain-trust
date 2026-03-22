@@ -18,6 +18,7 @@ import {
 	setupAccount,
 	updateUserRole,
 	deleteAccount,
+	changeEmail,
 } from '../controllers/auth.controller.js';
 import { authenticateJWT } from '../middlewares/auth.middleware.js';
 import { trackUserActivity } from '../middlewares/activity.middleware.js';
@@ -48,6 +49,7 @@ router.use(trackUserActivity);
 router.get('/verify', verifyUser);
 router.get('/me', verifyUser);
 router.post('/logout', logoutUser);
+router.post('/change-email', changeEmail);
 
 // Device management
 router.get('/devices', getUserDevices);

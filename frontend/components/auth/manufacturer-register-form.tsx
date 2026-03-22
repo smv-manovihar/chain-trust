@@ -103,62 +103,17 @@ export function ManufacturerRegisterForm() {
     setServerError("");
 
     try {
-      await register({
+      const redirectPath = await register({
         ...data,
         role: "manufacturer",
       });
-      setSuccess(true);
+      router.push(redirectPath);
     } catch (err: any) {
       setServerError(err.message || "Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
-
-  if (success) {
-    return (
-      <>
-        <AuthLayout
-          title="Verify Your Email"
-          subtitle="We've sent a verification code to your corporate email address."
-        >
-          <div className="flex flex-col items-center justify-center space-y-6 text-center">
-            <div className="h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
-              <CheckCircle2 className="h-8 w-8 text-accent" />
-            </div>
-
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-foreground">
-                Application Received!
-              </h2>
-              <p className="text-muted-foreground text-sm">
-                Please check your email and verify your corporate account to continue onboarding.
-              </p>
-            </div>
-
-            <div className="w-full space-y-3">
-              <Button
-                onClick={() => setShowVerificationModal(true)}
-                className="w-full"
-              >
-                Verify Email
-              </Button>
-              <Button variant="outline" asChild className="w-full">
-                <Link href="/login">Go to Login</Link>
-              </Button>
-            </div>
-          </div>
-        </AuthLayout>
-
-        <EmailVerificationModal
-          email={form.getValues("email")}
-          isOpen={showVerificationModal}
-          onOpenChange={setShowVerificationModal}
-          onSuccess={() => router.push("/login")}
-        />
-      </>
-    );
-  }
 
   return (
     <AuthLayout

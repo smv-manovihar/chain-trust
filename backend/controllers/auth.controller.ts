@@ -1051,3 +1051,74 @@ export const deleteAccount = async (req: Request, res: Response): Promise<void> 
 	}
 };
 
+/**
+ * Change email for unverified user and restart verification process.
+ */
+export const changeEmail = async (req: Request, res: Response): Promise<void> => {
+	const userId = (req as any).user.id;
+	const { newEmail } = req.body;
+
+	if (!newEmail) {
+		res.status(400).json({ message: 'New email is required' });
+		return;
+	}
+
+	try {
+		const user = await User.findById(userId);
+		if (!user) {
+			res.status(404).json({ message: 'User not found' });
+			return;
+		}
+
+		if (user.isEmailVerified) {
+			res.status(400).json({ message: 'Email is already verified. Use account settings to change it.' });
+			return;
+		}
+
+		const exists = await User.findOne({ email: newEmail.toLowerCase() });
+		if (exists && exists._id.toString() !== user._id.toString()) {
+			res.status(400).json({ message: 'New email already in use' });
+			return;
+		}
+
+		// Update email and generate new verification data
+		user.email = newEmail.toLowerCase();
+		
+		const verificationToken = generateVerificationToken();
+		const verificationOtp = generateOTP();
+		const otpExpiry = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+		const tokenExpiry = new Date(
+			Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
+		);
+
+		user.emailVerificationToken = verificationToken;
+		user.emailVerificationExpiresAt = tokenExpiry;
+		user.emailVerificationOtp = verificationOtp;
+		user.emailVerificationOtpExpiresAt = otpExpiry;
+
+		await user.save();
+
+		// Update company ID if manufacturer
+		const emailDomain = user.email.split('@')[1];
+		const company = await Company.findOne({ domain: emailDomain });
+		if (company && user.role === 'manufacturer') {
+			user.companyId = company._id;
+			await user.save();
+		}
+
+		await sendEmailVerification(
+			user.email,
+			verificationOtp,
+			verificationToken,
+			user.name,
+		);
+
+		res.json({ 
+			message: 'Email updated. A new verification code has been sent.', 
+			email: user.email 
+		});
+	} catch (err) {
+		console.error('Change email error:', err);
+		res.status(500).json({ message: 'Server error' });
+	}
+};

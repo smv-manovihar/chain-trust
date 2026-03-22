@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { tokenStore } from '@/lib/token-store';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -50,9 +49,7 @@ export const refreshToken = async (): Promise<string | null> => {
     );
     const newToken = response.data.accessToken;
 
-    if (newToken) {
-      tokenStore.setToken(newToken);
-    }
+    // Cookies handle the token storage
 
     isRefreshing = false;
     processQueue(null, newToken);

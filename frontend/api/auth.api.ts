@@ -82,3 +82,13 @@ export async function resendVerificationEmail(data: ResendVerificationData, sign
   const response = await client.post<EmailVerificationResponse>('/auth/resend-verification', data, { signal });
   return response.data;
 }
+
+export async function verifyEmailWithToken(token: string, signal?: AbortSignal): Promise<AuthResponse> {
+  const response = await client.get<AuthResponse>(`/auth/verify-email/${token}`, { signal });
+  return response.data;
+}
+
+export async function changeEmail(oldEmail: string, newEmail: string): Promise<any> {
+  const response = await client.post('/auth/change-email', { oldEmail, newEmail });
+  return response.data;
+}

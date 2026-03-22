@@ -15,16 +15,21 @@ import { toast } from "sonner";
 import { Mail, RefreshCw, CheckCircle2, Loader2, Lock, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+import { AuthLayout } from "@/components/layout/auth-layout";
+
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, verifyEmailWithToken, changeEmail } = useAuth();
   
   const [otp, setOtp] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [isLinkVerified, setIsLinkVerified] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
   const verifyAbortRef = useRef<AbortController | null>(null);
 
   const email = user?.email || searchParams.get("email") || "";
@@ -48,20 +53,19 @@ function VerifyEmailContent() {
         setIsVerifying(true);
         try {
           toast.info("Verifying link...");
-          // Simulate some work or call API if available
-          await new Promise((resolve, reject) => {
-            const timeout = setTimeout(resolve, 2000);
-            controller.signal.addEventListener('abort', () => {
-              clearTimeout(timeout);
-              reject(new Error('AbortError'));
-            });
-          });
+          
+          await verifyEmailWithToken(token);
 
           if (controller.signal.aborted) return;
 
           setIsLinkVerified(true);
-          await refreshUser(controller.signal);
           toast.success("Account verified!");
+          
+          // Small delay to show success state before redirecting
+          setTimeout(() => {
+            router.push(user?.role === "manufacturer" ? "/manufacturer" : "/customer");
+          }, 2000);
+          
         } catch (error: any) {
           if (error.name === 'AbortError') return;
           toast.error(error.message || "Verification failed");
@@ -74,7 +78,7 @@ function VerifyEmailContent() {
     };
     verifyToken();
     return () => verifyAbortRef.current?.abort();
-  }, [token, isLinkVerified, refreshUser]);
+  }, [token, isLinkVerified, verifyEmailWithToken, router, user?.role]);
 
   const handleOtpSubmit = async (value: string) => {
     if (value.length !== 6) return;
@@ -119,6 +123,24 @@ function VerifyEmailContent() {
     }
   };
 
+  const handleChangeEmail = async () => {
+    if (!newEmail || newEmail === email) {
+        setIsEditingEmail(false);
+        return;
+    }
+    setIsUpdatingEmail(true);
+    try {
+        await changeEmail(email, newEmail);
+        setIsEditingEmail(false);
+        setOtp("");
+        setCountdown(0);
+    } catch (err) {
+        // Error toast already shown in context
+    } finally {
+        setIsUpdatingEmail(false);
+    }
+  };
+
   if (!email && !isVerifying) {
       return (
           <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
@@ -139,119 +161,145 @@ function VerifyEmailContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-900 via-black to-black p-4 lg:p-8">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-xl w-full"
-      >
-        <Card className="border-zinc-800 bg-zinc-950/50 backdrop-blur-2xl shadow-2xl overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
-          
-          <CardHeader className="text-center pt-10 pb-6 relative">
-            <div className="mx-auto w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 border border-primary/20 rotate-3 hover:rotate-0 transition-transform duration-500">
-              <Mail className="w-8 h-8 text-primary" />
-            </div>
-            <CardTitle className="text-3xl font-bold tracking-tight text-white mb-2">Verify Your Identity</CardTitle>
-            <CardDescription className="text-zinc-400 text-lg">
-              We've sent a 6-digit code to <br />
-              <span className="text-white font-medium italic">{email}</span>
-            </CardDescription>
-          </CardHeader>
+    <AuthLayout 
+      title="Verify Your Identity" 
+      subtitle={isEditingEmail ? "Update your email address below" : `We've sent a 6-digit code to ${email}`}
+    >
+      <div className="flex flex-col items-center space-y-8 py-4">
+        <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-2 border border-primary/20">
+          <Mail className="w-8 h-8 text-primary" />
+        </div>
 
-          <CardContent className="px-8 pb-12 relative">
-            <div className="flex flex-col items-center space-y-10">
-              <div className="relative group">
-                <InputOTP
-                  maxLength={6}
-                  value={otp}
-                  onChange={(val) => {
-                    setOtp(val);
-                    if (val.length === 6) handleOtpSubmit(val);
-                  }}
-                  disabled={isVerifying}
-                >
-                  <InputOTPGroup className="gap-3 sm:gap-4">
-                    {[0, 1, 2, 3, 4, 5].map((i) => (
-                      <InputOTPSlot 
-                        key={i} 
-                        index={i} 
-                        className="w-12 h-16 sm:w-14 sm:h-20 text-2xl font-bold rounded-xl border-zinc-800 bg-zinc-900/50 text-white focus:ring-2 focus:ring-primary/50 transition-all duration-300"
-                      />
-                    ))}
-                  </InputOTPGroup>
-                </InputOTP>
-                
-                {isVerifying && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/40 rounded-xl backdrop-blur-[2px]">
-                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-col w-full space-y-4">
-                <AnimatePresence>
-                  {isLinkVerified && (
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="w-full p-4 bg-green-500/10 border border-green-500/20 rounded-xl flex items-center gap-3 text-green-400"
-                    >
-                      <CheckCircle2 className="w-5 h-5" />
-                      <span className="text-sm font-medium">Link verification successful</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <div className="flex flex-col sm:flex-row gap-3">
+        {isEditingEmail ? (
+            <div className="w-full space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground ml-1">New Email Address</label>
+                    <input 
+                        type="email"
+                        className="w-full h-12 px-4 rounded-xl border border-border bg-muted/30 focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+                        placeholder="new-email@example.com"
+                        value={newEmail}
+                        onChange={(e) => setNewEmail(e.target.value)}
+                        autoFocus
+                    />
+                </div>
+                <div className="flex gap-2">
                     <Button 
-                        variant="outline" 
-                        className="flex-1 h-12 rounded-xl border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
-                        onClick={handleResend}
-                        disabled={isResending || countdown > 0}
+                        variant="ghost" 
+                        className="flex-1" 
+                        onClick={() => setIsEditingEmail(false)}
+                        disabled={isUpdatingEmail}
                     >
-                        {isResending ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <RefreshCw className={`mr-2 h-4 w-4 ${countdown > 0 ? 'opacity-50' : ''}`} />
-                        )}
-                        {countdown > 0 ? `Resend in ${countdown}s` : "Resend Code"}
+                        Cancel
                     </Button>
-                    
                     <Button 
-                        className="flex-1 h-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
-                        onClick={() => handleOtpSubmit(otp)}
-                        disabled={isVerifying || otp.length !== 6}
+                        className="flex-1 bg-primary text-white" 
+                        onClick={handleChangeEmail}
+                        disabled={isUpdatingEmail || !newEmail || newEmail === email}
                     >
-                        Verify Identity
-                        <ArrowRight className="ml-2 w-4 h-4" />
+                        {isUpdatingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update Email"}
                     </Button>
                 </div>
-              </div>
-
-              <div className="pt-4 border-t border-zinc-900 w-full text-center">
-                <p className="text-sm text-zinc-500">
-                    Did not receive the email? Check your spam folder or 
-                    <button 
-                        onClick={() => router.push("/login")}
-                        className="text-primary hover:underline ml-1 font-medium"
-                    >
-                        try another email
-                    </button>
-                </p>
-              </div>
             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </div>
+        ) : (
+            <div className="relative group">
+              <InputOTP
+                maxLength={6}
+                value={otp}
+                onChange={(val) => {
+                  setOtp(val);
+                  if (val.length === 6) handleOtpSubmit(val);
+                }}
+                disabled={isVerifying}
+              >
+                <InputOTPGroup className="gap-2 sm:gap-3">
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <InputOTPSlot 
+                      key={i} 
+                      index={i} 
+                      className="w-10 h-14 sm:w-12 sm:h-16 text-xl font-bold rounded-xl border-border bg-muted/30 focus:ring-2 focus:ring-primary/50 transition-all"
+                    />
+                  ))}
+                </InputOTPGroup>
+              </InputOTP>
+              
+              {isVerifying && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/40 rounded-xl backdrop-blur-[2px]">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                </div>
+              )}
+            </div>
+        )}
+
+        <div className="flex flex-col w-full space-y-4">
+          <AnimatePresence>
+            {isLinkVerified && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="w-full p-4 bg-green-500/10 border border-green-500/20 rounded-xl flex items-center gap-3 text-green-600"
+              >
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="text-sm font-medium">Link verification successful</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {!isEditingEmail && (
+              <div className="flex flex-col sm:flex-row gap-3">
+                  <Button 
+                      variant="outline" 
+                      className="flex-1 h-12 rounded-xl"
+                      onClick={handleResend}
+                      disabled={isResending || countdown > 0}
+                  >
+                      {isResending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                          <RefreshCw className={`mr-2 h-4 w-4 ${countdown > 0 ? 'opacity-50' : ''}`} />
+                      )}
+                      {countdown > 0 ? `Resend in ${countdown}s` : "Resend Code"}
+                  </Button>
+                  
+                  <Button 
+                      className="flex-1 h-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+                      onClick={() => handleOtpSubmit(otp)}
+                      disabled={isVerifying || otp.length !== 6}
+                  >
+                      Verify
+                      <ArrowRight className="ml-2 w-4 h-4" />
+                  </Button>
+              </div>
+          )}
+        </div>
+
+        <div className="pt-4 border-t border-border w-full text-center">
+          <p className="text-sm text-muted-foreground">
+              {isEditingEmail ? "Entered the wrong email?" : "Did not receive the email?"} 
+              <button 
+                  onClick={() => {
+                      if (isEditingEmail) {
+                          setIsEditingEmail(false);
+                      } else {
+                          setIsEditingEmail(true);
+                          setNewEmail(email);
+                      }
+                  }}
+                  className="text-primary hover:underline ml-1 font-medium"
+              >
+                  {isEditingEmail ? "Go back" : "Edit email address"}
+              </button>
+          </p>
+        </div>
+      </div>
+    </AuthLayout>
   );
 }
 
 export default function VerifyEmailPage() {
   return (
     <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="min-h-screen flex items-center justify-center bg-background">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
         </div>
     }>

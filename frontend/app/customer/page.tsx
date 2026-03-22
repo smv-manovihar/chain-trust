@@ -82,7 +82,7 @@ export default function CustomerDashboard() {
                 size="lg"
                 asChild
               >
-                <Link href="/customer/cabinet">Full List</Link>
+                <Link href="/customer/cabinet">My Medicines</Link>
               </Button>
             </div>
           </div>

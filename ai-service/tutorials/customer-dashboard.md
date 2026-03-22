@@ -7,7 +7,7 @@ The Customer Dashboard provides a high-level overview of the user's medication s
 - **Safety Report**: Displays a "Trust Certified" badge and counts for "Items to Refill", "Critical Alerts", and "Recent Scans".
 - **Quick Actions**:
   - **Check Medicine**: Redirects to `/verify`.
-  - **Full Cabinet**: Redirects to `/customer/cabinet`.
+  - **My Medicines**: Redirects to `/customer/cabinet`.
 - **Recent Activity**: A list of the most recent scans and their status (Authentic/Verified).
 
 ## AI Context

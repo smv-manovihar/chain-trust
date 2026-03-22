@@ -95,65 +95,17 @@ export function CustomerRegisterForm() {
     setServerError("");
 
     try {
-      await register({
+      const redirectPath = await register({
         ...data,
         role: "customer",
       });
-      setSuccess(true);
+      router.push(redirectPath);
     } catch (err: any) {
       setServerError(err.message || "Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
-
-  if (success) {
-    return (
-      <>
-        <AuthLayout
-          title="Verify Your Email"
-          subtitle="We've sent a verification code to your email address."
-        >
-          <div className="flex flex-col items-center justify-center space-y-6 text-center">
-            <div className="h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
-              <div className="flex items-center gap-2 text-primary">
-                <User className="h-5 w-5" />
-                <h2 className="text-xl font-bold">Standard Member Registration</h2>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-foreground">
-                Account Created Successfully!
-              </h2>
-              <p className="text-muted-foreground text-sm">
-                Please check your email and verify your account to continue.
-              </p>
-            </div>
-
-            <div className="w-full space-y-3">
-              <Button
-                onClick={() => setShowVerificationModal(true)}
-                className="w-full"
-              >
-                Verify Email
-              </Button>
-              <Button variant="outline" asChild className="w-full">
-                <Link href="/login">Go to Login</Link>
-              </Button>
-            </div>
-          </div>
-        </AuthLayout>
-
-        <EmailVerificationModal
-          email={form.getValues("email")}
-          isOpen={showVerificationModal}
-          onOpenChange={setShowVerificationModal}
-          onSuccess={() => router.push("/login")}
-        />
-      </>
-    );
-  }
 
   return (
     <AuthLayout

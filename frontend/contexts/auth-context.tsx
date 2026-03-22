@@ -12,9 +12,11 @@ import {
   logout as apiLogout,
   login as apiLogin,
   register as apiRegister,
+  verifyEmailWithToken as apiVerifyEmailWithToken,
+  changeEmail as apiChangeEmail,
   User,
 } from "@/api";
-import { tokenStore } from "@/lib/token-store";
+import { toast } from "sonner";
 
 interface AuthContextType {
   user: User | null;
@@ -40,6 +42,8 @@ interface AuthContextType {
   googleLogin: (returnTo?: string) => void;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
+  verifyEmailWithToken: (token: string) => Promise<void>;
+  changeEmail: (oldEmail: string, newEmail: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -87,14 +91,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const data = await getCurrentUser(signal || controller.signal);
       if (data) {
         setUser(data.user);
-        if (data.accessToken) {
-          tokenStore.setToken(data.accessToken);
-        }
-        
+        // Cookies handle the token storage
+
         if (!data.user.isEmailVerified && typeof window !== "undefined") {
           const path = window.location.pathname;
-          if (!path.startsWith("/verify-email") && !path.startsWith("/login") && !path.startsWith("/register") && !path.startsWith("/setup-account")) {
-              window.location.href = "/verify-email";
+          if (
+            !path.startsWith("/verify-email") &&
+            !path.startsWith("/login") &&
+            !path.startsWith("/register") &&
+            !path.startsWith("/setup-account")
+          ) {
+            window.location.href = "/verify-email";
           }
         }
 
@@ -103,13 +110,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       } else {
         setUser(null);
-        tokenStore.clearToken();
       }
       setError(null);
     } catch (err: any) {
-      if (err.name === 'AbortError') return;
+      if (err.name === "AbortError") return;
       setUser(null);
-      tokenStore.clearToken();
     } finally {
       if (refreshAbortRef.current === controller) {
         setIsLoading(false);
@@ -123,9 +128,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const data = await apiLogin(email, password);
       setUser(data.user);
-      if (data.accessToken) {
-        tokenStore.setToken(data.accessToken);
-      }
       if (typeof window !== "undefined" && data.user.avatar) {
         cacheAvatarBlob(data.user.avatar);
       }
@@ -168,14 +170,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
     try {
       const data = await apiRegister(userData);
+      
+      // Auto-login after registration
       setUser(data.user);
+      // Cookies handle token storage
       if (data.accessToken) {
-        tokenStore.setToken(data.accessToken);
       }
-      return (
-        data.redirectUrl ||
-        (data.user.role === "manufacturer" ? "/manufacturer" : "/customer")
-      );
+      if (typeof window !== "undefined" && data.user.avatar) {
+        cacheAvatarBlob(data.user.avatar);
+      }
+
+      return "/verify-email";
     } catch (err: any) {
       setError(err.message || "Registration failed");
       throw err;
@@ -188,7 +193,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsLoading(true);
     setError(null);
     // Redirect to backend Google auth endpoint
-    const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
     const query = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : "";
     window.location.href = `${baseUrl}/api/auth/google${query}`;
   };
@@ -200,12 +206,52 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error("Logout API failed, continuing with cleanup:", err);
     } finally {
       setUser(null);
-      tokenStore.clearToken();
       if (typeof window !== "undefined") {
         localStorage.removeItem("cached_avatar");
         // Use hard redirect to ensure all state is cleared
         window.location.href = "/login";
       }
+    }
+  };
+
+  const verifyEmailWithToken = async (token: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await apiVerifyEmailWithToken(token);
+      setUser(data.user);
+      // Cookies handle token storage
+      if (data.accessToken) {
+      }
+      if (typeof window !== "undefined" && data.user.avatar) {
+        cacheAvatarBlob(data.user.avatar);
+      }
+    } catch (err: any) {
+      setError(err.message || "Verification failed");
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const changeEmail = async (oldEmail: string, newEmail: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await apiChangeEmail(oldEmail, newEmail);
+      if (user) {
+        setUser({ ...user, email: response.email });
+      }
+      toast.success("Email Updated", {
+        description: "A new verification code has been sent.",
+      });
+    } catch (error: any) {
+      toast.error("Failed to update email", {
+        description: error.message || "Please try again.",
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -225,6 +271,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     googleLogin,
     logout,
     setUser,
+    verifyEmailWithToken,
+    changeEmail,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
