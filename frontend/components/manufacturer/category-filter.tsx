@@ -73,6 +73,11 @@ export function CategoryFilter({
     onCategoryChange(nextList);
   };
 
+  const handleCategoriesChange = useCallback(() => {
+    loadCategories();
+    onCategoriesChange?.();
+  }, [loadCategories, onCategoriesChange]);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -149,10 +154,7 @@ export function CategoryFilter({
                 )}
                 {canManage && (
                   <CategoryManagementDialog 
-                    onCategoriesChange={() => {
-                      loadCategories();
-                      onCategoriesChange?.();
-                    }}
+                    onCategoriesChange={handleCategoriesChange}
                     trigger={
                       <Button
                         variant="ghost"

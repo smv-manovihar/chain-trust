@@ -43,7 +43,7 @@ import { recallProductOnChain } from "@/api/web3-client";
 import { useWeb3 } from "@/contexts/web3-context";
 import { format } from "date-fns";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -104,18 +104,48 @@ const BatchActions = ({
 );
 
 export default function BatchesPage() {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const router = useRouter();
+
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    searchParams.get("categories")?.split(",").filter(Boolean) || []
+  );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const fetchAbortRef = useRef<AbortController | null>(null);
 
   const debouncedSearch = useDebounce(searchTerm, 500);
   const debouncedCategories = useDebounce(selectedCategories, 500);
   const { address: walletAddress, connect: connectWallet } = useWeb3();
+
+  // Sync state to URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (debouncedSearch) {
+      params.set("search", debouncedSearch);
+    } else {
+      params.delete("search");
+    }
+
+    if (debouncedCategories.length > 0) {
+      params.set("categories", debouncedCategories.join(","));
+    } else {
+      params.delete("categories");
+    }
+
+    const queryString = params.toString();
+    const currentQueryString = searchParams.toString();
+
+    if (queryString !== currentQueryString) {
+      const url = queryString ? `${pathname}?${queryString}` : pathname;
+      // Use replace to avoid polluting history with every debounce
+      router.replace(url, { scroll: false });
+    }
+  }, [debouncedSearch, debouncedCategories, pathname, router, searchParams]);
 
   const fetchBatches = useCallback(async () => {
     if (fetchAbortRef.current) fetchAbortRef.current.abort();

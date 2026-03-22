@@ -26,26 +26,46 @@ let listSessionsPromise: Promise<ChatSession[]> | null = null;
 
 export const agentApi = {
   // Session Management
-  createSession: async (signal?: AbortSignal) => {
-    const response = await agentClient.post<{ session_id: string }>('/chat/session', null, { signal });
+  createSession: async (message?: string, context?: any, signal?: AbortSignal) => {
+    if (message) {
+      const response = await agentClient.post<{
+        status: string;
+        session_id: string;
+        user_message_id: string;
+        message_id: string
+      }>("/chat/session", { message, context }, { signal });
+      return response.data;
+    }
+    const response = await agentClient.post<{ session_id: string }>("/chat/session", null, { signal });
     return response.data;
   },
 
-  listSessions: async (signal?: AbortSignal) => {
-    if (listSessionsPromise) return listSessionsPromise;
+  listSessions: async (search?: string, limit: number = 20, offset: number = 0, signal?: AbortSignal) => {
+    // Only cache the full list (no search/offset)
+    if (!search && offset === 0 && listSessionsPromise) return listSessionsPromise;
 
-    listSessionsPromise = (async () => {
-      try {
-        const response = await agentClient.get<ChatSession[]>('/chat/sessions', { signal });
-        return response.data;
-      } finally {
-        setTimeout(() => {
-          listSessionsPromise = null;
-        }, 1000);
-      }
-    })();
+    const fetchSessions = async () => {
+      const response = await agentClient.get<ChatSession[]>('/chat/sessions', {
+        params: { search, limit, offset },
+        signal,
+      });
+      return response.data;
+    };
 
-    return listSessionsPromise;
+    if (!search && offset === 0) {
+      listSessionsPromise = (async () => {
+        try {
+          return await fetchSessions();
+        } finally {
+          setTimeout(() => {
+            listSessionsPromise = null;
+          }, 1000);
+        }
+      })();
+      return listSessionsPromise;
+    }
+
+    return fetchSessions();
   },
 
   renameSession: async (sessionId: string, name: string, signal?: AbortSignal) => {
@@ -67,18 +87,18 @@ export const agentApi = {
     return response.data;
   },
 
-  sendChatMessage: async (sessionId: string, message: string, current_context?: any, signal?: AbortSignal) => {
+  sendChatMessage: async (sessionId: string, message: string, context?: any, signal?: AbortSignal) => {
     const response = await agentClient.post(`/chat/${sessionId}/chat`, {
       message,
-      current_context,
+      context,
     }, { signal });
     return response.data;
   },
 
-  editChatMessage: async (sessionId: string, messageId: string, message: string, current_context?: any, signal?: AbortSignal) => {
+  editChatMessage: async (sessionId: string, messageId: string, message: string, context?: any, signal?: AbortSignal) => {
     const response = await agentClient.put(`/chat/${sessionId}/messages/${messageId}`, {
       message,
-      current_context,
+      context,
     }, { signal });
     return response.data;
   },
@@ -88,8 +108,10 @@ export const agentApi = {
     return response.data;
   },
 
-  retryChatMessage: async (sessionId: string, messageId: string, signal?: AbortSignal) => {
-    const response = await agentClient.post<{ status: string, message_id: string }>(`/chat/${sessionId}/retry/${messageId}`, {}, { signal });
+  retryChatMessage: async (sessionId: string, messageId: string, context?: any, signal?: AbortSignal) => {
+    const response = await agentClient.post<{ status: string, message_id: string }>(`/chat/${sessionId}/retry/${messageId}`, {
+      context
+    }, { signal });
     return response.data;
   },
 

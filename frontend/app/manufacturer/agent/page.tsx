@@ -15,8 +15,8 @@ export default function ManufacturerAgentPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-theme(spacing.16)-theme(spacing.16))]">
-      <div className="flex-1 min-h-0 w-full max-w-6xl mx-auto">
+    <div className="flex flex-col h-[calc(100dvh-64px)] -m-4 lg:-m-8">
+      <div className="flex-1 min-h-0 w-full max-w-5xl mx-auto">
         <AgentChat
           initialSessionId={sessionId}
           currentContext={currentContext}

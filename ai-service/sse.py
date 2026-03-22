@@ -160,9 +160,6 @@ class SSEManager:
         try:
             # 1. Send Accumulator State (if available) - This is the "Starting Point"
             if identifier in self.accumulator_state:
-                logger.info(
-                    f"Sending accumulated state to new subscriber for {identifier}"
-                )
                 partial_response = {
                     "event": "partial_response",
                     "data": self.accumulator_state[identifier].copy(),

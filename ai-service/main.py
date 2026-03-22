@@ -1,36 +1,27 @@
 import json
 from contextlib import asynccontextmanager
+from typing import Optional
 
 import jwt
-import motor.motor_asyncio
 import uvicorn
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 # No longer using HTTPBearer as primary auth
-from models import ChatRequest, EditChatRequest
+from models import ChatRequest, EditChatRequest, RetryChatRequest
 from sse import sse_manager
 from config import get_settings
-from store import ChatStore
+from store import chat_store
 from service import ChatService
+from database import get_db
 
 settings = get_settings()
 
-# --- Globals ---
-db_client = None
-db = None
-chat_store = None
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db_client, db, chat_store
-    db_client = motor.motor_asyncio.AsyncIOMotorClient(settings.MONGO_URI)
-    db = db_client["ChainTrust"]
-    chat_store = ChatStore(db)  # Initialize Store
+    get_db()  # Ensure database singleton is initialized
     yield
     await sse_manager.shutdown()
-    db_client.close()
 
 
 async def get_current_user_payload(request: Request):
@@ -74,30 +65,69 @@ app.add_middleware(
 
 
 @app.post("/api/chat/session")
-async def create_session(payload: dict = Depends(get_current_user_payload)):
+async def create_session(
+    req: Optional[ChatRequest] = None,
+    background_tasks: BackgroundTasks = None,
+    payload: dict = Depends(get_current_user_payload),
+):
     user_id = payload.get("id")
-    session_id = await chat_store.create_session(user_id)
-    return {"session_id": session_id}
+    role = payload.get("role", "customer")
+
+    if req and req.message:
+        # Atomic creation
+        result = await chat_store.create_session_with_messages(user_id, req.message)
+        session_id = result["session_id"]
+        assistant_message_id = result["assistant_message"]["id"]
+        user_message_id = result["user_message"]["id"]
+
+        background_tasks.add_task(
+            run_chat_service,
+            session_id,
+            req.model_dump(),
+            assistant_message_id,
+            user_id,
+            role,
+        )
+
+        return {
+            "status": "processing",
+            "session_id": session_id,
+            "user_message_id": user_message_id,
+            "message_id": assistant_message_id,
+        }
+    else:
+        session_id = await chat_store.create_session(user_id)
+        return {"session_id": session_id}
 
 
 @app.get("/api/chat/sessions")
-async def list_sessions(payload: dict = Depends(get_current_user_payload)):
+async def list_sessions(
+    search: str = None, 
+    limit: int = 20, 
+    offset: int = 0,
+    payload: dict = Depends(get_current_user_payload)
+):
     user_id = payload.get("id")
-    sessions = await chat_store.list_sessions(user_id)
+    sessions = await chat_store.list_sessions(user_id, search, limit, offset)
     return sessions
 
 
 @app.put("/api/chat/sessions/{session_id}")
 async def rename_session(
-    session_id: str, name: str, payload: dict = Depends(get_current_user_payload)
+    session_id: str,
+    name: str,
+    payload: dict = Depends(get_current_user_payload),
 ):
+    """Renames a chat session."""
     user_id = payload.get("id")
     session = await chat_store.get_session(session_id)
     if not session or session["user_id"] != user_id:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    success = await chat_store.update_session(session_id, {"name": name})
-    return {"success": success}
+    result = await chat_store.rename_session(session_id, name)
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to rename session")
+    return {"status": "renamed", "name": name}
 
 
 @app.delete("/api/chat/sessions/{session_id}")
@@ -175,7 +205,7 @@ async def run_chat_service(
     session_id: str, req_data: dict, assistant_message_id: str, user_id: str, role: str
 ):
     """Bridge to instantiate ChatService and run process_chat in background."""
-    current_context = req_data.get("current_context")
+    current_context = req_data.get("context")
     service = ChatService(
         user_id=user_id,
         chat_store=chat_store,
@@ -285,6 +315,7 @@ async def delete_chat_message(
 async def retry_chat_message(
     session_id: str,
     message_id: str,
+    req: RetryChatRequest,
     background_tasks: BackgroundTasks,
     payload: dict = Depends(get_current_user_payload),
 ):
@@ -309,7 +340,7 @@ async def retry_chat_message(
         )
 
     background_tasks.add_task(
-        run_chat_service, session_id, {}, assist_msg["id"], user_id, role
+        run_chat_service, session_id, req.model_dump(), assist_msg["id"], user_id, role
     )
 
     return {"status": "processing", "message_id": assist_msg["id"]}

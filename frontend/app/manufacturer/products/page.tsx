@@ -26,6 +26,7 @@ import type { Product } from "@/components/manufacturer/product-card";
 import { listProducts } from "@/api/product.api";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { CategoryManagementDialog } from "@/components/manufacturer/category-dialog";
 import { cn } from "@/lib/utils";
@@ -35,15 +36,46 @@ import { useDebounce } from "@/hooks/use-debounce";
 // Product interface is now imported from @/components/manufacturer/product-card
 
 export default function ProductsPage() {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
   const [categoriesCount, setCategoriesCount] = useState(0);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    searchParams.get("categories")?.split(",").filter(Boolean) || []
+  );
   const fetchAbortRef = useRef<AbortController | null>(null);
 
   const debouncedSearch = useDebounce(searchQuery, 500);
   const debouncedCategories = useDebounce(selectedCategories, 500);
+
+  // Sync state to URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (debouncedSearch) {
+      params.set("search", debouncedSearch);
+    } else {
+      params.delete("search");
+    }
+
+    if (debouncedCategories.length > 0) {
+      params.set("categories", debouncedCategories.join(","));
+    } else {
+      params.delete("categories");
+    }
+
+    const queryString = params.toString();
+    const currentQueryString = searchParams.toString();
+
+    if (queryString !== currentQueryString) {
+      const url = queryString ? `${pathname}?${queryString}` : pathname;
+      // Use replace to avoid polluting history with every debounce
+      router.replace(url, { scroll: false });
+    }
+  }, [debouncedSearch, debouncedCategories, pathname, router, searchParams]);
 
   const fetchProducts = useCallback(async () => {
     if (fetchAbortRef.current) fetchAbortRef.current.abort();
@@ -121,6 +153,7 @@ export default function ProductsPage() {
               className={cn("h-5 w-5 text-primary", loading && "animate-spin")}
             />
           </Button>
+          <CategoryManagementDialog onCategoriesChange={fetchProducts} />
           <Button
             asChild
             className="flex-1 sm:flex-none h-12 px-6 rounded-full gap-2 shadow-xl shadow-primary/20 font-bold"

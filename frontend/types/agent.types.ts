@@ -30,7 +30,7 @@ export interface AgentMessage {
 }
 
 export type AgentSSEEvent = {
-  type: 'token' | 'tool_start' | 'tool_end' | 'done' | 'error' | 'name_updated' | 'messages_deleted' | 'partial_response';
+  type: 'token' | 'tool_start' | 'tool_end' | 'done' | 'error' | 'name_updated'| 'partial_response';
   message_id?: string;
   [key: string]: any;
 };

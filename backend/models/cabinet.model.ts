@@ -28,7 +28,7 @@ const cabinetItemSchema = new Schema<ICabinetItem>(
 	},
 	{
 		timestamps: true,
-		collection: 'cabinet-items',
+		collection: 'cabinet_items',
 	},
 );
 

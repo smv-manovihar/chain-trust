@@ -8,7 +8,6 @@ import {
   Pill,
   Clock,
   AlertTriangle,
-  CheckCircle2,
   Calendar,
   Activity,
   BellRing,
@@ -22,18 +21,46 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { getCabinet, removeFromCabinet, CabinetItem } from "@/api";
 import { toast } from "sonner";
 import { AddManualMedicineDialog } from "@/components/cabinet/add-manual-medicine-dialog";
 import { format } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
+import { useDebounce } from "@/hooks/use-debounce";
 
 export default function MyMedicinesPage() {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+
   const { user } = useAuth();
   const [medications, setMedications] = useState<CabinetItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
 
+  const debouncedSearch = useDebounce(searchTerm, 500);
   const fetchAbortRef = useRef<AbortController | null>(null);
+
+  // Sync state to URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (debouncedSearch) {
+      params.set("search", debouncedSearch);
+    } else {
+      params.delete("search");
+    }
+
+    const queryString = params.toString();
+    const currentQueryString = searchParams.toString();
+
+    if (queryString !== currentQueryString) {
+      const url = queryString ? `${pathname}?${queryString}` : pathname;
+      router.replace(url, { scroll: false });
+    }
+  }, [debouncedSearch, pathname, router, searchParams]);
 
   const fetchCabinet = async () => {
     if (fetchAbortRef.current) fetchAbortRef.current.abort();
@@ -42,7 +69,7 @@ export default function MyMedicinesPage() {
 
     setIsLoading(true);
     try {
-      const data = await getCabinet(controller.signal);
+      const data = await getCabinet(debouncedSearch, controller.signal);
       setMedications(data);
     } catch (error: any) {
       if (error.name === "AbortError") return;
@@ -57,7 +84,7 @@ export default function MyMedicinesPage() {
   useEffect(() => {
     fetchCabinet();
     return () => fetchAbortRef.current?.abort();
-  }, []);
+  }, [debouncedSearch]);
 
   const handleDelete = async (id: string, name: string) => {
     try {
@@ -97,6 +124,17 @@ export default function MyMedicinesPage() {
             </Link>
           </Button>
         </div>
+      </div>
+      
+      {/* Search Bar */}
+      <div className="relative max-w-md px-1">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search your medicines..."
+          className="pl-11 h-12 rounded-full border-primary/10 bg-card/40 backdrop-blur-md shadow-sm focus-visible:ring-primary/20"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       {/* High-Level Metrics */}

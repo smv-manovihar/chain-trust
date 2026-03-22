@@ -9,7 +9,7 @@ from langchain_openai import ChatOpenAI
 from config import get_settings
 from prompts import CUSTOMER_SYSTEM_PROMPT, MANUFACTURER_SYSTEM_PROMPT
 
-DEFAULT_OPENROUTER_MODEL = "minimax/minimax-m2.5:free"
+DEFAULT_OPENROUTER_MODEL = "stepfun/step-3.5-flash:free"
 BASE_URL = "https://openrouter.ai/api/v1"
 
 
@@ -174,7 +174,7 @@ class Agent:
 def get_chain_trust_agent(
     role: str = "customer",
     tools: List[Any] = None,
-    model_name: str = DEFAULT_OPENROUTER_MODEL
+    model_name: str = DEFAULT_OPENROUTER_MODEL,
 ):
     """
     Factory function to create and return a configured Agent instance based on user role.

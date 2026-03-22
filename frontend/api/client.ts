@@ -90,6 +90,13 @@ client.interceptors.response.use(
       }
     }
 
+    // Handle cancelled requests (AbortController)
+    if (axios.isCancel(error)) {
+      const abortError = new Error('Request canceled');
+      abortError.name = 'AbortError';
+      return Promise.reject(abortError);
+    }
+
     // enhanced error handling for other errors
     const message = error.response?.data?.message || error.message || 'Something went wrong';
     const newError = new Error(message);

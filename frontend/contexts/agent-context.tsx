@@ -18,6 +18,9 @@ interface AgentContextType {
   isLoadingSessions: boolean;
   isLoadingMessages: boolean;
   isGenerating: boolean;
+  searchQuery: string;
+  hasMoreSessions: boolean;
+  isLoadingMoreSessions: boolean;
 
   setInput: (input: string) => void;
   setOpen: (open: boolean) => void;
@@ -27,10 +30,12 @@ interface AgentContextType {
   createSession: () => Promise<string>;
   deleteSession: (id: string) => Promise<void>;
   renameSession: (id: string, name: string) => Promise<void>;
-  retryMessage: (messageId: string) => Promise<void>;
-  editMessage: (messageId: string, newContent: string) => Promise<void>;
+  retryMessage: (messageId: string, context?: any) => Promise<void>;
+  editMessage: (messageId: string, newContent: string, context?: any) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
   refreshSessions: () => Promise<void>;
+  loadMoreSessions: () => Promise<void>;
+  setSearchQuery: (query: string) => void;
 }
 
 const AgentContext = createContext<AgentContextType | undefined>(undefined);
@@ -50,33 +55,46 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [hasMoreSessions, setHasMoreSessions] = useState(true);
+  const [isLoadingMoreSessions, setIsLoadingMoreSessions] = useState(false);
+
+  const situationalContext = React.useMemo(() => ({
+    route: pathname,
+    params: Object.fromEntries(searchParams.entries()),
+  }), [pathname, searchParams]);
 
   const isSubmittingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const sessionsAbortRef = useRef<AbortController | null>(null);
+  const loadMoreAbortRef = useRef<AbortController | null>(null);
   const messagesAbortRef = useRef<AbortController | null>(null);
 
-  // Sync session ID with URL search param 's'
+  // Sync session ID with URL search param 'session'
   useEffect(() => {
-    const s = searchParams.get("s");
-    if (s && s !== currentSessionId) {
-      setCurrentSessionId(s);
+    const sessionParam = searchParams.get("session");
+    if (sessionParam && sessionParam !== currentSessionId) {
+      setCurrentSessionId(sessionParam);
     }
   }, [searchParams, currentSessionId]);
 
   // Update URL when currentSessionId changes (only on specific pages if needed, but here we do it generally)
   const updateUrl = useCallback((id: string | undefined) => {
+    // Only update if we are on a page that should have session syncing
+    if (!pathname.includes("/agent")) return;
+
     const params = new URLSearchParams(searchParams.toString());
     if (id) {
-      params.set("s", id);
+      params.set("session", id);
     } else {
-      params.delete("s");
+      params.delete("session");
     }
+    
     const query = params.toString() ? `?${params.toString()}` : "";
-    // Only update if we are on a page that should have session syncing, or just do it globally
-    // For now, let's assume we want it reflected whenever the agent is active
-    if (pathname.includes("/agent")) {
-      router.replace(`${pathname}${query}`);
-    }
+    const newUrl = `${pathname}${query}`;
+    
+    // Use replace to avoid bloating history
+    router.replace(newUrl);
   }, [pathname, router, searchParams]);
 
   const handleSetCurrentSessionId = useCallback((id: string | undefined) => {
@@ -84,17 +102,19 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     updateUrl(id);
   }, [updateUrl]);
 
-  const loadSessions = useCallback(async () => {
+  const loadSessions = useCallback(async (search?: string) => {
     if (sessionsAbortRef.current) sessionsAbortRef.current.abort();
     const controller = new AbortController();
     sessionsAbortRef.current = controller;
 
     try {
       setIsLoadingSessions(true);
-      const data = await agentApi.listSessions(controller.signal);
+      const limit = 20;
+      const data = await agentApi.listSessions(search, limit, 0, controller.signal);
       setSessions(data);
+      setHasMoreSessions(data.length === limit);
     } catch (error: any) {
-      if (error.name === "AbortError") return;
+      if (error.name === "AbortError" || error.name === "CanceledError" || error.message === "canceled") return;
       console.error("Failed to load sessions", error);
     } finally {
       setIsLoadingSessions(false);
@@ -111,7 +131,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
       const data = await agentApi.listMessages(sessionId, controller.signal);
       setMessages(data);
     } catch (error: any) {
-      if (error.name === "AbortError") return;
+      if (error.name === "AbortError" || error.name === "CanceledError" || error.message === "canceled") return;
       console.error("Failed to load messages", error);
     } finally {
       setIsLoadingMessages(false);
@@ -119,12 +139,8 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    loadSessions();
-    return () => sessionsAbortRef.current?.abort();
-  }, [loadSessions]);
-
-  useEffect(() => {
     if (currentSessionId) {
+      setMessages([]); // Clear stale messages immediately
       loadMessages(currentSessionId);
     } else {
       setMessages([]);
@@ -265,7 +281,15 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
       case "error":
         setIsGenerating(false);
         setMessages((prev) =>
-          prev.map((m) => (m.id === msgId ? { ...m, status: "error" as const } : m))
+          prev.map((m) =>
+            m.id === msgId
+              ? {
+                  ...m,
+                  status: "error" as const,
+                  content: data.message || m.content || "An error occurred with the AI agent",
+                }
+              : m
+          )
         );
         toast.error(data.message || "An error occurred with the AI agent");
         disconnect();
@@ -283,16 +307,9 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     if (!input.trim() || isSubmittingRef.current) return;
 
     let sessionId = currentSessionId;
+    let isNewSession = false;
     if (!sessionId) {
-      try {
-        const { session_id } = await agentApi.createSession();
-        sessionId = session_id;
-        handleSetCurrentSessionId(session_id);
-        await loadSessions();
-      } catch (error) {
-        toast.error("Failed to start chat");
-        return;
-      }
+      isNewSession = true;
     }
 
     const messageContent = input;
@@ -301,10 +318,11 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     setIsGenerating(true);
     setInput("");
 
-    // Optimistic User Message
+    // Optimistic User Message (Temporary ID if new session)
+    const tempUserMsgId = Date.now().toString();
     const tempUserMsg: AgentMessage = {
-      id: Date.now().toString(),
-      session_id: sessionId!,
+      id: tempUserMsgId,
+      session_id: sessionId || "new",
       role: "user",
       content: messageContent,
       status: "completed",
@@ -314,13 +332,68 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     };
     setMessages((prev) => [...prev, tempUserMsg]);
 
+    // Abort previous request if any
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      await agentApi.sendChatMessage(sessionId!, messageContent, context);
+      let message_id: string;
+      let user_message_id: string | undefined;
+
+      if (isNewSession) {
+        const result: any = await agentApi.createSession(messageContent, context || situationalContext, controller.signal);
+        sessionId = result.session_id;
+        message_id = result.message_id;
+        user_message_id = result.user_message_id;
+
+        handleSetCurrentSessionId(sessionId);
+        // Rename the optimistic message to the real ID and update session
+        setMessages((prev) => 
+          prev.map(m => m.id === tempUserMsgId ? { ...m, id: user_message_id!, session_id: sessionId! } : m)
+        );
+        await loadSessions();
+      } else {
+        const result = await agentApi.sendChatMessage(sessionId!, messageContent, context || situationalContext, controller.signal);
+        message_id = result.message_id;
+      }
+
+      // Add Assistant Placeholder
+      const assistantPlaceholder: AgentMessage = {
+        id: message_id,
+        session_id: sessionId!,
+        role: "assistant",
+        content: "",
+        status: "generating",
+        thoughts: [],
+        edited: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, assistantPlaceholder]);
+
       connect();
-    } catch (error) {
-      toast.error("Failed to send message");
-      setMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
-      setInput(messageContent);
+    } catch (error: any) {
+      if (error.name === 'AbortError') return;
+      const errorMessage = error.response?.data?.detail || error.message || "Failed to send message";
+      toast.error(errorMessage);
+
+      // Instead of rolling back the user message, add an error assistant message
+      const errorAssistantMsg: AgentMessage = {
+        id: `err-${Date.now()}`,
+        session_id: sessionId!,
+        role: "assistant",
+        content: `Error: ${errorMessage}`,
+        status: "error",
+        thoughts: [],
+        edited: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorAssistantMsg]);
+
       setIsGenerating(false);
     } finally {
       setIsSending(false);
@@ -364,40 +437,66 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const retryMessage = async (messageId: string) => {
+  const retryMessage = useCallback(async (messageId: string, context?: any) => {
     if (!currentSessionId || isSubmittingRef.current) return;
+
+    isSubmittingRef.current = true;
+    setIsSending(true);
+    setIsGenerating(true);
+
     try {
-      isSubmittingRef.current = true;
-      setIsSending(true);
-      setIsGenerating(true);
-      await agentApi.retryChatMessage(currentSessionId, messageId);
+      const result = await agentApi.retryChatMessage(currentSessionId, messageId, context || situationalContext);
+      
       setMessages((prev) => {
         const index = prev.findIndex((m) => m.id === messageId);
         if (index === -1) return prev;
+        
         const targetMsg = prev[index];
         const sliceIndex = targetMsg.role === "user" ? index + 1 : index;
-        return prev.slice(0, sliceIndex);
+        const truncatedMessages = prev.slice(0, sliceIndex);
+
+        // Add Assistant Placeholder with real ID from backend
+        const assistantPlaceholder: AgentMessage = {
+          id: result.message_id,
+          session_id: currentSessionId!,
+          role: "assistant",
+          content: "",
+          status: "generating",
+          thoughts: [],
+          edited: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        return [...truncatedMessages, assistantPlaceholder];
       });
+      
       connect();
     } catch (err) {
       toast.error("Failed to retry");
       setIsGenerating(false);
+      throw err;
     } finally {
       setIsSending(false);
       isSubmittingRef.current = false;
     }
-  };
+  }, [connect, currentSessionId, situationalContext]);
 
-  const editMessage = async (messageId: string, newContent: string) => {
-    if (!currentSessionId || isSubmittingRef.current) return;
+  const editMessage = useCallback(async (messageId: string, newContent: string, context?: any) => {
+    if (!currentSessionId || isSubmittingRef.current || !newContent.trim()) return;
+
+    isSubmittingRef.current = true;
+    setIsSending(true);
+    setIsGenerating(true);
+
     try {
-      isSubmittingRef.current = true;
-      setIsSending(true);
-      setIsGenerating(true);
-      await agentApi.editChatMessage(currentSessionId, messageId, newContent);
+      const result = await agentApi.editChatMessage(currentSessionId, messageId, newContent, context || situationalContext);
+      
       setMessages((prev) => {
         const index = prev.findIndex((m) => m.id === messageId);
         if (index === -1) return prev;
+        
+        // Update the user message and truncate everything after it
         const updatedMessages = [...prev.slice(0, index + 1)];
         updatedMessages[index] = {
           ...updatedMessages[index],
@@ -405,17 +504,34 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
           updated_at: new Date().toISOString(),
           edited: true,
         };
-        return updatedMessages;
+
+        // Add Assistant Placeholder with real ID from backend
+        const assistantPlaceholder: AgentMessage = {
+          id: result.message_id,
+          session_id: currentSessionId,
+          role: "assistant",
+          content: "",
+          status: "generating",
+          thoughts: [],
+          edited: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        return [...updatedMessages, assistantPlaceholder];
       });
+      
       connect();
-    } catch (err) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') return;
       toast.error("Failed to edit message");
       setIsGenerating(false);
+      throw error;
     } finally {
       setIsSending(false);
       isSubmittingRef.current = false;
     }
-  };
+  }, [connect, currentSessionId, situationalContext]);
 
   const deleteMessage = async (messageId: string) => {
     if (!currentSessionId) return;
@@ -432,6 +548,44 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loadMoreSessions = useCallback(async () => {
+    if (isLoadingMoreSessions || !hasMoreSessions) return;
+    
+    if (loadMoreAbortRef.current) loadMoreAbortRef.current.abort();
+    const controller = new AbortController();
+    loadMoreAbortRef.current = controller;
+
+    try {
+      setIsLoadingMoreSessions(true);
+      const limit = 20;
+      const offset = sessions.length;
+      const data = await agentApi.listSessions(searchQuery, limit, offset, controller.signal);
+      
+      if (data.length > 0) {
+        setSessions((prev) => [...prev, ...data]);
+      }
+      setHasMoreSessions(data.length === limit);
+    } catch (error: any) {
+      if (error.name === "AbortError" || error.name === "CanceledError" || error.message === "canceled") return;
+      console.error("Failed to load more sessions:", error);
+    } finally {
+      setIsLoadingMoreSessions(false);
+    }
+  }, [hasMoreSessions, isLoadingMoreSessions, searchQuery, sessions.length]);
+
+  const refreshSessions = useCallback(() => loadSessions(searchQuery), [loadSessions, searchQuery]);
+
+  // Sync sessions on mount and search changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadSessions(searchQuery);
+    }, 300); // 300ms debounce
+    return () => {
+      clearTimeout(timer);
+      sessionsAbortRef.current?.abort();
+    };
+  }, [loadSessions, searchQuery]);
+
   return (
     <AgentContext.Provider
       value={{
@@ -445,6 +599,9 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         isLoadingSessions,
         isLoadingMessages,
         isGenerating,
+        searchQuery,
+        hasMoreSessions,
+        isLoadingMoreSessions,
         setInput,
         setOpen,
         setHistoryOpen,
@@ -456,7 +613,9 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         retryMessage,
         editMessage,
         deleteMessage,
-        refreshSessions: loadSessions,
+        refreshSessions,
+        loadMoreSessions,
+        setSearchQuery,
       }}
     >
       {children}

@@ -3,6 +3,11 @@ import { ArrowUp, ArrowDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface AgentChatInputProps {
   input: string;
@@ -12,6 +17,7 @@ interface AgentChatInputProps {
   showScrollDown?: boolean;
   scrollToBottom?: () => void;
   compact?: boolean;
+  isNewSession?: boolean;
 }
 
 export function AgentChatInput({
@@ -22,6 +28,7 @@ export function AgentChatInput({
   showScrollDown,
   scrollToBottom,
   compact = false,
+  isNewSession = false,
 }: AgentChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -38,6 +45,13 @@ export function AgentChatInput({
       textareaRef.current.style.overflowY = newHeight > 200 ? "auto" : "hidden";
     }
   }, [input]);
+  
+  // Auto-focus on initial mount and new sessions
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [isNewSession]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -49,7 +63,7 @@ export function AgentChatInput({
   return (
     <div
       className={cn(
-        "absolute bottom-0 left-0 right-0 px-2 pt-2 pb-0.5 sm:p-4 z-20 pointer-events-none",
+        "absolute bottom-2 md:bottom-0 left-0 right-0 px-2 pt-2 pb-0 sm:p-4 z-20 pointer-events-none",
         compact && "px-2 pt-2 pb-1 sm:p-2",
       )}
     >
@@ -58,15 +72,20 @@ export function AgentChatInput({
         compact ? "max-w-full" : "max-w-3xl"
       )}>
         {showScrollDown && scrollToBottom && (
-          <div className="absolute -top-10 sm:-top-12 right-1 sm:right-2 pointer-events-auto">
-            <Button
-              variant="secondary"
-              size="icon"
-              className="rounded-full shadow-lg h-8 w-8 sm:h-9 sm:w-9 bg-card/80 backdrop-blur-sm border hover:bg-card transition-colors"
-              onClick={scrollToBottom}
-            >
-              <ArrowDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </Button>
+          <div className="absolute -top-10 sm:-top-12 left-1/2 -translate-x-1/2 pointer-events-auto">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="rounded-full shadow-lg h-8 w-8 sm:h-9 sm:w-9 bg-card/80 backdrop-blur-sm border hover:bg-card transition-colors"
+                  onClick={scrollToBottom}
+                >
+                  <ArrowDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Scroll to Latest</TooltipContent>
+            </Tooltip>
           </div>
         )}
       </div>
@@ -86,29 +105,34 @@ export function AgentChatInput({
             onKeyDown={handleKeyDown}
             placeholder="Ask anything..."
             className={cn(
-              "resize-none pr-12 sm:pr-16 min-h-[40px] sm:min-h-[44px] py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-muted/20 border-transparent focus:bg-background/50 focus:ring-1 focus:ring-primary/20 transition-all scrollbar-hide overflow-hidden text-[13px] sm:text-sm",
+              "resize-none pr-12 sm:pr-16 min-h-[40px] sm:min-h-[44px] py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-muted/20 border-transparent focus:bg-background/50 focus:ring-1 focus:ring-primary/20 transition-all text-[13px] sm:text-sm",
               compact && "pr-10 py-2 min-h-[36px] text-[11px]",
             )}
           />
           <div className="absolute right-1.5 bottom-1.2 sm:right-2 sm:bottom-1.5">
-            <Button
-              size="icon"
-              disabled={isSending || !input.trim()}
-              onClick={sendMessage}
-              className={cn(
-                "h-7 w-7 sm:h-8 sm:w-8 rounded-full shadow-sm transition-all duration-200 shrink-0",
-                input.trim()
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "bg-muted text-muted-foreground opacity-50",
-                compact && "h-6 w-6",
-              )}
-            >
-              {isSending ? (
-                <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
-              ) : (
-                <ArrowUp className={cn(compact ? "h-3.5 w-3.5" : "h-4 w-4 sm:h-5 sm:w-5")} />
-              )}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  disabled={isSending || !input.trim()}
+                  onClick={sendMessage}
+                  className={cn(
+                    "h-7 w-7 sm:h-8 sm:w-8 rounded-full shadow-sm transition-all duration-200 shrink-0",
+                    input.trim()
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "bg-muted text-muted-foreground opacity-50",
+                    compact && "h-6 w-6",
+                  )}
+                >
+                  {isSending ? (
+                    <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+                  ) : (
+                    <ArrowUp className={cn(compact ? "h-3.5 w-3.5" : "h-4 w-4 sm:h-5 sm:w-5")} />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Send Message</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </div>

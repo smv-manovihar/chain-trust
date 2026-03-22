@@ -88,26 +88,47 @@ class SessionCreate(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    current_context: Optional[Dict[str, Any]] = None
+    context: Optional[Dict[str, Any]] = None
 
 
 class EditChatRequest(BaseModel):
     message: str
-    current_context: Optional[Dict[str, Any]] = None
+    context: Optional[Dict[str, Any]] = None
 
 
 class ChatSessionDB(BaseModel):
+    id: Optional[PyObjectId] = Field(alias="_id", default=None)
     user_id: str
+    name: str = "New Conversation"
+    name_updated: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+    model_config = {
+        "populate_by_name": True,
+        "arbitrary_types_allowed": True,
+        "json_encoders": {BsonObjectId: str},
+    }
+
 
 class ChatMessageDB(BaseModel):
+    id: Optional[PyObjectId] = Field(alias="_id", default=None)
     session_id: str
     role: str
     content: str
     thoughts: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    parent_id: Optional[str] = None  # Link to parent user message for paired generations
     status: str = "completed"  # generating, completed, error
     edited: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    model_config = {
+        "populate_by_name": True,
+        "arbitrary_types_allowed": True,
+        "json_encoders": {BsonObjectId: str},
+    }
+
+
+class RetryChatRequest(BaseModel):
+    context: Optional[Dict[str, Any]] = None

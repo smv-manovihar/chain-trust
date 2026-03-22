@@ -64,7 +64,6 @@ export function CategoryManagementDialog({
     try {
       const data = await fetchCategories(controller.signal);
       setCategories(data.categories);
-      onCategoriesChange?.();
     } catch (err: any) {
       if (err.name === 'AbortError') return;
       toast.error(err.message || "Failed to load categories");
@@ -120,7 +119,8 @@ export function CategoryManagementDialog({
         toast.success("Category created");
       }
       setFormDialogOpen(false);
-      loadCategories();
+      await loadCategories();
+      onCategoriesChange?.();
     } catch (err: any) {
       if (err.name === 'AbortError') return;
       toast.error(err.message || "Failed to save category");
@@ -136,7 +136,8 @@ export function CategoryManagementDialog({
     try {
       await deleteCategory(id);
       toast.success("Category deleted");
-      loadCategories();
+      await loadCategories();
+      onCategoriesChange?.();
     } catch (err: any) {
       toast.error(err.message || "Failed to delete category");
     }

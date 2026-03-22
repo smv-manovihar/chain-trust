@@ -19,8 +19,11 @@ export const addToCabinet = async (data: Partial<CabinetItem>, signal?: AbortSig
   return response.data;
 };
 
-export const getCabinet = async (signal?: AbortSignal) => {
-  const response = await client.get('/users/cabinet/list', { signal });
+export const getCabinet = async (search?: string, signal?: AbortSignal) => {
+  const response = await client.get('/users/cabinet/list', { 
+    params: { search },
+    signal 
+  });
   // Handle both { cabinet: [] } and directly returning []
   return (response.data.cabinet || response.data) as CabinetItem[];
 };

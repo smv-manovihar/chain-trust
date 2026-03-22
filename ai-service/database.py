@@ -1,26 +1,15 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-from core.config import settings
-import logging
+from config import get_settings
 
-logger = logging.getLogger(__name__)
+settings = get_settings()
+
+_client_cache = None
+_db_cache = None
 
 
-class DatabaseManager:
-    client: AsyncIOMotorClient = None
-
-    @classmethod
-    def connect(cls):
-        logger.info("Connecting to MongoDB...")
-        cls.client = AsyncIOMotorClient(settings.MONGO_URI)
-
-    @classmethod
-    def close(cls):
-        if cls.client:
-            logger.info("Closing MongoDB connection...")
-            cls.client.close()
-
-    @classmethod
-    def get_db(cls):
-        if cls.client is None:
-            raise ConnectionError("Database not initialized")
-        return cls.client[settings.MONGO_DB_NAME]
+def get_db():
+    global _client_cache, _db_cache
+    if _db_cache is None:
+        _client_cache = AsyncIOMotorClient(settings.MONGO_URI)
+        _db_cache = _client_cache["ChainTrust"]
+    return _db_cache

@@ -62,7 +62,7 @@ export function NotificationBell() {
     return () => {
       clearInterval(interval);
       fetchAbortRef.current?.abort();
-    }
+    };
   }, [fetchNotifications]);
 
   const handleMarkAllRead = async () => {
@@ -107,26 +107,30 @@ export function NotificationBell() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative text-muted-foreground hover:text-primary transition-colors rounded-full"
+          className="relative rounded-full text-muted-foreground hover:text-foreground transition-colors"
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <Badge className="absolute -right-1 -top-1 h-5 w-5 rounded-full bg-primary p-0 flex items-center justify-center border-2 border-background text-[10px] font-black">
+            <Badge className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-background bg-primary p-0 text-[10px] font-bold text-primary-foreground">
               {unreadCount > 9 ? "9+" : unreadCount}
             </Badge>
           )}
           <span className="sr-only">Notifications</span>
         </Button>
       </PopoverTrigger>
+
+      {/* Mobile updates: w-[calc(100vw-2rem)] ensures it doesn't overflow small screens, 
+        sm:w-80 keeps it standard width on desktop. z-50 handles overlay stacking. 
+      */}
       <PopoverContent
-        className="w-80 p-0 rounded-[1.5rem] border-border/40 bg-card/95 backdrop-blur-md shadow-2xl relative z-[100]"
+        className="w-[calc(100vw-2rem)] sm:w-80 p-0 z-50"
         align="end"
       >
-        <div className="flex items-center justify-between p-4 border-b border-border/40">
+        <div className="flex items-center justify-between border-b p-4">
           <div>
-            <h4 className="text-sm uppercase tracking-widest">Alerts Center</h4>
-            <p className="text-[10px] text-muted-foreground font-medium">
-              {unreadCount} unread reports
+            <h4 className="font-semibold text-sm">Notifications</h4>
+            <p className="text-xs text-muted-foreground">
+              {unreadCount} unread
             </p>
           </div>
           {unreadCount > 0 && (
@@ -134,17 +138,18 @@ export function NotificationBell() {
               variant="ghost"
               size="sm"
               onClick={handleMarkAllRead}
-              className="h-8 px-2 font-bold uppercase tracking-tighter hover:bg-primary/10 hover:text-primary rounded-lg"
+              className="h-8 text-xs hover:bg-muted"
             >
-              Clear All <Check className="ml-1 h-3 w-3" />
+              Mark all read <Check className="ml-2 h-3 w-3" />
             </Button>
           )}
         </div>
 
-        <ScrollArea className="h-[350px]">
+        {/* Dynamic height for better mobile experience */}
+        <ScrollArea className="max-h-[60vh] sm:h-[400px]">
           {isLoading && notifications.length === 0 ? (
             <div className="flex items-center justify-center h-40">
-              <MoreHorizontal className="h-8 w-8 animate-pulse text-muted-foreground opacity-30" />
+              <MoreHorizontal className="h-8 w-8 animate-pulse text-muted-foreground opacity-50" />
             </div>
           ) : notifications.length > 0 ? (
             <div className="flex flex-col">
@@ -153,23 +158,18 @@ export function NotificationBell() {
                   key={notif._id}
                   onClick={() => !notif.isRead && handleMarkRead(notif._id)}
                   className={cn(
-                    "relative flex gap-3 p-4 border-b border-border/20 transition-all hover:bg-muted/50 cursor-pointer",
-                    !notif.isRead && "bg-primary/5 border-l-2 border-l-primary",
+                    "flex gap-3 p-4 border-b transition-colors hover:bg-muted/50 cursor-pointer",
+                    !notif.isRead
+                      ? "bg-muted/20 border-l-2 border-l-primary"
+                      : "border-l-2 border-l-transparent",
                   )}
                 >
-                  <div
-                    className={cn(
-                      "h-8 w-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5",
-                      !notif.isRead ? "bg-background shadow-sm" : "bg-muted",
-                    )}
-                  >
-                    {getTypeIcon(notif.type)}
-                  </div>
+                  <div className="mt-1 shrink-0">{getTypeIcon(notif.type)}</div>
                   <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-start gap-2">
                       <p
                         className={cn(
-                          "text-xs font-bold truncate leading-tight",
+                          "text-sm font-medium leading-none",
                           !notif.isRead
                             ? "text-foreground"
                             : "text-muted-foreground",
@@ -177,25 +177,25 @@ export function NotificationBell() {
                       >
                         {notif.title}
                       </p>
-                      <span className="text-[9px] font-medium text-muted-foreground shrink-0 whitespace-nowrap ml-2">
+                      <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
                         {formatDistanceToNow(new Date(notif.createdAt), {
                           addSuffix: true,
                         }).replace("about ", "")}
                       </span>
                     </div>
-                    <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2 italic">
+                    <p className="text-xs text-muted-foreground line-clamp-2">
                       {notif.message}
                     </p>
                     {notif.link && (
                       <Link
                         href={notif.link}
-                        className="inline-flex items-center text-[9px] uppercase tracking-widest text-primary mt-1 hover:underline"
+                        className="inline-flex items-center text-xs text-primary mt-1 hover:underline"
                         onClick={(e) => {
                           e.stopPropagation();
                           setIsOpen(false);
                         }}
                       >
-                        Resolve Threat <Zap className="ml-1 w-2.5 h-2.5" />
+                        View Details
                       </Link>
                     )}
                   </div>
@@ -203,29 +203,27 @@ export function NotificationBell() {
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-center px-6 opacity-30">
-              <Inbox className="h-12 w-12 mb-3" />
-              <p className="text-sm uppercase tracking-widest">
-                Network Secure
-              </p>
-              <p className="text-[10px] font-medium mt-1">
-                No pending notifications in your feed.
+            <div className="flex flex-col items-center justify-center h-48 text-center px-4">
+              <Inbox className="h-10 w-10 mb-3 text-muted-foreground opacity-50" />
+              <p className="text-sm font-medium">All caught up!</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                You have no new notifications.
               </p>
             </div>
           )}
         </ScrollArea>
 
-        <div className="p-3 border-t border-border/40 text-center">
+        <div className="p-2 border-t text-center">
           <Button
             variant="ghost"
-            className="w-full h-8 uppercase hover:bg-primary/5 hover:text-primary rounded-xl"
+            className="w-full text-sm hover:bg-muted"
             asChild
           >
             <Link
               href="/manufacturer/analytics"
               onClick={() => setIsOpen(false)}
             >
-              Full Intelligence Feed
+              View All Notifications
             </Link>
           </Button>
         </div>

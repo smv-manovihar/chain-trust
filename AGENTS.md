@@ -35,7 +35,7 @@
   - `/manufacturer/add-product`: Multi-step wizard for enrolling batches. Derives cryptographic salts client-side before sending to backend.
   - `/manufacturer/batches`: Dashboard showing enrolled batches and their scan counts. Supports mobile-first refreshing and row actions.
   - `/manufacturer/batches/[id]`: QR generation page with `print`-media CSS to directly output grid sheets without the UI chrome.
-- **Blockchain Integration:** Handled via APIs in `frontend/api/web3-client.ts` and `frontend/lib/blockchain-utils.ts`. 
+- **Blockchain Integration:** Handled via APIs in `frontend/api/web3-client.ts`. 
   - **Core Rule:** The UI should ALWAYS prefer blockchain data as the root source of truth for product verification, using the DB only for rich metadata (high-res images, dynamic scan counts). Verification must function even if the MongoDB node is unresponsive.
 
 ## Backend Context
@@ -45,3 +45,5 @@
   - **Unit Salts:** QR codes embed a unit index. The exact salt is deterministically derived via `SHA-256(batchSalt + "-" + unitIndex)`.
   - **Scan Tracking:** When a QR is scanned, the `/api/batches/verify-scan` endpoint checks the salt, increments a tracking counter in MongoDB for that specific unit, and returns the scan count to alert the consumer of potential counterfeits (e.g., >5 scans).
   - **S3/MinIO:** Used for decentralized-style or self-hosted image storage for product packaging. The backend is configured to automatically initialize MinIO buckets on first upload.
+## Documentation & Tutorials
+1. **Tutorial Updates**: AI agents MUST update the corresponding tutorial files in `ai-service/tutorials` whenever they make UI changes to the pages or components described in those tutorials. This ensures user-facing documentation remains synchronized with the latest UI enhancements.

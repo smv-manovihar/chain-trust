@@ -30,7 +30,7 @@ export function AppShell({ children, sidebar, mobileSidebar }: AppShellProps) {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground selection:bg-primary/20 font-sans">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground font-sans">
       {/* Desktop Sidebar — Contained, No Double-Blur */}
       <div className="hidden lg:block h-full shrink-0 border-r z-40">
         {sidebar}
@@ -47,8 +47,8 @@ export function AppShell({ children, sidebar, mobileSidebar }: AppShellProps) {
         {/* Top Header — Modern, Clinical, and Sticky */}
         <header
           className={cn(
-            "flex h-14 lg:h-16 shrink-0 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-md lg:px-8 shadow-sm z-30 transition-transform duration-300 ease-in-out",
-            "sticky top-0 left-0 right-0 lg:relative",
+            "flex h-14 lg:h-16 shrink-0 items-center justify-between gap-4 border-b bg-card/50 px-4 backdrop-blur-xl lg:px-8 shadow-sm z-30 transition-all duration-300 ease-in-out",
+            "absolute top-0 left-0 right-0 lg:relative lg:top-auto lg:left-auto lg:right-auto",
             !headerVisible &&
               !isMobileOpen &&
               "-translate-y-full lg:translate-y-0",
@@ -78,7 +78,7 @@ export function AppShell({ children, sidebar, mobileSidebar }: AppShellProps) {
         </header>
 
         {/* Main Content Area — Strictly Contained */}
-        <main className="flex-1 overflow-hidden bg-muted/30 relative">
+        <main className="flex-1 overflow-hidden bg-background relative">
           {/* Native scrollable div for better scroll tracking with useScrollDirection */}
           <div
             ref={mainRef}
@@ -97,7 +97,7 @@ export function AppShell({ children, sidebar, mobileSidebar }: AppShellProps) {
                   duration: 0.25,
                   ease: "easeInOut",
                 }}
-                className="mx-auto max-w-7xl w-full p-4 lg:p-8"
+                className="mx-auto max-w-7xl w-full p-4 lg:p-8 pt-20 lg:pt-8"
               >
                 {children}
               </motion.div>

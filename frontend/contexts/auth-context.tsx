@@ -194,11 +194,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = async () => {
-    await apiLogout();
-    setUser(null);
-    tokenStore.clearToken();
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("cached_avatar");
+    try {
+      await apiLogout();
+    } catch (err) {
+      console.error("Logout API failed, continuing with cleanup:", err);
+    } finally {
+      setUser(null);
+      tokenStore.clearToken();
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("cached_avatar");
+        // Use hard redirect to ensure all state is cleared
+        window.location.href = "/login";
+      }
     }
   };
 

@@ -1,31 +1,36 @@
-# Batches Management (Manufacturer)
-Route: `/manufacturer/batches`
+# Route: /manufacturer/batches (Batch Management)
 
-## Layout Overview
-- **Header**: Title "Batches", active batch count badge, "Refresh" button, and "Create Batch" button.
-- **Search & Filter**: A search bar for batches/products and a category filter dropdown.
-- **Data Table (Desktop)**: Columns for Batch Number, Product, Quantity, Status (Active/Recalled), and Total Scans.
-- **Card View (Mobile)**: List of cards showing the same info in a compact format.
+A comprehensive list of all production batches registered under the manufacturer's account.
 
-## Interaction Guides (Buttons)
-1. **Create Batch (Plus Icon)**:
-   - *Label*: "Create Batch".
-   - *Action*: Navigates to `/manufacturer/batches/new`.
-   - *Position*: Top right header.
-2. **Refresh (Refresh Icon)**:
-   - *Action*: Reloads the batch list.
-   - *Position*: Next to Create Batch.
-3. **View QR Sheets (QrCode Icon)**:
-   - *Action*: Navigates to `/manufacturer/batches/[id]` to print/view unit QR codes.
-   - *Position*: Dropdown menu on each row/card.
-4. **Copy Tx Hash (ExternalLink Icon)**:
-   - *Action*: Copies the blockchain transaction hash to clipboard.
-   - *Position*: Dropdown menu on each row/card.
-5. **Recall Batch (AlertTriangle Icon)**:
-   - *Action*: Triggers a blockchain recall and updates local status to "Recalled". **Irreversible.**
-   - *Position*: Dropdown menu (only for Active batches).
+## Dashboard Layout & User Actions
 
-## Page Logic
-- Recalled batches show a red "Recalled" badge and cannot be recalled again.
-- Active batches show an emerald "Active" badge.
-- Search is debounced to 500ms.
+### 1. Batches Table (Desktop)
+- **Table Columns**:
+  - `Batch No.`: Unique batch identifier.
+  - `Product`: Name and SKU.
+  - `Quantity`: Number of units (e.g., 500).
+  - `Dates`: Manufactured and Expiry dates.
+  - `Status`: (Badge) Active (Primary) or Recalled (Destructive).
+  - `On-chain`: (Badge) Yes (Emerald) or No (Outline).
+- **Row Actions**: Click the `...` menu to see:
+  - **View Details**: Redirects to batch detail page.
+  - **Download PDF**: Instant generation of QR report.
+  - **Recall Batch**: Destructive action (requires confirmation).
+
+### 2. Mobile View
+- Batches are displayed as **Cards** instead of table rows.
+- Each card shows the Batch No, Product Name, and Status.
+- Includes a **Swipe to Manage** vibe with a quick action button.
+
+### 3. Search & Filters
+- **Search Bar**: Sticky at the top, placeholder: "Search batches...".
+- **Category Filter**: A dropdown menu (e.g., Antibiotics, Vitamins).
+- **URL Sync**: Both search and categories are synced to the URL (`?search=...`, `?categories=...`). Use `get_current_view_data` to see this.
+
+## AI Guidance & Context
+- **Tooling**: Use `search_manufacturer_batches` or `get_current_view_data` to locate a specific batch.
+- **Troubleshooting**: If a user asks "where is my newly created batch?", check the "On-chain" status. If it's not registered, suggest they "Recall and Re-create" if metadata was wrong.
+- **Recall Guidance**: Only manufacturers can recall their own batches. This is an ethical and safety responsibility.
+
+## AI Context
+When helping a manufacturer on this page, always check the `query_params` in `Tools` to understand if they are looking at a filtered set of batches.

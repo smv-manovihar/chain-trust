@@ -41,19 +41,19 @@ const ChainStep = ({ step, isLast, connectorClass }: ChainStepProps) => {
       {!isLast && (
         <div
           className={cn(
-            "absolute left-3 top-7 bottom-[-8px] w-px bg-primary/50",
+            "absolute left-[11px] top-3 -bottom-4 w-px bg-primary/50",
             connectorClass,
           )}
           aria-hidden
         />
       )}
 
-      <div className="group/step flex gap-2 items-start pl-0 pr-2 py-1.5 rounded-lg hover:bg-muted/10 transition-colors">
+      <div className="group/step flex gap-2 items-start pl-0 pr-2 rounded-lg hover:bg-muted/10 transition-colors duration-300">
         {/* Step Dot */}
         <div className="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center mt-0.5">
           <div
             className={cn(
-              "w-2 h-2 rounded-full transition-all duration-200",
+              "w-2 h-2 rounded-full transition-all duration-300 ease-in-out",
               isRunning
                 ? "bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.6)]"
                 : isFailed
@@ -67,7 +67,7 @@ const ChainStep = ({ step, isLast, connectorClass }: ChainStepProps) => {
 
         {/* Message Container */}
         <div className="flex-1 min-w-0 flex items-center min-h-[28px]">
-          <span className="text-xs font-medium text-muted-foreground/75 group-hover/step:text-foreground transition-colors truncate">
+          <span className="text-xs font-medium text-muted-foreground/75 group-hover/step:text-foreground transition-colors duration-300 truncate">
             {step.message ||
               step.tool
                 .split("_")
@@ -111,9 +111,7 @@ export function ChainOfThoughtPreview({
     controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
 
   const toolThoughts = useMemo(() => {
-    return thoughts.filter(
-      (t) => t.tool && (t.input || t.result || t.status === "running"),
-    );
+    return thoughts.filter((t) => !!t.tool);
   }, [thoughts]);
 
   const displayedThoughts =
@@ -149,8 +147,8 @@ export function ChainOfThoughtPreview({
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <CollapsibleTrigger asChild>
-              <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer focus:outline-none focus:ring-0">
-                <span className="text-xs font-semibold text-muted-foreground/70 group-hover:text-foreground">
+              <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-muted/50 transition-colors duration-300 group/thought cursor-pointer focus:outline-none focus:ring-0">
+                <span className="text-xs font-semibold text-muted-foreground/70 group-hover/thought:text-foreground transition-colors duration-300">
                   Thought process
                 </span>
                 <span className="text-xs text-muted-foreground/50">
@@ -190,28 +188,23 @@ export function ChainOfThoughtPreview({
 
         {/* Chain content */}
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-          <div className="pl-2 py-2 space-y-1">
-            <AnimatePresence mode="popLayout">
-              {displayedThoughts.map((step, idx) => (
-                <motion.div
-                  key={
-                    step.run_id
-                      ? `${step.run_id}-${idx}`
-                      : `${step.tool}-${idx}`
-                  }
-                  initial={{ opacity: 0, x: -4 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -4 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <ChainStep
-                    step={step}
-                    isLast={idx === displayedThoughts.length - 1}
-                    connectorClass={connectorClass}
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
+          <div className="pl-2 pb-2 pt-1 space-y-1">
+            {displayedThoughts.map((step, idx) => (
+              <div
+                key={
+                  step.run_id
+                    ? `${step.run_id}-${idx}`
+                    : `${step.tool}-${idx}`
+                }
+                className="animate-in fade-in slide-in-from-left-1 duration-200 fill-mode-both"
+              >
+                <ChainStep
+                  step={step}
+                  isLast={idx === displayedThoughts.length - 1}
+                  connectorClass={connectorClass}
+                />
+              </div>
+            ))}
           </div>
         </CollapsibleContent>
       </Collapsible>
