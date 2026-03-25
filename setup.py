@@ -491,13 +491,7 @@ def setup_metamask_tutorial():
         if confirm("Is MetaMask installed and a password set? [Y/n]: "):
             break
 
-    print_cyan("\n--- Phase 2: App Registration ---")
-    print_yellow("1. Ensure the app is running (Terminal 3: pnpm run dev).")
-    print_yellow("2. Visit the frontend URL (typically http://localhost:3000).")
-    print_yellow("3. Click 'Sign In' or 'Register' and use Google OAuth or your preferred method.")
-    input("\nPress Enter once you have registered/signed in to the app...")
-
-    print_cyan("\n--- Phase 3: Importing Ganache Wallet ---")
+    print_cyan("\n--- Phase 2: Importing Ganache Wallet ---")
     print_yellow("Follow these steps to link your local blockchain to MetaMask:")
     print_yellow(
         "1. In MetaMask, click the Network selector (top-left) -> 'Add Network'."
@@ -526,7 +520,39 @@ def setup_metamask_tutorial():
         if confirm("Have you successfully imported a DIFFERENT account (Index 1+)? [Y/n]: "):
             break
 
-    print_green("\nWallet & Account setup complete! You are ready.")
+    print_green("\nWallet & Account setup complete!")
+
+def launch_terminals():
+    header("Launching Services")
+    print_cyan("\n--- Starting Automatic Terminals ---")
+    
+    # 1. MinIO
+    root = Path(".")
+    minio_cmd = "minio" if check_command("minio") else "minio.exe"
+    if not check_command("minio") and not (root / "minio.exe").exists() and (root / "refs" / "minio.exe").exists():
+        minio_cmd = "./refs/minio.exe"
+    elif not check_command("minio") and (root / "minio.exe").exists():
+        minio_cmd = "./minio.exe"
+
+    minio_full_cmd = f"{minio_cmd} server ./infra-data/minio --console-address :9090"
+    print_yellow("Starting MinIO...")
+    subprocess.Popen(f'start cmd /k "title ChainTrust-MinIO && {minio_full_cmd}"', shell=True)
+
+    # 2. Backend
+    print_yellow("Starting Backend...")
+    subprocess.Popen('start cmd /k "title ChainTrust-Backend && cd backend && pnpm dev"', shell=True)
+
+    # 3. Frontend
+    print_yellow("Starting Frontend...")
+    subprocess.Popen('start cmd /k "title ChainTrust-Frontend && cd frontend && pnpm dev"', shell=True)
+
+    # 4. AI Service
+    print_yellow("Starting AI-Service...")
+    subprocess.Popen('start cmd /k "title ChainTrust-AI-Service && cd ai-service && uv run main.py"', shell=True)
+    
+    print_green("\n[✓] All service terminals have been launched.")
+    print_cyan("\nWait a few seconds for the services to initialize.")
+    print_yellow("Then, visit http://localhost:3000 to register/sign in.")
 
 
 def main():
@@ -666,40 +692,18 @@ def main():
             if not confirm("AI Service setup failed. Retry? [Y/n] (Enter to retry): "):
                 break
 
-    header("Frontend & AI Service setup handled.")
     # Ensure infra directories exist
     root = Path(".")
     (root / "infra-data" / "minio").mkdir(parents=True, exist_ok=True)
     (root / "infra-data" / "mongodb").mkdir(parents=True, exist_ok=True)
 
-    print_green("\n--- Local Setup Complete ---")
-    print_cyan("\nTo start the application, run these in separate terminals:")
-    print_yellow("Terminal 1 (Infra):")
-    mongo_cmd = globals().get("MONGO_CMD", "mongod")
-    print(f"  {mongo_cmd} --dbpath ./infra-data/mongodb")
-    minio_cmd = "minio.exe" if check_command("minio") else "./minio.exe"
-    if not check_command("minio") and Path("refs/minio.exe").exists():
-        minio_cmd = "./refs/minio.exe"
-    print(f"  {minio_cmd} server ./infra-data/minio --console-address :9090")
-    print("  (Run Ganache UI on port 7545)")
-    print_yellow("\nTerminal 2 (Backend):")
-    print("  cd backend && pnpm dev")
-    print_yellow("\nTerminal 3 (Frontend):")
-    print("  cd frontend && pnpm dev")
-    print_cyan("\nTerminal 4 (AI Service):")
-    print("  cd ai-service && uv run main.py")
+    header("Environment & Dependencies Ready")
+    
+    # Run MetaMask tutorial BEFORE starting services as requested
+    setup_metamask_tutorial()
 
-    print_yellow("\nACTION REQUIRED: Please open 4 separate terminals and run the commands above.")
-    print_yellow("The Backend and Frontend must be running to complete MetaMask onboarding.")
-
-    while True:
-        if confirm("\nAre all services running and ready for MetaMask onboarding? [Y/n]: "):
-            setup_metamask_tutorial()
-            break
-        else:
-            if confirm("Skip MetaMask onboarding for now? [y/N]: ", default_yes=False):
-                break
-            print_yellow("Please start the services listed above to proceed.")
+    # Automate terminal launching
+    launch_terminals()
 
     print_green("\nReady to build the future of trust!")
 
