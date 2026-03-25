@@ -41,7 +41,26 @@ Make sure you have the following installed:
 
 ---
 
-## 🚀 Getting Started
+## ⚡ Quick Setup (Windows Only)
+
+> [!IMPORTANT]
+> This automated setup script is currently optimized for **Windows OS only**. For other operating systems, please follow the [Manual Setup](#🚀-manual-setup-all-os) instructions.
+
+If you are on Windows, you can use the interactive **Setup Assistant** to automate environment configuration, dependency installation, and smart contract deployment in one go.
+
+```powershell
+python setup.py
+```
+
+The script handles:
+- **Environment Configuration**: Automatically populates all `.env` files.
+- **Dependency Installation**: Runs `pnpm install` and `uv sync` for you.
+- **Smart Contract Deployment**: Deploys to Ganache and updates contract addresses.
+- **MetaMask Tutorial**: A guided walkthrough for role-based account setup.
+
+---
+
+## 🚀 Manual Setup (All OS)
 
 ### 1. Clone the Repository
 
@@ -67,12 +86,17 @@ cp frontend/.env.example frontend/.env
 
 ### 3. Start Ganache (Local Blockchain)
 
-Ganache provides a personal Ethereum blockchain for development. This project is configured to work with the **Ganache UI (Desktop Application)**.
+Ganache provides a personal Ethereum blockchain for development. This project is optimized for the **Ganache UI (Desktop Application)**.
 
-1. **Launch & Quickstart:** Open Ganache and select **"Quickstart"**.
-2. **Verify Port:** The app defaults to port **`7545`**.
-   - _If your server is running on a different port, click the Gear Icon (Settings) -> Server tab -> Change Port Number to `7545` -> Save and Restart._
-3. **Retrieve Deployer Key:** In the Accounts tab, click the Key Icon next to the **first account (Index 0)**. Copy this Private Key and paste it into `backend/.env` under `PRIVATE_KEY`.
+1. **Create a Workspace (Highly Recommended):** 
+   - Open Ganache and select **"New Workspace (Ethereum)"**.
+   - **Workspace Name:** `ChainTrust`
+   - **Project Integration:** Add the `backend/truffle-config.js` (if exists) or just proceed.
+   - **Server Tab:** Set **Port Number** to `7545` and **Network ID** to `1337`.
+   - Click **Save Workspace**. Using a workspace ensures your contracts and accounts persist between restarts.
+   - _Note: If you use **Quickstart**, ensure the port is `7545` and avoid restarting Ganache frequently as it resets the state._
+
+2. **Retrieve Deployer Key:** In the Accounts tab, click the Key Icon next to the **first account (Index 0)**. Copy this Private Key and paste it into `backend/.env` under `PRIVATE_KEY`.
 
 ### 4. Deploy the Smart Contract (Initial Setup)
 

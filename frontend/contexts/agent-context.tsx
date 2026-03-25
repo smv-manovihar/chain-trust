@@ -1,11 +1,19 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
 import { agentApi, ChatSession } from "@/api/agent.api";
-import type { AgentMessage, AgentSSEEvent } from "@/types/agent.types";
+import type { AgentMessage } from "@/types/agent.types";
 import { useSSEStream, SSEEvent } from "@/hooks/use-sse-stream";
 import { toast } from "sonner";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 
 interface AgentContextType {
   sessions: ChatSession[];
@@ -31,7 +39,11 @@ interface AgentContextType {
   deleteSession: (id: string) => Promise<void>;
   renameSession: (id: string, name: string) => Promise<void>;
   retryMessage: (messageId: string, context?: any) => Promise<void>;
-  editMessage: (messageId: string, newContent: string, context?: any) => Promise<void>;
+  editMessage: (
+    messageId: string,
+    newContent: string,
+    context?: any,
+  ) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
   refreshSessions: () => Promise<void>;
   loadMoreSessions: () => Promise<void>;
@@ -44,9 +56,12 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(undefined);
+  const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(
+    undefined,
+  );
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -59,10 +74,13 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const [hasMoreSessions, setHasMoreSessions] = useState(true);
   const [isLoadingMoreSessions, setIsLoadingMoreSessions] = useState(false);
 
-  const situationalContext = React.useMemo(() => ({
-    route: pathname,
-    params: Object.fromEntries(searchParams.entries()),
-  }), [pathname, searchParams]);
+  const situationalContext = React.useMemo(
+    () => ({
+      route: pathname,
+      params: Object.fromEntries(searchParams.entries()),
+    }),
+    [pathname, searchParams],
+  );
 
   const isSubmittingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -79,28 +97,34 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   }, [searchParams, currentSessionId]);
 
   // Update URL when currentSessionId changes (only on specific pages if needed, but here we do it generally)
-  const updateUrl = useCallback((id: string | undefined) => {
-    // Only update if we are on a page that should have session syncing
-    if (!pathname.includes("/agent")) return;
+  const updateUrl = useCallback(
+    (id: string | undefined) => {
+      // Only update if we are on a page that should have session syncing
+      if (!pathname.includes("/agent")) return;
 
-    const params = new URLSearchParams(searchParams.toString());
-    if (id) {
-      params.set("session", id);
-    } else {
-      params.delete("session");
-    }
-    
-    const query = params.toString() ? `?${params.toString()}` : "";
-    const newUrl = `${pathname}${query}`;
-    
-    // Use replace to avoid bloating history
-    router.replace(newUrl);
-  }, [pathname, router, searchParams]);
+      const params = new URLSearchParams(searchParams.toString());
+      if (id) {
+        params.set("session", id);
+      } else {
+        params.delete("session");
+      }
 
-  const handleSetCurrentSessionId = useCallback((id: string | undefined) => {
-    setCurrentSessionId(id);
-    updateUrl(id);
-  }, [updateUrl]);
+      const query = params.toString() ? `?${params.toString()}` : "";
+      const newUrl = `${pathname}${query}`;
+
+      // Use replace to avoid bloating history
+      router.replace(newUrl);
+    },
+    [pathname, router, searchParams],
+  );
+
+  const handleSetCurrentSessionId = useCallback(
+    (id: string | undefined) => {
+      setCurrentSessionId(id);
+      updateUrl(id);
+    },
+    [updateUrl],
+  );
 
   const loadSessions = useCallback(async (search?: string) => {
     if (sessionsAbortRef.current) sessionsAbortRef.current.abort();
@@ -110,11 +134,21 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoadingSessions(true);
       const limit = 20;
-      const data = await agentApi.listSessions(search, limit, 0, controller.signal);
+      const data = await agentApi.listSessions(
+        search,
+        limit,
+        0,
+        controller.signal,
+      );
       setSessions(data);
       setHasMoreSessions(data.length === limit);
     } catch (error: any) {
-      if (error.name === "AbortError" || error.name === "CanceledError" || error.message === "canceled") return;
+      if (
+        error.name === "AbortError" ||
+        error.name === "CanceledError" ||
+        error.message === "canceled"
+      )
+        return;
       console.error("Failed to load sessions", error);
     } finally {
       setIsLoadingSessions(false);
@@ -131,7 +165,12 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
       const data = await agentApi.listMessages(sessionId, controller.signal);
       setMessages(data);
     } catch (error: any) {
-      if (error.name === "AbortError" || error.name === "CanceledError" || error.message === "canceled") return;
+      if (
+        error.name === "AbortError" ||
+        error.name === "CanceledError" ||
+        error.message === "canceled"
+      )
+        return;
       console.error("Failed to load messages", error);
     } finally {
       setIsLoadingMessages(false);
@@ -149,156 +188,171 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   }, [currentSessionId, loadMessages]);
 
   // SSE Management
-  const handleSSEEvent = useCallback((sseEvent: SSEEvent) => {
-    const { event, data } = sseEvent;
-    const msgId = data.message_id;
+  const handleSSEEvent = useCallback(
+    (sseEvent: SSEEvent) => {
+      const { event, data } = sseEvent;
+      const msgId = data.message_id;
 
-    switch (event) {
-      case "token":
-        if (msgId && data.content) {
-          setMessages((prev) => {
-            const existing = prev.find((m) => m.id === msgId);
-            if (existing) {
-              return prev.map((m) =>
+      switch (event) {
+        case "token":
+          if (msgId && data.content) {
+            setMessages((prev) => {
+              const existing = prev.find((m) => m.id === msgId);
+              if (existing) {
+                return prev.map((m) =>
+                  m.id === msgId
+                    ? {
+                        ...m,
+                        content: (m.content || "") + data.content!,
+                        status: "generating" as const,
+                      }
+                    : m,
+                );
+              }
+              return [
+                ...prev,
+                {
+                  id: msgId,
+                  session_id: currentSessionId!,
+                  role: "assistant",
+                  content: data.content!,
+                  status: "generating" as const,
+                  thoughts: [],
+                  edited: false,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                },
+              ];
+            });
+          }
+          break;
+
+        case "partial_response":
+          if (msgId && data.content) {
+            setMessages((prev) =>
+              prev.map((m) =>
                 m.id === msgId
                   ? {
                       ...m,
-                      content: (m.content || "") + data.content!,
+                      content: data.content!,
                       status: "generating" as const,
                     }
-                  : m
-              );
-            }
-            return [
-              ...prev,
-              {
-                id: msgId,
-                session_id: currentSessionId!,
-                role: "assistant",
-                content: data.content!,
-                status: "generating" as const,
-                thoughts: [],
-                edited: false,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              },
-            ];
-          });
-        }
-        break;
+                  : m,
+              ),
+            );
+          }
+          break;
 
-      case "partial_response":
-        if (msgId && data.content) {
+        case "tool_start":
+          if (msgId && data.tool) {
+            setMessages((prev) => {
+              const existing = prev.find((m) => m.id === msgId);
+              const thought = {
+                tool: data.tool!,
+                input: data.input,
+                status: data.status || ("running" as const),
+                message: data.message || `Running ${data.tool}...`,
+                tool_call_id: data.tool_call_id,
+              };
+
+              if (existing) {
+                return prev.map((m) =>
+                  m.id === msgId
+                    ? { ...m, thoughts: [...(m.thoughts || []), thought] }
+                    : m,
+                );
+              }
+              return [
+                ...prev,
+                {
+                  id: msgId,
+                  session_id: currentSessionId!,
+                  role: "assistant",
+                  content: "",
+                  status: "generating" as const,
+                  thoughts: [thought],
+                  edited: false,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                },
+              ];
+            });
+          }
+          break;
+
+        case "tool_end":
+          if (msgId && data.tool_call_id) {
+            setMessages((prev) =>
+              prev.map((m) => {
+                if (m.id !== msgId) return m;
+                return {
+                  ...m,
+                  thoughts: (m.thoughts || []).map((t: any) =>
+                    t.tool_call_id === data.tool_call_id
+                      ? {
+                          ...t,
+                          result: data.result,
+                          status: data.status || ("completed" as const),
+                          message: data.message,
+                          execution_time_ms: data.execution_time_ms,
+                        }
+                      : t,
+                  ),
+                };
+              }),
+            );
+          }
+          break;
+
+        case "name_updated":
+          if (data.name) {
+            setSessions((prev) =>
+              prev.map((s) =>
+                s.id === currentSessionId ? { ...s, name: data.name! } : s,
+              ),
+            );
+          }
+          break;
+
+        case "done":
+          setIsGenerating(false);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === msgId && m.status !== "error"
+                ? { ...m, status: "completed" as const }
+                : m,
+            ),
+          );
+          disconnect();
+          break;
+
+        case "error":
+          setIsGenerating(false);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === msgId
-                ? { ...m, content: data.content!, status: "generating" as const }
-                : m
-            )
+                ? {
+                    ...m,
+                    status: "error" as const,
+                    content:
+                      data.message ||
+                      m.content ||
+                      "An error occurred with the AI agent",
+                  }
+                : m,
+            ),
           );
-        }
-        break;
-
-      case "tool_start":
-        if (msgId && data.tool) {
-          setMessages((prev) => {
-            const existing = prev.find((m) => m.id === msgId);
-            const thought = {
-              tool: data.tool!,
-              input: data.input,
-              status: data.status || ("running" as const),
-              message: data.message || `Running ${data.tool}...`,
-              tool_call_id: data.tool_call_id,
-            };
-
-            if (existing) {
-              return prev.map((m) =>
-                m.id === msgId
-                  ? { ...m, thoughts: [...(m.thoughts || []), thought] }
-                  : m
-              );
-            }
-            return [
-              ...prev,
-              {
-                id: msgId,
-                session_id: currentSessionId!,
-                role: "assistant",
-                content: "",
-                status: "generating" as const,
-                thoughts: [thought],
-                edited: false,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              },
-            ];
-          });
-        }
-        break;
-
-      case "tool_end":
-        if (msgId && data.tool_call_id) {
-          setMessages((prev) =>
-            prev.map((m) => {
-              if (m.id !== msgId) return m;
-              return {
-                ...m,
-                thoughts: (m.thoughts || []).map((t: any) =>
-                  t.tool_call_id === data.tool_call_id
-                    ? {
-                        ...t,
-                        result: data.result,
-                        status: data.status || ("completed" as const),
-                        message: data.message,
-                        execution_time_ms: data.execution_time_ms,
-                      }
-                    : t
-                ),
-              };
-            })
-          );
-        }
-        break;
-
-      case "name_updated":
-        if (data.name) {
-          setSessions((prev) =>
-            prev.map((s) => (s.id === currentSessionId ? { ...s, name: data.name! } : s))
-          );
-        }
-        break;
-
-      case "done":
-        setIsGenerating(false);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === msgId && m.status !== "error" ? { ...m, status: "completed" as const } : m
-          )
-        );
-        disconnect();
-        break;
-
-      case "error":
-        setIsGenerating(false);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === msgId
-              ? {
-                  ...m,
-                  status: "error" as const,
-                  content: data.message || m.content || "An error occurred with the AI agent",
-                }
-              : m
-          )
-        );
-        toast.error(data.message || "An error occurred with the AI agent");
-        disconnect();
-        break;
-    }
-  }, [currentSessionId]);
+          toast.error(data.message || "An error occurred with the AI agent");
+          disconnect();
+          break;
+      }
+    },
+    [currentSessionId],
+  );
 
   const { connect, disconnect } = useSSEStream({
-    getUrl: () => (currentSessionId ? agentApi.getStreamUrl(currentSessionId) : ""),
+    getUrl: () =>
+      currentSessionId ? agentApi.getStreamUrl(currentSessionId) : "",
     onEvent: handleSSEEvent,
     onComplete: () => setIsGenerating(false),
   });
@@ -344,19 +398,32 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
       let user_message_id: string | undefined;
 
       if (isNewSession) {
-        const result: any = await agentApi.createSession(messageContent, context || situationalContext, controller.signal);
+        const result: any = await agentApi.createSession(
+          messageContent,
+          context || situationalContext,
+          controller.signal,
+        );
         sessionId = result.session_id;
         message_id = result.message_id;
         user_message_id = result.user_message_id;
 
         handleSetCurrentSessionId(sessionId);
         // Rename the optimistic message to the real ID and update session
-        setMessages((prev) => 
-          prev.map(m => m.id === tempUserMsgId ? { ...m, id: user_message_id!, session_id: sessionId! } : m)
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tempUserMsgId
+              ? { ...m, id: user_message_id!, session_id: sessionId! }
+              : m,
+          ),
         );
         await loadSessions();
       } else {
-        const result = await agentApi.sendChatMessage(sessionId!, messageContent, context || situationalContext, controller.signal);
+        const result = await agentApi.sendChatMessage(
+          sessionId!,
+          messageContent,
+          context || situationalContext,
+          controller.signal,
+        );
         message_id = result.message_id;
       }
 
@@ -376,8 +443,11 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
 
       connect();
     } catch (error: any) {
-      if (error.name === 'AbortError') return;
-      const errorMessage = error.response?.data?.detail || error.message || "Failed to send message";
+      if (error.name === "AbortError") return;
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to send message";
       toast.error(errorMessage);
 
       // Instead of rolling back the user message, add an error assistant message
@@ -430,108 +500,126 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const renameSession = async (id: string, name: string) => {
     try {
       await agentApi.renameSession(id, name);
-      setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
+      setSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, name } : s)),
+      );
       toast.success("Chat renamed");
     } catch (error) {
       toast.error("Failed to rename chat");
     }
   };
 
-  const retryMessage = useCallback(async (messageId: string, context?: any) => {
-    if (!currentSessionId || isSubmittingRef.current) return;
+  const retryMessage = useCallback(
+    async (messageId: string, context?: any) => {
+      if (!currentSessionId || isSubmittingRef.current) return;
 
-    isSubmittingRef.current = true;
-    setIsSending(true);
-    setIsGenerating(true);
+      isSubmittingRef.current = true;
+      setIsSending(true);
+      setIsGenerating(true);
 
-    try {
-      const result = await agentApi.retryChatMessage(currentSessionId, messageId, context || situationalContext);
-      
-      setMessages((prev) => {
-        const index = prev.findIndex((m) => m.id === messageId);
-        if (index === -1) return prev;
-        
-        const targetMsg = prev[index];
-        const sliceIndex = targetMsg.role === "user" ? index + 1 : index;
-        const truncatedMessages = prev.slice(0, sliceIndex);
+      try {
+        const result = await agentApi.retryChatMessage(
+          currentSessionId,
+          messageId,
+          context || situationalContext,
+        );
 
-        // Add Assistant Placeholder with real ID from backend
-        const assistantPlaceholder: AgentMessage = {
-          id: result.message_id,
-          session_id: currentSessionId!,
-          role: "assistant",
-          content: "",
-          status: "generating",
-          thoughts: [],
-          edited: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        
-        return [...truncatedMessages, assistantPlaceholder];
-      });
-      
-      connect();
-    } catch (err) {
-      toast.error("Failed to retry");
-      setIsGenerating(false);
-      throw err;
-    } finally {
-      setIsSending(false);
-      isSubmittingRef.current = false;
-    }
-  }, [connect, currentSessionId, situationalContext]);
+        setMessages((prev) => {
+          const index = prev.findIndex((m) => m.id === messageId);
+          if (index === -1) return prev;
 
-  const editMessage = useCallback(async (messageId: string, newContent: string, context?: any) => {
-    if (!currentSessionId || isSubmittingRef.current || !newContent.trim()) return;
+          const targetMsg = prev[index];
+          const sliceIndex = targetMsg.role === "user" ? index + 1 : index;
+          const truncatedMessages = prev.slice(0, sliceIndex);
 
-    isSubmittingRef.current = true;
-    setIsSending(true);
-    setIsGenerating(true);
+          // Add Assistant Placeholder with real ID from backend
+          const assistantPlaceholder: AgentMessage = {
+            id: result.message_id,
+            session_id: currentSessionId!,
+            role: "assistant",
+            content: "",
+            status: "generating",
+            thoughts: [],
+            edited: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
 
-    try {
-      const result = await agentApi.editChatMessage(currentSessionId, messageId, newContent, context || situationalContext);
-      
-      setMessages((prev) => {
-        const index = prev.findIndex((m) => m.id === messageId);
-        if (index === -1) return prev;
-        
-        // Update the user message and truncate everything after it
-        const updatedMessages = [...prev.slice(0, index + 1)];
-        updatedMessages[index] = {
-          ...updatedMessages[index],
-          content: newContent,
-          updated_at: new Date().toISOString(),
-          edited: true,
-        };
+          return [...truncatedMessages, assistantPlaceholder];
+        });
 
-        // Add Assistant Placeholder with real ID from backend
-        const assistantPlaceholder: AgentMessage = {
-          id: result.message_id,
-          session_id: currentSessionId,
-          role: "assistant",
-          content: "",
-          status: "generating",
-          thoughts: [],
-          edited: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        
-        return [...updatedMessages, assistantPlaceholder];
-      });
-      
-      connect();
-    } catch (error: any) {
-      if (error.name === 'AbortError') return;
-      toast.error("Failed to edit message");
-      setIsGenerating(false);
-      throw error;
-    } finally {
-      setIsSending(false);
-      isSubmittingRef.current = false;
-    }
-  }, [connect, currentSessionId, situationalContext]);
+        connect();
+      } catch (err) {
+        toast.error("Failed to retry");
+        setIsGenerating(false);
+        throw err;
+      } finally {
+        setIsSending(false);
+        isSubmittingRef.current = false;
+      }
+    },
+    [connect, currentSessionId, situationalContext],
+  );
+
+  const editMessage = useCallback(
+    async (messageId: string, newContent: string, context?: any) => {
+      if (!currentSessionId || isSubmittingRef.current || !newContent.trim())
+        return;
+
+      isSubmittingRef.current = true;
+      setIsSending(true);
+      setIsGenerating(true);
+
+      try {
+        const result = await agentApi.editChatMessage(
+          currentSessionId,
+          messageId,
+          newContent,
+          context || situationalContext,
+        );
+
+        setMessages((prev) => {
+          const index = prev.findIndex((m) => m.id === messageId);
+          if (index === -1) return prev;
+
+          // Update the user message and truncate everything after it
+          const updatedMessages = [...prev.slice(0, index + 1)];
+          updatedMessages[index] = {
+            ...updatedMessages[index],
+            content: newContent,
+            updated_at: new Date().toISOString(),
+            edited: true,
+          };
+
+          // Add Assistant Placeholder with real ID from backend
+          const assistantPlaceholder: AgentMessage = {
+            id: result.message_id,
+            session_id: currentSessionId,
+            role: "assistant",
+            content: "",
+            status: "generating",
+            thoughts: [],
+            edited: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          return [...updatedMessages, assistantPlaceholder];
+        });
+
+        connect();
+      } catch (error: any) {
+        if (error.name === "AbortError") return;
+        toast.error("Failed to edit message");
+        setIsGenerating(false);
+        throw error;
+      } finally {
+        setIsSending(false);
+        isSubmittingRef.current = false;
+      }
+    },
+    [connect, currentSessionId, situationalContext],
+  );
 
   const deleteMessage = async (messageId: string) => {
     if (!currentSessionId) return;
@@ -550,7 +638,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
 
   const loadMoreSessions = useCallback(async () => {
     if (isLoadingMoreSessions || !hasMoreSessions) return;
-    
+
     if (loadMoreAbortRef.current) loadMoreAbortRef.current.abort();
     const controller = new AbortController();
     loadMoreAbortRef.current = controller;
@@ -559,24 +647,39 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
       setIsLoadingMoreSessions(true);
       const limit = 20;
       const offset = sessions.length;
-      const data = await agentApi.listSessions(searchQuery, limit, offset, controller.signal);
-      
+      const data = await agentApi.listSessions(
+        searchQuery,
+        limit,
+        offset,
+        controller.signal,
+      );
+
       if (data.length > 0) {
         setSessions((prev) => [...prev, ...data]);
       }
       setHasMoreSessions(data.length === limit);
     } catch (error: any) {
-      if (error.name === "AbortError" || error.name === "CanceledError" || error.message === "canceled") return;
+      if (
+        error.name === "AbortError" ||
+        error.name === "CanceledError" ||
+        error.message === "canceled"
+      )
+        return;
       console.error("Failed to load more sessions:", error);
     } finally {
       setIsLoadingMoreSessions(false);
     }
   }, [hasMoreSessions, isLoadingMoreSessions, searchQuery, sessions.length]);
 
-  const refreshSessions = useCallback(() => loadSessions(searchQuery), [loadSessions, searchQuery]);
+  const refreshSessions = useCallback(
+    () => loadSessions(searchQuery),
+    [loadSessions, searchQuery],
+  );
 
   // Sync sessions on mount and search changes
   useEffect(() => {
+    if (!isAuthenticated || isAuthLoading) return;
+
     const timer = setTimeout(() => {
       loadSessions(searchQuery);
     }, 300); // 300ms debounce
@@ -584,7 +687,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timer);
       sessionsAbortRef.current?.abort();
     };
-  }, [loadSessions, searchQuery]);
+  }, [loadSessions, searchQuery, isAuthenticated, isAuthLoading]);
 
   return (
     <AgentContext.Provider

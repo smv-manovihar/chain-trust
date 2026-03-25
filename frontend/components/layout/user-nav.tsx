@@ -32,10 +32,7 @@ export function UserNav() {
   };
 
   const getDashboardLink = () => {
-    if (user?.role === "manufacturer") {
-      return "/manufacturer";
-    }
-    return "/customer";
+    return "/verify";
   };
 
   if (isLoading) {

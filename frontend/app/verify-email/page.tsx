@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { verifyEmailWithOTP, resendVerificationEmail } from "@/api";
+import { resendVerificationEmail } from "@/api/auth.api";
 import { 
   InputOTP, 
   InputOTPGroup, 
@@ -20,7 +20,7 @@ import { AuthLayout } from "@/components/layout/auth-layout";
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user, refreshUser, verifyEmailWithToken, changeEmail } = useAuth();
+  const { user, refreshUser, verifyEmailWithToken, verifyEmailWithOTP, changeEmail, isLoading } = useAuth();
   
   const [otp, setOtp] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
@@ -89,7 +89,6 @@ function VerifyEmailContent() {
       toast.success("Identity Verified", {
         description: "Your account is now secure."
       });
-      await refreshUser();
       
       // Small delay to show success state
       setTimeout(() => {
@@ -141,23 +140,12 @@ function VerifyEmailContent() {
     }
   };
 
-  if (!email && !isVerifying) {
-      return (
-          <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
-              <Card className="max-w-md w-full border-none shadow-2xl bg-background/80 backdrop-blur-xl">
-                  <CardHeader className="text-center">
-                    <div className="mx-auto w-12 h-12 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
-                        <Lock className="w-6 h-6 text-destructive" />
-                    </div>
-                    <CardTitle>Session Expired</CardTitle>
-                    <CardDescription>Please login again to continue verification.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                      <Button onClick={() => router.push("/login")} className="w-full">Go to Login</Button>
-                  </CardContent>
-              </Card>
-          </div>
-      )
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (

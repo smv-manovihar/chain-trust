@@ -33,10 +33,10 @@ export const agentApi = {
         session_id: string;
         user_message_id: string;
         message_id: string
-      }>("/chat/session", { message, context }, { signal });
+      }>("/ai/session", { message, context }, { signal });
       return response.data;
     }
-    const response = await agentClient.post<{ session_id: string }>("/chat/session", null, { signal });
+    const response = await agentClient.post<{ session_id: string }>("/ai/session", null, { signal });
     return response.data;
   },
 
@@ -45,7 +45,7 @@ export const agentApi = {
     if (!search && offset === 0 && listSessionsPromise) return listSessionsPromise;
 
     const fetchSessions = async () => {
-      const response = await agentClient.get<ChatSession[]>('/chat/sessions', {
+      const response = await agentClient.get<ChatSession[]>('/ai/sessions', {
         params: { search, limit, offset },
         signal,
       });
@@ -69,7 +69,7 @@ export const agentApi = {
   },
 
   renameSession: async (sessionId: string, name: string, signal?: AbortSignal) => {
-    const response = await agentClient.put(`/chat/sessions/${sessionId}`, null, {
+    const response = await agentClient.put(`/ai/sessions/${sessionId}`, null, {
       params: { name },
       signal,
     });
@@ -77,18 +77,18 @@ export const agentApi = {
   },
 
   deleteSession: async (sessionId: string, signal?: AbortSignal) => {
-    const response = await agentClient.delete(`/chat/sessions/${sessionId}`, { signal });
+    const response = await agentClient.delete(`/ai/sessions/${sessionId}`, { signal });
     return response.data;
   },
 
   // Message Management
   listMessages: async (sessionId: string, signal?: AbortSignal) => {
-    const response = await agentClient.get<AgentMessage[]>(`/chat/${sessionId}/messages`, { signal });
+    const response = await agentClient.get<AgentMessage[]>(`/ai/${sessionId}/messages`, { signal });
     return response.data;
   },
 
   sendChatMessage: async (sessionId: string, message: string, context?: any, signal?: AbortSignal) => {
-    const response = await agentClient.post(`/chat/${sessionId}/chat`, {
+    const response = await agentClient.post(`/ai/${sessionId}/chat`, {
       message,
       context,
     }, { signal });
@@ -96,7 +96,7 @@ export const agentApi = {
   },
 
   editChatMessage: async (sessionId: string, messageId: string, message: string, context?: any, signal?: AbortSignal) => {
-    const response = await agentClient.put(`/chat/${sessionId}/messages/${messageId}`, {
+    const response = await agentClient.put(`/ai/${sessionId}/messages/${messageId}`, {
       message,
       context,
     }, { signal });
@@ -104,12 +104,12 @@ export const agentApi = {
   },
 
   deleteChatMessage: async (sessionId: string, messageId: string, signal?: AbortSignal) => {
-    const response = await agentClient.delete(`/chat/${sessionId}/messages/${messageId}`, { signal });
+    const response = await agentClient.delete(`/ai/${sessionId}/messages/${messageId}`, { signal });
     return response.data;
   },
 
   retryChatMessage: async (sessionId: string, messageId: string, context?: any, signal?: AbortSignal) => {
-    const response = await agentClient.post<{ status: string, message_id: string }>(`/chat/${sessionId}/retry/${messageId}`, {
+    const response = await agentClient.post<{ status: string, message_id: string }>(`/ai/${sessionId}/retry/${messageId}`, {
       context
     }, { signal });
     return response.data;
@@ -118,6 +118,6 @@ export const agentApi = {
   // SSE Stream URL
   getStreamUrl: (sessionId: string) => {
     const baseURL = agentClient.defaults.baseURL || 'http://localhost:8000/api';
-    return `${baseURL}/chat/${sessionId}/stream`;
+    return `${baseURL}/ai/${sessionId}/stream`;
   },
 };

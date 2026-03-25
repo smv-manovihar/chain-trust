@@ -7,12 +7,14 @@ import React, {
   useState,
   ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import {
   getCurrentUser,
   logout as apiLogout,
   login as apiLogin,
   register as apiRegister,
   verifyEmailWithToken as apiVerifyEmailWithToken,
+  verifyEmailWithOTP as apiVerifyEmailWithOTP,
   changeEmail as apiChangeEmail,
   User,
 } from "@/api";
@@ -43,6 +45,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
   verifyEmailWithToken: (token: string) => Promise<void>;
+  verifyEmailWithOTP: (data: { email: string; otp: string }) => Promise<void>;
   changeEmail: (oldEmail: string, newEmail: string) => Promise<void>;
 }
 
@@ -56,6 +59,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!isLoading && user && !user.isEmailVerified) {
+      if (
+        (pathname.startsWith("/customer") || 
+         pathname.startsWith("/manufacturer") || 
+         pathname.startsWith("/settings")) &&
+        !pathname.startsWith("/verify-email")
+      ) {
+        window.location.href = "/verify-email";
+      }
+    }
+  }, [user, isLoading, pathname]);
 
   const cacheAvatarBlob = async (url: string) => {
     if (typeof window === "undefined" || !url) return;
@@ -234,6 +251,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  const verifyEmailWithOTP = async (data: { email: string; otp: string }) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const resp = await apiVerifyEmailWithOTP(data);
+      setUser(resp.user);
+    } catch (err: any) {
+      setError(err.message || "OTP Verification failed");
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const changeEmail = async (oldEmail: string, newEmail: string) => {
     setIsLoading(true);
     setError(null);
@@ -272,6 +303,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     logout,
     setUser,
     verifyEmailWithToken,
+    verifyEmailWithOTP,
     changeEmail,
   };
 

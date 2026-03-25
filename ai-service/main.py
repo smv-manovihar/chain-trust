@@ -64,7 +64,7 @@ app.add_middleware(
 )
 
 
-@app.post("/api/chat/session")
+@app.post("/api/ai/session")
 async def create_session(
     req: Optional[ChatRequest] = None,
     background_tasks: BackgroundTasks = None,
@@ -100,7 +100,7 @@ async def create_session(
         return {"session_id": session_id}
 
 
-@app.get("/api/chat/sessions")
+@app.get("/api/ai/sessions")
 async def list_sessions(
     search: str = None, 
     limit: int = 20, 
@@ -112,7 +112,7 @@ async def list_sessions(
     return sessions
 
 
-@app.put("/api/chat/sessions/{session_id}")
+@app.put("/api/ai/sessions/{session_id}")
 async def rename_session(
     session_id: str,
     name: str,
@@ -130,7 +130,7 @@ async def rename_session(
     return {"status": "renamed", "name": name}
 
 
-@app.delete("/api/chat/sessions/{session_id}")
+@app.delete("/api/ai/sessions/{session_id}")
 async def delete_session(
     session_id: str, payload: dict = Depends(get_current_user_payload)
 ):
@@ -143,7 +143,7 @@ async def delete_session(
     return {"success": success}
 
 
-@app.get("/api/chat/{session_id}/messages")
+@app.get("/api/ai/{session_id}/messages")
 async def list_messages(
     session_id: str, payload: dict = Depends(get_current_user_payload)
 ):
@@ -156,7 +156,7 @@ async def list_messages(
     return messages
 
 
-@app.get("/api/chat/{session_id}/stream")
+@app.get("/api/ai/{session_id}/stream")
 async def subscribe_stream(
     session_id: str, payload: dict = Depends(get_current_user_payload)
 ):
@@ -215,7 +215,7 @@ async def run_chat_service(
     await service.process_chat(session_id, req_data, assistant_message_id)
 
 
-@app.post("/api/chat/{session_id}/chat")
+@app.post("/api/ai/{session_id}/chat")
 async def send_chat_message(
     session_id: str,
     req: ChatRequest,
@@ -250,7 +250,7 @@ async def send_chat_message(
     return {"status": "processing", "message_id": assistant_message_id}
 
 
-@app.put("/api/chat/{session_id}/messages/{message_id}")
+@app.put("/api/ai/{session_id}/messages/{message_id}")
 async def edit_chat_message(
     session_id: str,
     message_id: str,
@@ -287,7 +287,7 @@ async def edit_chat_message(
     return {"status": "processing", "message_id": assist_msg["id"]}
 
 
-@app.delete("/api/chat/{session_id}/messages/{message_id}")
+@app.delete("/api/ai/{session_id}/messages/{message_id}")
 async def delete_chat_message(
     session_id: str, message_id: str, payload: dict = Depends(get_current_user_payload)
 ):
@@ -311,7 +311,7 @@ async def delete_chat_message(
     return {"status": "deleted"}
 
 
-@app.post("/api/chat/{session_id}/retry/{message_id}")
+@app.post("/api/ai/{session_id}/retry/{message_id}")
 async def retry_chat_message(
     session_id: str,
     message_id: str,
