@@ -92,18 +92,26 @@ def setup_env():
         def get_secret(key, prompt, default=None):
             if key in existing and existing[key] not in placeholders:
                 existing_val = existing[key]
-                display_val = f"{existing_val[:10]}..." if len(existing_val) > 10 else existing_val
+                display_val = (
+                    f"{existing_val[:10]}..."
+                    if len(existing_val) > 10
+                    else existing_val
+                )
                 print_cyan(f"[?] Found existing {key}: {display_val}")
                 if confirm("    Use this? [Y/n]: ", default_yes=True):
                     return existing_val
-            
-            val = input(f"{prompt} (default: {default}, Enter to use default/skip): ").strip() if default else input(f"{prompt}: ").strip()
+
+            val = (
+                input(
+                    f"{prompt} (default: {default}, Enter to use default/skip): "
+                ).strip()
+                if default
+                else input(f"{prompt}: ").strip()
+            )
             return val or default
 
         secrets = {}
-        print_yellow(
-            "Please confirm or enter the following secrets:"
-        )
+        print_yellow("Please confirm or enter the following secrets:")
 
         secrets["JWT_SECRET"] = get_secret(
             "JWT_SECRET", "Enter JWT_SECRET", "chain_trust_secret"
@@ -117,21 +125,25 @@ def setup_env():
             print_cyan(f"[?] Found existing OPENROUTER_API_KEY: {display_val}")
             if confirm("    Use this? [Y/n]: ", default_yes=True):
                 use_existing_or = True
-        
+
         if not use_existing_or:
             while True:
                 print_yellow("Tip: Your key should start with 'sk-or-v1-'.")
                 print(
                     "Type 'open' to visit OpenRouter and generate a key, or enter your key directly."
                 )
-                or_input = input("Enter OPENROUTER_API_KEY (or 'open' / Enter to skip): ").strip()
+                or_input = input(
+                    "Enter OPENROUTER_API_KEY (or 'open' / Enter to skip): "
+                ).strip()
 
                 if or_input.lower() == "open":
                     webbrowser.open("https://openrouter.ai/settings/keys")
                     continue
 
                 if not or_input:
-                    print_red("No OpenRouter key provided. AI features will be disabled.")
+                    print_red(
+                        "No OpenRouter key provided. AI features will be disabled."
+                    )
                     or_key = "your_openrouter_api_key"
                     break
 
@@ -160,35 +172,53 @@ def setup_env():
         smtp_keys = ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"]
         use_existing_smtp = False
         if all(k in existing and existing[k] for k in smtp_keys):
-             print_cyan("[?] Found existing SMTP configuration.")
-             if confirm("    Use this? [Y/n]: ", default_yes=True):
-                 use_existing_smtp = True
-                 for k in smtp_keys:
-                     secrets[k] = existing[k]
-        
+            print_cyan("[?] Found existing SMTP configuration.")
+            if confirm("    Use this? [Y/n]: ", default_yes=True):
+                use_existing_smtp = True
+                for k in smtp_keys:
+                    secrets[k] = existing[k]
+
         if not use_existing_smtp:
-            print_yellow("\nSMTP is required for email verification and security alerts.")
-            if not confirm("Do you already have SMTP credentials (e.g., from Brevo)? [Y/n]: "):
-                print_cyan("\nWe recommend using Brevo as it provides a free SMTP relay.")
+            print_yellow(
+                "\nSMTP is required for email verification and security alerts."
+            )
+            if not confirm(
+                "Do you already have SMTP credentials (e.g., from Brevo)? [Y/n]: "
+            ):
+                print_cyan(
+                    "\nWe recommend using Brevo as it provides a free SMTP relay."
+                )
                 if confirm("Open Brevo signup page? [Y/n]: "):
                     webbrowser.open("https://www.brevo.com/")
                     print_cyan("\nInstructions:")
                     print("1. Create an account on Brevo.")
-                    print("2. Navigate to 'SMTP & API' in the left sidebar: https://app.brevo.com/settings/keys/smtp")
-                    print("3. In the 'SMTP & API' section, click 'Generate a new SMTP key'.")
-                    print("4. This key is your EMAIL_PASS. Your EMAIL_USER is your Brevo login email.")
-                    print("5. Important: Use your registered email (Gmail/Outlook) as the sender.")
+                    print(
+                        "2. Click on the settings icon (top-right) -> 'SMTP & API' (left sidebar)."
+                    )
+                    print("   Direct link: https://app.brevo.com/settings/keys/smtp")
+                    print(
+                        "3. In the 'SMTP & API' section, click 'Generate a new SMTP key'."
+                    )
+                    print(
+                        "4. COPY AND SAVE this key immediately. It is your EMAIL_PASS."
+                    )
+                    print("5. Also COPY the following from the same page:")
+                    print("   - SMTP Server: smtp-relay.brevo.com (use for EMAIL_HOST)")
+                    print("   - Port: 587 (use for EMAIL_PORT)")
+                    print("   - Login: [some-id]@smtp-brevo.com (use for EMAIL_USER)")
                     input("\nPress Enter once you have your credentials ready...")
 
             while True:
                 secrets["EMAIL_HOST"] = input(
-                    "Enter EMAIL_HOST (e.g. smtp-relay.brevo.com): "
+                    "Enter EMAIL_HOST (Brevo: smtp-relay.brevo.com): "
                 ).strip()
-                secrets["EMAIL_PORT"] = input("Enter EMAIL_PORT (e.g. 587): ").strip()
+                secrets["EMAIL_PORT"] = input("Enter EMAIL_PORT (Brevo: 587): ").strip()
                 secrets["EMAIL_USER"] = input(
-                    "Enter EMAIL_USER (e.g. your@email.com): "
+                    "Enter EMAIL_USER (Brevo Login, e.g. 12345@smtp-brevo.com): "
                 ).strip()
-                secrets["EMAIL_PASS"] = input("Enter EMAIL_PASS (App Password/SMTP Key): ").strip()
+                secrets["EMAIL_PASS"] = input(
+                    "Enter EMAIL_PASS (Brevo SMTP Key): "
+                ).strip()
                 if (
                     secrets["EMAIL_HOST"]
                     and secrets["EMAIL_PORT"]
@@ -206,7 +236,7 @@ def setup_env():
         for k, v in secrets.items():
             display_v = f"{v[:10]}..." if len(v) > 10 else v
             print(f"  {k}: {display_v}")
-        
+
         if confirm("\nAre these correct? [Y/n]: "):
             break
 
@@ -221,19 +251,23 @@ def setup_env():
     # Root
     if (root / ".env.example").exists() and not (root / ".env").exists():
         shutil.copy(".env.example", ".env")
-    
+
     update_env_file(root / ".env", secrets)
 
     # Backend
-    if (root / "backend" / ".env.example").exists() and not (root / "backend" / ".env").exists():
+    if (root / "backend" / ".env.example").exists() and not (
+        root / "backend" / ".env"
+    ).exists():
         shutil.copy("backend/.env.example", "backend/.env")
-    
+
     update_env_file(root / "backend" / ".env", secrets)
 
     # Frontend
-    if (root / "frontend" / ".env.example").exists() and not (root / "frontend" / ".env").exists():
+    if (root / "frontend" / ".env.example").exists() and not (
+        root / "frontend" / ".env"
+    ).exists():
         shutil.copy("frontend/.env.example", "frontend/.env")
-    
+
     update_env_file(root / "frontend" / ".env", frontend_secrets)
 
     # AI Service
@@ -293,37 +327,63 @@ def handle_prerequisites():
                             "Could not find 'node' in PATH. Try checking again?"
                         )
                         if confirm("Check again? [Y/n]: "):
-                            pass # Loop continues
+                            pass  # Loop continues
                         else:
-                            break # Exit loop if user doesn't want to check again
+                            break  # Exit loop if user doesn't want to check again
 
     # 2. Handle pnpm via npm
     if check_command("pnpm"):
         print_green("[✓] pnpm is already installed.")
     else:
         print_red("[✗] pnpm is missing.")
-        if confirm("Install pnpm via 'npm install -g pnpm'? [Y/n]: "):
-            if run_command(["npm", "install", "-g", "pnpm"], shell=True):
-                print_green("[✓] pnpm installed via npm.")
+        while True:
+            if confirm("Install pnpm via 'npm install -g pnpm'? [Y/n]: "):
+                if run_command(["npm", "install", "-g", "pnpm"], shell=True):
+                    if check_command("pnpm"):
+                        print_green("[✓] pnpm verified.")
+                        break
+                    else:
+                        print_red("pnpm installed but still not found in PATH.")
+                else:
+                    print_red("Failed to install pnpm via npm.")
+                    webbrowser.open("https://pnpm.io/installation")
+            
+            if confirm("Have you finished installing pnpm manually? [Y/n]: "):
+                if check_command("pnpm"):
+                    print_green("[✓] pnpm verified.")
+                    break
+                else:
+                    print_yellow("Could not find 'pnpm'. Try checking again?")
             else:
-                print_red("Failed to install pnpm via npm.")
-                webbrowser.open("https://pnpm.io/installation")
-                input("Press Enter once you have installed pnpm manually...")
+                break
 
     # 3. Handle uv via pip
     if check_command("uv"):
         print_green("[✓] uv is already installed.")
     else:
         print_red("[✗] uv is missing.")
-        if confirm("Install uv via 'pip install uv'? [Y/n]: "):
-            if run_command([sys.executable, "-m", "pip", "install", "uv"]):
-                print_green("[✓] uv installed via pip.")
+        while True:
+            if confirm("Install uv via 'pip install uv'? [Y/n]: "):
+                if run_command([sys.executable, "-m", "pip", "install", "uv"]):
+                    if check_command("uv"):
+                        print_green("[✓] uv verified.")
+                        break
+                    else:
+                        print_red("uv installed but still not found in PATH.")
+                else:
+                    print_red("Failed to install uv via pip.")
+                    webbrowser.open(
+                        "https://docs.astral.sh/uv/getting-started/installation/"
+                    )
+
+            if confirm("Have you finished installing uv manually? [Y/n]: "):
+                if check_command("uv"):
+                    print_green("[✓] uv verified.")
+                    break
+                else:
+                    print_yellow("Could not find 'uv'. Try checking again?")
             else:
-                print_red("Failed to install uv via pip.")
-                webbrowser.open(
-                    "https://docs.astral.sh/uv/getting-started/installation/"
-                )
-                input("Press Enter once you have installed uv manually...")
+                break
 
     # 4. Handle MinIO
     root = Path(".")
@@ -399,26 +459,34 @@ def handle_prerequisites():
         print_green("[✓] Ganache UI detected.")
     else:
         print_red("[✗] Ganache UI NOT detected.")
-        # Only suggest download, don't force a blocking confirmation for now
-        print_yellow(
-            "Tip: If you've installed it via the Microsoft Store, it might be in a restricted path."
-        )
-        if confirm("Open Ganache download page? [Y/n]: "):
-            webbrowser.open("https://trufflesuite.com/ganache/")
+        while True:
+            if confirm("Open Ganache download page? [Y/n]: "):
+                webbrowser.open("https://trufflesuite.com/ganache/")
+            
+            if confirm("Have you finished installing Ganache UI? [Y/n]: "):
+                if check_ganache_ui():
+                    print_green("[✓] Ganache UI verified.")
+                    break
+                else:
+                    print_yellow("Could not find 'Ganache.exe'. Try checking again?")
+            else:
+                break
 
     # 6. Handle MongoDB
     def check_mongodb():
         # 1. Try global path
         if check_command("mongod"):
             try:
-                res = subprocess.run(["mongod", "--version"], capture_output=True, text=True, check=False)
+                res = subprocess.run(
+                    ["mongod", "--version"], capture_output=True, text=True, check=False
+                )
                 match = re.search(r"db version v(\d+)\.", res.stdout)
                 if match:
                     ver = int(match.group(1))
                     return True, ver, "mongod"
             except Exception:
                 return True, None, "mongod"
-        
+
         # 2. Try dynamic path scanning on Windows
         base_path = Path("C:/Program Files/MongoDB/Server")
         if base_path.exists():
@@ -429,7 +497,12 @@ def handle_prerequisites():
                     exe = v_dir / "bin" / "mongod.exe"
                     if exe.exists():
                         try:
-                            res = subprocess.run([str(exe), "--version"], capture_output=True, text=True, check=False)
+                            res = subprocess.run(
+                                [str(exe), "--version"],
+                                capture_output=True,
+                                text=True,
+                                check=False,
+                            )
                             match = re.search(r"db version v(\d+)\.", res.stdout)
                             if match:
                                 return True, int(match.group(1)), str(exe)
@@ -441,30 +514,46 @@ def handle_prerequisites():
 
     is_mongo, mongo_ver, mongo_path = check_mongodb()
     if is_mongo:
-        if mongo_ver and mongo_ver < 8:
-            print_yellow(f"[!] MongoDB {mongo_ver}.x detected.")
-            print_red("URGENT: This project requires MongoDB 8.0 or higher for full compatibility.")
-            if confirm("Open MongoDB download page to upgrade? [Y/n]: "):
-                webbrowser.open("https://www.mongodb.com/try/download/community")
-                input("\nPress Enter once you have upgraded MongoDB...")
-        else:
-            ver_str = f" v{mongo_ver}.x" if mongo_ver else ""
-            print_green(f"[✓] MongoDB{ver_str} (mongod) is already installed.")
-    else:
-        print_red("[✗] MongoDB (mongod) is missing.")
-        if confirm("Open MongoDB download page? [Y/n]: "):
-            webbrowser.open("https://www.mongodb.com/try/download/community")
-            while True:
-                if confirm("Have you finished installing MongoDB? [Y/n]: "):
+        while True:
+            if mongo_ver and mongo_ver < 8:
+                print_yellow(f"[!] MongoDB {mongo_ver}.x detected.")
+                print_red(
+                    "URGENT: This project requires MongoDB 8.0 or higher for full compatibility."
+                )
+                if confirm("Open MongoDB download page to upgrade? [Y/n]: "):
+                    webbrowser.open("https://www.mongodb.com/try/download/community")
+                
+                if confirm("Have you finished upgrading MongoDB? [Y/n]: "):
                     is_mongo, mongo_ver, mongo_path = check_mongodb()
-                    if is_mongo:
-                        print_green("[✓] MongoDB verified.")
+                    if is_mongo and mongo_ver and mongo_ver >= 8:
+                        print_green(f"[✓] MongoDB v{mongo_ver}.x verified.")
                         break
                     else:
-                        print_yellow("Could not find 'mongod'. Try checking again?")
-                        if not confirm("Check again? [Y/n]: "):
-                            break
-    
+                        print_yellow(f"MongoDB version still {mongo_ver}.x or not found. Try checking again?")
+                else:
+                    break
+            else:
+                ver_str = f" v{mongo_ver}.x" if mongo_ver else ""
+                print_green(f"[✓] MongoDB{ver_str} (mongod) is already installed.")
+                break
+    else:
+        print_red("[✗] MongoDB (mongod) is missing.")
+        while True:
+            if confirm("Open MongoDB download page? [Y/n]: "):
+                webbrowser.open("https://www.mongodb.com/try/download/community")
+            
+            if confirm("Have you finished installing MongoDB? [Y/n]: "):
+                is_mongo, mongo_ver, mongo_path = check_mongodb()
+                if is_mongo:
+                    if mongo_ver and mongo_ver < 8:
+                        print_yellow(f"[!] MongoDB {mongo_ver}.x installed, but version 8.0+ is recommended.")
+                    print_green("[✓] MongoDB verified.")
+                    break
+                else:
+                    print_yellow("Could not find 'mongod'. Try checking again?")
+            else:
+                break
+
     # Store for final instructions
     globals()["MONGO_CMD"] = mongo_path or "mongod"
 
@@ -493,10 +582,8 @@ def setup_metamask_tutorial():
 
     print_cyan("\n--- Phase 2: Importing Ganache Wallet ---")
     print_yellow("Follow these steps to link your local blockchain to MetaMask:")
-    print_yellow(
-        "1. In MetaMask, click the Network selector (top-left) -> 'Add Network'."
-    )
-    print_yellow("2. Click 'Add a network manually'.")
+    print_yellow("1. Click on the right-side hamburger menu OR the settings icon.")
+    print_yellow("2. Select 'Networks' options and then click 'Add a custom network'.")
     print_yellow("3. Enter these details:")
     print("   - Network Name: ChainTrust Dev")
     print("   - RPC URL: http://127.0.0.1:7545")
@@ -506,50 +593,76 @@ def setup_metamask_tutorial():
         if confirm("Have you added the 'ChainTrust Dev' network? [Y/n]: "):
             break
 
-    print_yellow("\n4. In MetaMask, click the Account icon -> 'Import Account'.")
-    print_yellow("5. Paste a DIFFERENT Ganache Private Key (e.g., Index 1 or later).")
-    print_yellow("   IMPORTANT: Account 0 is used by the system as the Service Provider (ChainTrust).")
-    print_yellow("   To mimic a 'Manufacturer' or 'User', you MUST use a different account.")
+    print_yellow("\n4. Click on the Account icon OR the 'Account' label in the header.")
+    print_yellow("5. Select 'Add wallet', then click 'Import an Account'.")
+    print_yellow("6. Paste a DIFFERENT Ganache Private Key (e.g., Index 1 or later).")
+    print_yellow(
+        "   IMPORTANT: Account 0 is used by the system as the Service Provider (ChainTrust)."
+    )
+    print_yellow(
+        "   To mimic a 'Manufacturer' or 'User', you MUST use a different account."
+    )
     print_yellow(
         "   (You can find these in Ganache UI under the 'keys' icon for each account)."
     )
     print_cyan("\n[!] WHY DIFFERENT?")
-    print_yellow("   The smart contract handles transactions between the Manufacturer (You) and")
-    print_yellow("   ChainTrust (Service Provider). Using Account 1+ makes testing realistic.")
+    print_yellow(
+        "   The smart contract handles transactions between the Manufacturer (You) and"
+    )
+    print_yellow(
+        "   ChainTrust (Service Provider). Using Account 1+ makes testing realistic."
+    )
     while True:
-        if confirm("Have you successfully imported a DIFFERENT account (Index 1+)? [Y/n]: "):
+        if confirm(
+            "Have you successfully imported a DIFFERENT account (Index 1+)? [Y/n]: "
+        ):
             break
 
     print_green("\nWallet & Account setup complete!")
 
+
 def launch_terminals():
     header("Launching Services")
     print_cyan("\n--- Starting Automatic Terminals ---")
-    
+
     # 1. MinIO
     root = Path(".")
     minio_cmd = "minio" if check_command("minio") else "minio.exe"
-    if not check_command("minio") and not (root / "minio.exe").exists() and (root / "refs" / "minio.exe").exists():
+    if (
+        not check_command("minio")
+        and not (root / "minio.exe").exists()
+        and (root / "refs" / "minio.exe").exists()
+    ):
         minio_cmd = "./refs/minio.exe"
     elif not check_command("minio") and (root / "minio.exe").exists():
         minio_cmd = "./minio.exe"
 
     minio_full_cmd = f"{minio_cmd} server ./infra-data/minio --console-address :9090"
     print_yellow("Starting MinIO...")
-    subprocess.Popen(f'start cmd /k "title ChainTrust-MinIO && {minio_full_cmd}"', shell=True)
+    subprocess.Popen(
+        f'start cmd /k "title ChainTrust-MinIO && {minio_full_cmd}"', shell=True
+    )
 
     # 2. Backend
     print_yellow("Starting Backend...")
-    subprocess.Popen('start cmd /k "title ChainTrust-Backend && cd backend && pnpm dev"', shell=True)
+    subprocess.Popen(
+        'start cmd /k "title ChainTrust-Backend && cd backend && pnpm dev"', shell=True
+    )
 
     # 3. Frontend
     print_yellow("Starting Frontend...")
-    subprocess.Popen('start cmd /k "title ChainTrust-Frontend && cd frontend && pnpm dev"', shell=True)
+    subprocess.Popen(
+        'start cmd /k "title ChainTrust-Frontend && cd frontend && pnpm dev"',
+        shell=True,
+    )
 
     # 4. AI Service
     print_yellow("Starting AI-Service...")
-    subprocess.Popen('start cmd /k "title ChainTrust-AI-Service && cd ai-service && uv run main.py"', shell=True)
-    
+    subprocess.Popen(
+        'start cmd /k "title ChainTrust-AI-Service && cd ai-service && uv run main.py"',
+        shell=True,
+    )
+
     print_green("\n[✓] All service terminals have been launched.")
     print_cyan("\nWait a few seconds for the services to initialize.")
     print_yellow("Then, visit http://localhost:3000 to register/sign in.")
@@ -563,7 +676,7 @@ def main():
 
     header("Environment files configured successfully.")
     print_cyan("\n--- Project Dependency Installation ---")
-    
+
     # Backend dependencies
     while True:
         print_yellow("Installing Backend dependencies (pnpm)...")
@@ -571,7 +684,9 @@ def main():
             print_green("Backend dependencies installed.")
             break
         else:
-            if not confirm("Backend installation failed. Retry? [Y/n] (Enter to retry): "):
+            if not confirm(
+                "Backend installation failed. Retry? [Y/n] (Enter to retry): "
+            ):
                 break
 
     header("Backend dependencies handled.")
@@ -579,8 +694,13 @@ def main():
     print_yellow(
         "This step will automatically populate blockchain secrets in your .env files."
     )
-    print_yellow("Ensure Ganache UI is running with a 'New Workspace' on port 7545.")
-    print_yellow("Project Settings (Ganache): Network ID: 1337, Account Balance: 100.")
+    print_yellow(
+        "Ensure Ganache UI is running and a Workspace is created on port 7545."
+    )
+    print_yellow("Instructions:")
+    print("  1. Choose 'New Workspace' (NOT Quickstart) in the Ganache UI.")
+    print("  2. In the 'Server' tab, set the Network ID to 1337.")
+    print("  3. Ensure the port is 7545.")
     print_red("IMPORTANT: Keep Ganache running! Do not close it during development.")
 
     import socket
@@ -614,7 +734,9 @@ def main():
                             p_key = existing_key
 
                     if not p_key:
-                        print_yellow("To deploy, we need a Ganache Private Key (Index 0).")
+                        print_yellow(
+                            "To deploy, we need a Ganache Private Key (Index 0)."
+                        )
                         print_yellow(
                             "In Ganache UI: Click the 'keys' icon on the first account."
                         )
@@ -628,7 +750,9 @@ def main():
                             )
                             if re.match(r"^[0-9a-fA-F]{64}$", clean_pk):
                                 p_key = (
-                                    pk_input if pk_input.startswith("0x") else f"0x{pk_input}"
+                                    pk_input
+                                    if pk_input.startswith("0x")
+                                    else f"0x{pk_input}"
                                 )
                                 break
                             else:
@@ -636,12 +760,12 @@ def main():
                                 if confirm("Use anyway? [Y/n]: "):
                                     p_key = pk_input
                                     break
-                    
+
                     if p_key:
                         print_green(f"Selected Key: {p_key[:6]}...{p_key[-4:]}")
                         if confirm("Proceed with this key? [Y/n]: "):
                             break
-                
+
                 if p_key:
                     update_env_file(Path(".env"), {"PRIVATE_KEY": p_key})
                     update_env_file(Path("backend/.env"), {"PRIVATE_KEY": p_key})
@@ -664,14 +788,18 @@ def main():
                     break
         else:
             print_red("[✗] Ganache NOT detected on port 7545.")
-            print_yellow("Please start Ganache UI and create/open your workspace.")
+            print_yellow("\nTo fix this:")
+            print_yellow("1. Open the Ganache GUI.")
+            print_yellow("2. Choose 'New Workspace' (rather than Quickstart).")
+            print_yellow("3. Go to the 'Server' tab and change 'Network ID' to 1337.")
+            print_yellow("4. Click 'Save Workspace' at the top-right.")
             if not confirm("Check again? [Y/n]: "):
                 break
     input("\nPress Enter to continue...")
 
     header("Smart Contract deployment handled.")
     print_cyan("\n--- Frontend & AI Service Setup ---")
-    
+
     # Frontend dependencies
     while True:
         print_yellow("Installing Frontend dependencies (pnpm)...")
@@ -679,7 +807,9 @@ def main():
             print_green("Frontend dependencies installed.")
             break
         else:
-            if not confirm("Frontend installation failed. Retry? [Y/n] (Enter to retry): "):
+            if not confirm(
+                "Frontend installation failed. Retry? [Y/n] (Enter to retry): "
+            ):
                 break
 
     # AI Service dependencies
@@ -698,7 +828,7 @@ def main():
     (root / "infra-data" / "mongodb").mkdir(parents=True, exist_ok=True)
 
     header("Environment & Dependencies Ready")
-    
+
     # Run MetaMask tutorial BEFORE starting services as requested
     setup_metamask_tutorial()
 
