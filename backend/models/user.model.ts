@@ -112,7 +112,10 @@ const userSchema = new Schema<IUser>(
 
 userSchema.index(
 	{ provider: 1, providerId: 1 },
-	{ unique: true, sparse: true },
+	{
+		unique: true,
+		partialFilterExpression: { providerId: { $type: 'string' } },
+	},
 );
 
 export default model<IUser>('User', userSchema);

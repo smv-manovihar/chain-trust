@@ -65,14 +65,14 @@ export function CustomerSidebar({ className }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "hidden transition-all duration-300 lg:block relative flex-shrink-0 h-full z-20 bg-background group/sidebar cursor-ew-resize",
-        isCollapsed ? "w-20" : "w-72",
+        "hidden transition-all duration-300 lg:block relative flex-shrink-0 h-full z-20 bg-background group/sidebar",
+        isCollapsed ? "w-20 cursor-ew-resize" : "w-72 cursor-default",
         className,
       )}
-      onClick={toggleSidebar}
-      role="button"
-      tabIndex={0}
-      aria-label="Toggle sidebar"
+      onClick={isCollapsed ? toggleSidebar : undefined}
+      role={isCollapsed ? "button" : undefined}
+      tabIndex={isCollapsed ? 0 : -1}
+      aria-label={isCollapsed ? "Expand sidebar" : undefined}
       onKeyDown={(e) => {
         if (!isCollapsed) return;
         if (e.key !== "Enter" && e.key !== " ") return;

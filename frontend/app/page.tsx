@@ -24,7 +24,8 @@ export default function Home() {
   const { user, isAuthenticated, isLoading } = useAuth();
 
   const getDashboardLink = () => {
-    return "/verify";
+    if (!user) return "/login";
+    return user.role === "manufacturer" ? "/manufacturer" : "/customer";
   };
 
   const memberFeatures = [

@@ -64,11 +64,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     if (!isLoading && user && !user.isEmailVerified) {
       if (
-        (pathname.startsWith("/customer") || 
-         pathname.startsWith("/manufacturer") || 
-         pathname.startsWith("/settings")) &&
+        (pathname.startsWith("/customer") ||
+          pathname.startsWith("/manufacturer") ||
+          pathname.startsWith("/settings")) &&
         !pathname.startsWith("/verify-email")
       ) {
+        console.log(`[Redirect Check] Unverified user on protected path: ${pathname}. Redirecting to /verify-email`);
         window.location.href = "/verify-email";
       }
     }
@@ -116,8 +117,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
             !path.startsWith("/verify-email") &&
             !path.startsWith("/login") &&
             !path.startsWith("/register") &&
-            !path.startsWith("/setup-account")
+            !path.startsWith("/setup-account") &&
+            path !== "/" &&
+            !path.startsWith("/verify")
           ) {
+            console.log(`[RefreshUser Redirect] User not verified on path: ${path}. Redirecting to /verify-email`);
             window.location.href = "/verify-email";
           }
         }
@@ -187,7 +191,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
     try {
       const data = await apiRegister(userData);
-      
+
       // Auto-login after registration
       setUser(data.user);
       // Cookies handle token storage
@@ -237,9 +241,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const data = await apiVerifyEmailWithToken(token);
       setUser(data.user);
-      // Cookies handle token storage
-      if (data.accessToken) {
-      }
+      // Wait for state to settle, then refresh to be sure
+      await refreshUser();
+      
       if (typeof window !== "undefined" && data.user.avatar) {
         cacheAvatarBlob(data.user.avatar);
       }
@@ -257,6 +261,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const resp = await apiVerifyEmailWithOTP(data);
       setUser(resp.user);
+      // Ensure session is fully refreshed
+      await refreshUser();
     } catch (err: any) {
       setError(err.message || "OTP Verification failed");
       throw err;

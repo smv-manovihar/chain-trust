@@ -37,11 +37,20 @@ def header(success_msg=None):
         print_cyan("----------------------------------------")
 
 
-def confirm(prompt="Proceed? [Y/n]: ", default_yes=True):
-    ans = input(f"\033[95m{prompt} (Enter for Yes): \033[0m").strip().lower()
-    if ans == "":
-        return default_yes
-    return ans == "y"
+def confirm(prompt="Proceed? [Y/n]: ", default_yes=True, extra_yes=None):
+    if extra_yes is None:
+        extra_yes = []
+    while True:
+        choice = input(f"\033[95m{prompt} (Enter for {'Yes' if default_yes else 'No'}): \033[0m").strip().lower()
+        if choice == "":
+            return default_yes
+        if choice in ["y", "yes"] + [e.lower() for e in extra_yes]:
+            return True
+        if choice in ["n", "no"]:
+            return False
+        
+        valid_options = " / ".join(["y", "yes", "n", "no"] + extra_yes)
+        print_red(f"Invalid input. Please enter one of: {valid_options}")
 
 
 def check_command(cmd):
@@ -128,22 +137,20 @@ def setup_env():
 
         if not use_existing_or:
             while True:
-                print_yellow("Tip: Your key should start with 'sk-or-v1-'.")
-                print(
-                    "Type 'open' to visit OpenRouter and generate a key, or enter your key directly."
-                )
-                or_input = input(
-                    "Enter OPENROUTER_API_KEY (or 'open' / Enter to skip): "
-                ).strip()
+                print_yellow("\nAI Configuration (OpenRouter):")
+                print("1. Press Enter or type 'y'/'yes' to open OpenRouter and generate a key.")
+                print("2. Or, paste your key directly (e.g., sk-or-v1-...).")
+                print("3. Type 'n'/'no' or 'skip' to skip AI configuration.")
+                
+                or_input = input("\nEnter OPENROUTER_API_KEY (Enter to open registration): ").strip()
 
-                if or_input.lower() == "open":
+                if or_input.lower() in ["", "y", "yes"]:
+                    print_cyan("Opening OpenRouter registration page...")
                     webbrowser.open("https://openrouter.ai/settings/keys")
                     continue
 
-                if not or_input:
-                    print_red(
-                        "No OpenRouter key provided. AI features will be disabled."
-                    )
+                if or_input.lower() in ["n", "no", "skip"]:
+                    print_red("No OpenRouter key provided. AI features will be disabled.")
                     or_key = "your_openrouter_api_key"
                     break
 
@@ -169,7 +176,7 @@ def setup_env():
         )
 
         print_cyan("\n--- SMTP Configuration (REQUIRED) ---")
-        smtp_keys = ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS"]
+        smtp_keys = ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_USER", "EMAIL_PASS", "EMAIL_FROM"]
         use_existing_smtp = False
         if all(k in existing and existing[k] for k in smtp_keys):
             print_cyan("[?] Found existing SMTP configuration.")
@@ -188,7 +195,7 @@ def setup_env():
                 print_cyan(
                     "\nWe recommend using Brevo as it provides a free SMTP relay."
                 )
-                if confirm("Open Brevo signup page? [Y/n]: "):
+                if confirm("Open Brevo signup page? [Y/n]: ", extra_yes=["open"]):
                     webbrowser.open("https://www.brevo.com/")
                     print_cyan("\nInstructions:")
                     print("1. Create an account on Brevo.")
@@ -219,11 +226,20 @@ def setup_env():
                 secrets["EMAIL_PASS"] = input(
                     "Enter EMAIL_PASS (Brevo SMTP Key): "
                 ).strip()
+                
+                print_yellow("\nSender Email Setup:")
+                print("Use a valid email address with a provider or a custom domain.")
+                print("Examples: no-reply@yourdomain.com, yourname@gmail.com, yourname@outlook.com")
+                secrets["EMAIL_FROM"] = input(
+                    "Enter EMAIL_FROM (Sender Email): "
+                ).strip()
+
                 if (
                     secrets["EMAIL_HOST"]
                     and secrets["EMAIL_PORT"]
                     and secrets["EMAIL_USER"]
                     and secrets["EMAIL_PASS"]
+                    and secrets["EMAIL_FROM"]
                 ):
                     break
                 print_red(
@@ -292,15 +308,25 @@ def update_env_file(file_path, secrets):
         lines = f.readlines()
 
     new_lines = []
+    updated_keys = set()
     for line in lines:
         updated = False
         for key, value in secrets.items():
             if re.match(rf"^{key}\s*=", line):
                 new_lines.append(f"{key} = {value}\n")
                 updated = True
+                updated_keys.add(key)
                 break
         if not updated:
             new_lines.append(line)
+
+    # Append any keys that weren't found in the original file
+    for key, value in secrets.items():
+        if key not in updated_keys:
+            # Add a newline before the new section if it's the first appended key
+            if not updated_keys and key == list(secrets.keys())[0]:
+                new_lines.append("\n")
+            new_lines.append(f"{key} = {value}\n")
 
     with open(file_path, "w") as f:
         f.writelines(new_lines)
@@ -315,7 +341,7 @@ def handle_prerequisites():
         print_green("[✓] Node.js is already installed.")
     else:
         print_red("[✗] Node.js is missing.")
-        if confirm("Open Node.js download page? [Y/n]: "):
+        if confirm("Open Node.js download page? [Y/n]: ", extra_yes=["open"]):
             webbrowser.open("https://nodejs.org/")
             while True:
                 if confirm("Have you finished installing Node.js? [Y/n]: "):
@@ -396,7 +422,7 @@ def handle_prerequisites():
         print_green("[✓] MinIO is already installed/available.")
     else:
         print_red("[✗] MinIO is missing.")
-        if confirm("Open MinIO download page (Windows binary)? [Y/n]: "):
+        if confirm("Open MinIO download page (Windows binary)? [Y/n]: ", extra_yes=["open"]):
             webbrowser.open(
                 "https://dl.min.io/server/minio/release/windows-amd64/minio.exe"
             )
@@ -460,7 +486,7 @@ def handle_prerequisites():
     else:
         print_red("[✗] Ganache UI NOT detected.")
         while True:
-            if confirm("Open Ganache download page? [Y/n]: "):
+            if confirm("Open Ganache download page? [Y/n]: ", extra_yes=["open"]):
                 webbrowser.open("https://trufflesuite.com/ganache/")
             
             if confirm("Have you finished installing Ganache UI? [Y/n]: "):
@@ -520,7 +546,7 @@ def handle_prerequisites():
                 print_red(
                     "URGENT: This project requires MongoDB 8.0 or higher for full compatibility."
                 )
-                if confirm("Open MongoDB download page to upgrade? [Y/n]: "):
+                if confirm("Open MongoDB download page to upgrade? [Y/n]: ", extra_yes=["open"]):
                     webbrowser.open("https://www.mongodb.com/try/download/community")
                 
                 if confirm("Have you finished upgrading MongoDB? [Y/n]: "):
@@ -539,7 +565,7 @@ def handle_prerequisites():
     else:
         print_red("[✗] MongoDB (mongod) is missing.")
         while True:
-            if confirm("Open MongoDB download page? [Y/n]: "):
+            if confirm("Open MongoDB download page? [Y/n]: ", extra_yes=["open"]):
                 webbrowser.open("https://www.mongodb.com/try/download/community")
             
             if confirm("Have you finished installing MongoDB? [Y/n]: "):
@@ -571,7 +597,7 @@ def setup_metamask_tutorial():
     print_yellow(
         "MetaMask is required to interact with the blockchain in your browser."
     )
-    if confirm("Open MetaMask Chrome Web Store link? [Y/n]: "):
+    if confirm("Open MetaMask Chrome Web Store link? [Y/n]: ", extra_yes=["open"]):
         webbrowser.open(
             "https://chromewebstore.google.com/detail/metamask/nkbihfbeogaeaoehlefnkodbefgpgknn"
         )
@@ -713,8 +739,11 @@ def main():
     while True:
         if is_ganache_running():
             print_green("[✓] Ganache detected on port 7545.")
-            if confirm("Deploy the Smart Contract to Ganache now? [Y/n]: "):
-                # --- Logical Key Collection ---
+            if not confirm("Deploy the Smart Contract to Ganache now? [Y/n]: "):
+                print_yellow("Skipping smart contract deployment.")
+                break
+                
+            # --- Logical Key Collection ---
                 while True:
                     print_cyan("\n--- Deployment Configuration ---")
 

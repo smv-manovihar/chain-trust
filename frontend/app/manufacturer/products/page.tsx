@@ -5,8 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-} from "@/components/ui/command";
+import {} from "@/components/ui/command";
 import { CategoryFilter } from "@/components/manufacturer/category-filter";
 import {
   Search,
@@ -42,10 +41,12 @@ export default function ProductsPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
+  const [searchQuery, setSearchQuery] = useState(
+    searchParams.get("search") || "",
+  );
   const [categoriesCount, setCategoriesCount] = useState(0);
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
-    searchParams.get("categories")?.split(",").filter(Boolean) || []
+    searchParams.get("categories")?.split(",").filter(Boolean) || [],
   );
   const fetchAbortRef = useRef<AbortController | null>(null);
 
@@ -84,13 +85,16 @@ export default function ProductsPage() {
 
     try {
       setLoading(true);
-      const res = await listProducts({
-        search: debouncedSearch,
-        categories: debouncedCategories,
-      }, controller.signal);
+      const res = await listProducts(
+        {
+          search: debouncedSearch,
+          categories: debouncedCategories,
+        },
+        controller.signal,
+      );
       setProducts(res.products || []);
     } catch (err: any) {
-      if (err.name === 'AbortError') return;
+      if (err.name === "AbortError") return;
       console.error("Failed to load products:", err);
       toast.error("Catalogue sync failed.");
     } finally {
@@ -137,7 +141,10 @@ export default function ProductsPage() {
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20">
               <LayoutGrid className="w-3 h-3 text-blue-600" />
               <span className="text-[10px] font-bold tracking-tight text-blue-600">
-                {products.length > 0 ? [...new Set(products.map(p => p.category))].length : 0} Categories
+                {products.length > 0
+                  ? [...new Set(products.map((p) => p.category))].length
+                  : 0}{" "}
+                Categories
               </span>
             </div>
           </div>
@@ -203,11 +210,11 @@ export default function ProductsPage() {
           </div>
         ) : (
           <EmptyState
-            icon={Boxes}
+            icon={Package}
             title="No Products Found"
             description="Your inventory is currently empty. Start by initializing your first digital asset on the blockchain secure catalogue."
             action={{
-              label: "Initialize New Asset",
+              label: "Add Product",
               href: "/manufacturer/products/new",
             }}
           />

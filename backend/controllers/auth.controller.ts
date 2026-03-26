@@ -684,9 +684,14 @@ export const verifyEmailWithOTP = async (req: Request, res: Response): Promise<v
 
 		await user.save();
 
+		// Refresh tokens to update session with verified status
+		const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id, req);
+		attachTokens(accessToken, refreshToken, res);
+
 		res.json({
 			message: 'Email verified successfully',
 			user: publicUser(user),
+			accessToken,
 		});
 	} catch (error) {
 		console.error('Email verification OTP error:', error);
@@ -726,9 +731,14 @@ export const verifyEmailWithToken = async (req: Request, res: Response): Promise
 
 		await user.save();
 
+		// Refresh tokens to update session with verified status
+		const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id, req);
+		attachTokens(accessToken, refreshToken, res);
+
 		res.json({
 			message: 'Email verified successfully',
 			user: publicUser(user),
+			accessToken,
 		});
 	} catch (error) {
 		console.error('Email verification token error:', error);

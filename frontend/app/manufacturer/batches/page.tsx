@@ -246,6 +246,7 @@ export default function BatchesPage() {
         </div>
       </div>
 
+
       <div className="flex gap-4 px-1 sticky top-4 z-30">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

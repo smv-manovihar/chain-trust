@@ -63,8 +63,9 @@ function VerifyEmailContent() {
           
           // Small delay to show success state before redirecting
           setTimeout(() => {
-            router.push(user?.role === "manufacturer" ? "/manufacturer" : "/customer");
-          }, 2000);
+            const currentRole = user?.role || "customer";
+            router.push(currentRole === "manufacturer" ? "/manufacturer" : "/customer");
+          }, 800);
           
         } catch (error: any) {
           if (error.name === 'AbortError') return;
@@ -92,8 +93,9 @@ function VerifyEmailContent() {
       
       // Small delay to show success state
       setTimeout(() => {
-        router.push(user?.role === "manufacturer" ? "/manufacturer" : "/customer");
-      }, 1500);
+        const currentRole = user?.role || "customer";
+        router.push(currentRole === "manufacturer" ? "/manufacturer" : "/customer");
+      }, 500);
       
     } catch (error: any) {
       toast.error("Invalid Code", {

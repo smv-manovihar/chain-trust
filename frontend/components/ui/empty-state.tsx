@@ -38,7 +38,7 @@ export function EmptyState({
       )}
     >
       <div className="h-20 w-20 rounded-full bg-primary/5 flex items-center justify-center mb-6 relative group">
-        <Icon className="h-10 w-10 text-primary/40 relative z-10" />
+        <Icon className="h-10 w-10 text-primary relative z-10" />
       </div>
 
       <h3 className="text-2xl tracking-tighter mb-2">{title}</h3>

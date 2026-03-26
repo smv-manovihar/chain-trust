@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useEffect, Suspense, useRef } from "react";
+import { useState, useEffect, Suspense, useRef, MouseEvent } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   CheckCircle2,
   Building2,
-  Hash,
-  ShieldCheck,
-  Clock,
-  Bell,
-  BookmarkPlus,
   PackageCheck,
+  Clock,
+  ShieldCheck,
+  BookmarkPlus,
   ChevronLeft,
   AlertTriangle,
 } from "lucide-react";
@@ -20,6 +18,7 @@ import { verifyScan } from "@/api/batch.api";
 import { addToCabinet } from "@/api/customer.api";
 import { verifyOnBlockchain } from "@/api/web3-client";
 import { getVisitorId } from "@/lib/visitor";
+import { resolveMediaUrl } from "@/lib/media-url";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
@@ -34,8 +33,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { AppShell } from "@/components/layout/app-shell";
 import { CustomerSidebar } from "@/components/layout/customer-sidebar";
@@ -71,6 +68,166 @@ interface ScanResult {
 
 type ScanView = "camera" | "upload";
 
+// ── NEW: Extracted Interactive Card Component ─────────────────────────────
+// By moving the hover states here, we prevent the entire AppShell from re-rendering
+function InteractiveResultCard({
+  product,
+  scanStats,
+  isMobileDevice,
+}: {
+  product: ScanResult["product"] | null;
+  scanStats: {
+    isSuspicious: boolean;
+    count: number;
+    blockchainHash: string;
+    suspiciousReason?: string | null;
+  };
+  isMobileDevice: boolean;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [glow, setGlow] = useState({ x: 0, y: 0, opacity: 0 });
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleCardMouseMove = (e: MouseEvent<HTMLDivElement>) => {
+    if (!cardRef.current || isMobileDevice) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = -((y - centerY) / centerY) * 8;
+    const rotateY = ((x - centerX) / centerX) * 8;
+
+    setTilt({ x: rotateX, y: rotateY });
+    setGlow({ x, y, opacity: 1 });
+    setIsHovered(true);
+  };
+
+  const resetCardPosition = () => {
+    setTilt({ x: 0, y: 0 });
+    setGlow((prev) => ({ ...prev, opacity: 0 }));
+    setIsHovered(false);
+  };
+
+  const handleCardMouseLeave = () => {
+    if (isMobileDevice) return;
+    resetCardPosition();
+  };
+
+  return (
+    <div style={{ perspective: "1000px" }} className="w-full">
+      <div
+        ref={cardRef}
+        onMouseMove={handleCardMouseMove}
+        onMouseLeave={handleCardMouseLeave}
+        onClick={resetCardPosition}
+        onTouchEnd={resetCardPosition}
+        style={{
+          transform:
+            isHovered && !isMobileDevice
+              ? `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`
+              : "none",
+          transition:
+            isHovered && !isMobileDevice ? "none" : "transform 0.5s ease-out",
+          transformStyle: "preserve-3d",
+          cursor: "pointer",
+        }}
+        className={cn(
+          "group relative overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-12 shadow-xl border transition-all duration-300 bg-card text-card-foreground",
+          scanStats.isSuspicious
+            ? "border-amber-500/30 shadow-amber-900/10"
+            : "border-green-500/30 shadow-green-900/10",
+        )}
+      >
+        <div
+          className={cn(
+            "absolute inset-0 opacity-10 pointer-events-none z-0",
+            scanStats.isSuspicious ? "bg-amber-500" : "bg-green-500",
+          )}
+        />
+
+        {!isMobileDevice && (
+          <div
+            className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-300"
+            style={{
+              opacity: glow.opacity,
+              background: `radial-gradient(circle 300px at ${glow.x}px ${glow.y}px, ${
+                scanStats.isSuspicious
+                  ? "rgba(245, 158, 11, 0.15)"
+                  : "rgba(16, 185, 129, 0.15)"
+              }, transparent)`,
+            }}
+          />
+        )}
+
+        <div className="absolute top-0 right-0 p-6 sm:p-12 opacity-5 pointer-events-none z-0">
+          {scanStats.isSuspicious ? (
+            <AlertTriangle className="w-32 h-32 sm:w-48 sm:h-48" />
+          ) : (
+            <CheckCircle2 className="w-32 h-32 sm:w-48 sm:h-48" />
+          )}
+        </div>
+
+        <div
+          className="relative z-10 flex flex-col h-full min-h-[180px] sm:min-h-[200px] justify-between pointer-events-none"
+          style={{ transform: !isMobileDevice ? "translateZ(30px)" : "none" }}
+        >
+          <div className="flex justify-between items-start">
+            <div className="w-full">
+              <Badge
+                variant="outline"
+                className={cn(
+                  "mb-4 px-3 py-1 font-bold tracking-widest uppercase text-[10px] backdrop-blur-sm",
+                  scanStats.isSuspicious
+                    ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                    : "bg-green-500/10 text-green-600 border-green-500/30",
+                )}
+              >
+                {scanStats.isSuspicious
+                  ? "Warning • High Scans"
+                  : "Blockchain Verified"}
+              </Badge>
+              <h2 className="text-3xl sm:text-5xl font-black tracking-tight leading-none mb-2 break-words">
+                {product?.productName}
+              </h2>
+              <p className="text-muted-foreground text-sm sm:text-base font-medium tracking-tight break-words pr-4">
+                {product?.brand}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-8 sm:mt-12 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 overflow-hidden border-t border-border/50 pt-6">
+            <div className="flex-1 w-full">
+              <p className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase mb-1">
+                Manufacturing Batch
+              </p>
+              <p className="font-mono text-lg sm:text-xl tracking-[0.2em] font-black break-all">
+                {product?.batchNumber?.toUpperCase()}
+              </p>
+            </div>
+            <div className="text-left sm:text-right shrink-0">
+              <p className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase mb-1">
+                Exp. Date
+              </p>
+              <p className="font-mono text-sm sm:text-base tracking-wider font-bold">
+                {product?.expiryDate
+                  ? new Date(product.expiryDate).toLocaleDateString(undefined, {
+                      month: "2-digit",
+                      year: "2-digit",
+                    })
+                  : "00/00"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────
+
 function VerifyContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -87,6 +244,7 @@ function VerifyContent() {
   });
   const { user, isAuthenticated } = useAuth();
   const [showLoginDialog, setShowLoginDialog] = useState(false);
+
   const [userInteracted, setUserInteracted] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -115,7 +273,6 @@ function VerifyContent() {
       return;
     }
 
-    // If we haven't manually closed or switched, and we're on mobile, default to camera
     if (!userInteracted) {
       setScanView(defaultView);
     }
@@ -142,7 +299,10 @@ function VerifyContent() {
         : "0";
       const unitIndex = parseInt(unitIndexStr, 10);
 
-      const blockchainResult = await verifyOnBlockchain(batchSalt, controller.signal);
+      const blockchainResult = await verifyOnBlockchain(
+        batchSalt,
+        controller.signal,
+      );
       if (!blockchainResult.isValid || !blockchainResult.record) {
         throw new Error(
           blockchainResult.warnings?.[0] ||
@@ -173,7 +333,13 @@ function VerifyContent() {
 
       try {
         const visitorId = getVisitorId();
-        const result: ScanResult = await verifyScan(saltToVerify, visitorId, undefined, undefined, controller.signal);
+        const result: ScanResult = await verifyScan(
+          saltToVerify,
+          visitorId,
+          undefined,
+          undefined,
+          controller.signal,
+        );
         if (result.isValid && result.product) {
           finalProduct = { ...finalProduct, ...result.product };
           finalStats = {
@@ -186,7 +352,7 @@ function VerifyContent() {
           throw new Error("RECALLED: This batch has been flagged as unsafe.");
         }
       } catch (err: any) {
-        if (err.name === 'AbortError') throw err;
+        if (err.name === "AbortError") throw err;
         console.warn("DB Metadata unavailable, using blockchain data.");
       }
 
@@ -194,12 +360,11 @@ function VerifyContent() {
       setScanStats(finalStats);
       setScanned(true);
 
-      // Clean up URL if we successfully scanned from a query param
       if (searchParams.has("salt") || searchParams.has("id")) {
         router.replace("/verify", { scroll: false });
       }
     } catch (err: any) {
-      if (err.name === 'AbortError') return;
+      if (err.name === "AbortError") return;
       setError(err.message || "Verification failed.");
       toast.error(err.message || "Verification failed");
       setScanned(false);
@@ -233,7 +398,6 @@ function VerifyContent() {
     }
   };
 
-  // ── 2. Link Interception & Routing ────────────────────────────────────────
   const onScanSuccess = (decodedText: string) => {
     try {
       const url = new URL(decodedText);
@@ -263,9 +427,7 @@ function VerifyContent() {
     );
   }
 
-  const isCustomer = user?.role === "customer";
   const isManufacturer = user?.role === "manufacturer";
-
   const isMobileFullscreenCamera =
     isMobileDevice && scanView === "camera" && !scanned && !loading;
 
@@ -292,330 +454,366 @@ function VerifyContent() {
       )}
 
       <main className="overflow-hidden relative flex-1 flex flex-col">
-        <AnimatePresence mode="wait">
-          {loading ? (
-            <motion.div
-              key="loading-step"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 1.05 }}
-              className="flex-1 flex flex-col items-center justify-center p-8 z-10"
-            >
-              <div className="relative h-24 w-24 mb-8">
-                <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
-                <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <ShieldCheck className="h-10 w-10 text-primary animate-pulse" />
-                </div>
+        {loading ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 z-10 animate-in fade-in zoom-in-95 duration-300">
+            <div className="relative h-24 w-24 mb-8">
+              <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
+              <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <ShieldCheck className="h-10 w-10 text-primary animate-pulse" />
               </div>
-              <h3 className="text-2xl font-black tracking-tight mb-2 text-center">
-                Verifying Authenticity
-              </h3>
-              <p className="text-muted-foreground text-sm font-medium text-center">
-                Querying secure blockchain records...
-              </p>
-            </motion.div>
-          ) : !scanned ? (
-            <motion.div
-              key="scan-step"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className={cn(
-                "flex-1 flex flex-col",
-                isMobileFullscreenCamera
-                  ? "p-0"
-                  : !isAuthenticated && "p-4 lg:p-8",
-                "min-h-0",
-              )}
-            >
-              {isMobileFullscreenCamera ? (
-                <VideoScanner
-                  isMobileDevice={true}
-                  onScanSuccess={onScanSuccess}
-                  onSwitchToUpload={() => {
-                    setScanView("upload");
-                    setUserInteracted(true);
-                  }}
-                  onClose={() => {
-                    router.back();
-                    setUserInteracted(true);
-                  }}
-                />
-              ) : (
-                <div className="max-w-3xl mx-auto w-full flex-1 flex flex-col min-h-0 gap-6 justify-center">
-                  <div className="flex-1 max-h-[600px] flex flex-col items-center justify-center bg-card/50 rounded-[2rem] border border-border/50 border-dashed p-4 sm:p-8 shadow-sm relative overflow-hidden">
-                    {scanView === "camera" ? (
-                      <VideoScanner
-                        isMobileDevice={false}
-                        onScanSuccess={onScanSuccess}
-                        onSwitchToUpload={() => {
-                          setScanView("upload");
-                          setUserInteracted(true);
-                        }}
-                        onClose={() => {
-                          setScanView("upload");
-                          setUserInteracted(true);
-                        }}
-                      />
-                    ) : (
-                      <UploadScanner
-                        onScanSuccess={onScanSuccess}
-                        onSwitchToCamera={
-                          hasCameraAPI ? () => setScanView("camera") : undefined
-                        }
-                      />
-                    )}
-                  </div>
-                  <p className="text-center text-[10px] font-bold tracking-tight text-muted-foreground/50">
-                    Secure Blockchain Verification • No-Storage Policy
-                  </p>
+            </div>
+            <h3 className="text-2xl font-black tracking-tight mb-2 text-center">
+              Verifying Authenticity
+            </h3>
+            <p className="text-muted-foreground text-sm font-medium text-center">
+              Querying secure blockchain records...
+            </p>
+          </div>
+        ) : !scanned ? (
+          <div
+            className={cn(
+              "flex-1 flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300",
+              isMobileFullscreenCamera
+                ? "p-0"
+                : !isAuthenticated && "p-4 sm:p-8",
+              "min-h-0",
+            )}
+          >
+            {isMobileFullscreenCamera ? (
+              <VideoScanner
+                isMobileDevice={true}
+                onScanSuccess={onScanSuccess}
+                onSwitchToUpload={() => {
+                  setScanView("upload");
+                  setUserInteracted(true);
+                }}
+                onClose={() => {
+                  router.back();
+                  setUserInteracted(true);
+                }}
+              />
+            ) : (
+              <div className="max-w-3xl mx-auto w-full flex-1 flex flex-col min-h-0 gap-6 justify-center">
+                <div className="flex-1 max-h-[600px] flex flex-col items-center justify-center bg-card/50 rounded-[2rem] border border-border/50 border-dashed p-4 sm:p-8 shadow-sm relative overflow-hidden">
+                  {scanView === "camera" ? (
+                    <VideoScanner
+                      isMobileDevice={false}
+                      onScanSuccess={onScanSuccess}
+                      onSwitchToUpload={() => {
+                        setScanView("upload");
+                        setUserInteracted(true);
+                      }}
+                      onClose={() => {
+                        setScanView("upload");
+                        setUserInteracted(true);
+                      }}
+                    />
+                  ) : (
+                    <UploadScanner
+                      onScanSuccess={onScanSuccess}
+                      onSwitchToCamera={
+                        hasCameraAPI ? () => setScanView("camera") : undefined
+                      }
+                    />
+                  )}
                 </div>
-              )}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="result-step"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className={cn(
-                "flex flex-col flex-1 min-h-0",
-                !isAuthenticated && "p-4 lg:p-0",
-              )}
-            >
-              <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col min-h-0 mt-4 lg:mt-8">
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
-                  <div>
-                    <Badge
-                      variant="outline"
-                      className="mb-2 bg-green-500/10 text-green-600 border-green-200 px-3 py-1 font-bold tracking-tighter"
-                    >
-                      Blockchain Verified
-                    </Badge>
-                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
-                      {product?.productName}
-                    </h2>
-                    <p className="text-muted-foreground text-sm font-medium">
-                      Authenticity record confirmed on{" "}
+                <p className="text-center text-[10px] sm:text-xs font-bold tracking-tight text-muted-foreground/50 px-4">
+                  Secure Blockchain Verification • No-Storage Policy
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "flex flex-col flex-1 min-h-0 animate-in fade-in zoom-in-95 duration-500",
+              !isAuthenticated && "p-4 sm:p-8 lg:p-0",
+            )}
+          >
+            <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col min-h-0 mt-2 sm:mt-8 px-2 sm:px-6 relative z-10">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 mb-6 sm:mb-8">
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
+                    Verification Result
+                  </h2>
+                  <p className="text-muted-foreground text-sm font-medium mt-1">
+                    Authenticity record confirmed on{" "}
+                    <span className="whitespace-nowrap">
                       {new Date(
                         product?.manufactureDate || "",
                       ).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setScanned(false);
-                        setScanView(defaultView);
-                      }}
-                      className="rounded-full"
-                    >
-                      Scan New
-                    </Button>
+                    </span>
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setScanned(false);
+                      setScanView(defaultView);
+                    }}
+                    className="rounded-full px-6 w-full sm:w-auto h-12 sm:h-10"
+                  >
+                    Scan New
+                  </Button>
+                  {!isManufacturer && (
                     <Button
                       onClick={handleSaveToCabinet}
-                      className="rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90"
+                      className="rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 px-6 transition-all duration-300 w-full sm:w-auto h-12 sm:h-10"
                     >
-                      <BookmarkPlus className="mr-2 h-4 w-4" />
+                      <BookmarkPlus className="mr-2 h-5 w-5 sm:h-4 sm:w-4" />
                       Save to My Medicines
                     </Button>
-                  </div>
-                </div>
-
-                <div className="flex-1 min-h-0 grid lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2 flex flex-col gap-6 overflow-hidden">
-                    <ScrollArea className="flex-1 pr-4">
-                      <div className="space-y-6 pb-6">
-                        <Card
-                          className={cn(
-                            "p-6 border rounded-[2rem] flex items-center gap-6",
-                            scanStats.isSuspicious
-                              ? "bg-gradient-to-br from-amber-500/10 via-background to-amber-500/5 border-amber-500/50 shadow-amber-500/10"
-                              : "bg-gradient-to-br from-green-500/10 via-background to-primary/5 border-green-500/20",
-                          )}
-                        >
-                          <div
-                            className={cn(
-                              "h-16 w-16 rounded-full flex items-center justify-center shrink-0 shadow-inner",
-                              scanStats.isSuspicious
-                                ? "bg-amber-500/20"
-                                : "bg-green-500/20",
-                            )}
-                          >
-                            {scanStats.isSuspicious ? (
-                              <AlertTriangle className="h-8 w-8 text-amber-600" />
-                            ) : (
-                              <CheckCircle2 className="h-8 w-8 text-green-600" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span
-                                className={cn(
-                                  "text-xs font-bold tracking-tight leading-none",
-                                  scanStats.isSuspicious
-                                    ? "text-amber-600"
-                                    : "text-green-600",
-                                )}
-                              >
-                                {scanStats.isSuspicious ? "Warning" : "Status"}
-                              </span>
-                              {scanStats.count > 5 &&
-                                !scanStats.isSuspicious && (
-                                  <Badge
-                                    variant="destructive"
-                                    className="h-4 text-[8px] px-1 font-bold"
-                                  >
-                                    High Scans
-                                  </Badge>
-                                )}
-                            </div>
-                            <p className="text-lg font-bold leading-tight">
-                              {scanStats.isSuspicious
-                                ? "Suspicious Scan Activity"
-                                : "Product is 100% Authentic"}
-                            </p>
-                            {scanStats.isSuspicious &&
-                            scanStats.suspiciousReason ? (
-                              <p className="text-xs text-amber-600/80 mt-1 font-medium leading-tight">
-                                {scanStats.suspiciousReason}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-muted-foreground mt-1 font-mono">
-                                HASH: {scanStats.blockchainHash.slice(0, 16)}...
-                              </p>
-                            )}
-                          </div>
-                          <div className="hidden sm:block text-right">
-                            <p
-                              className={cn(
-                                "text-xl font-bold",
-                                scanStats.isSuspicious
-                                  ? "text-amber-600"
-                                  : "text-primary",
-                              )}
-                            >
-                              {scanStats.count}
-                            </p>
-                            <p className="text-[10px] uppercase font-bold text-muted-foreground">
-                              Total Scans
-                            </p>
-                          </div>
-                        </Card>
-
-                        <div className="grid sm:grid-cols-2 gap-4">
-                          <Card className="p-5 rounded-3xl border-border/50 bg-card/50">
-                            <p className="text-[10px] font-bold tracking-tight text-muted-foreground mb-3">
-                              Manufacturer
-                            </p>
-                            <div className="flex items-center gap-3">
-                              <Building2 className="h-5 w-5 text-primary" />
-                              <p className="font-bold">{product?.brand}</p>
-                            </div>
-                          </Card>
-                          <Card className="p-5 rounded-3xl border-border/50 bg-card/50">
-                            <p className="text-[10px] font-bold tracking-tight text-muted-foreground mb-3">
-                              Expiration
-                            </p>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <Clock className="h-5 w-5 text-primary" />
-                                <p className="font-bold">
-                                  {product?.expiryDate
-                                    ? new Date(
-                                        product.expiryDate,
-                                      ).toLocaleDateString()
-                                    : "N/A"}
-                                </p>
-                              </div>
-                            </div>
-                          </Card>
-                          <Card className="p-5 rounded-3xl border-border/50 bg-card/50">
-                            <p className="text-[10px] font-bold tracking-tight text-muted-foreground mb-3">
-                              Batch ID
-                            </p>
-                            <div className="flex items-center gap-3">
-                              <Hash className="h-5 w-5 text-primary" />
-                              <p className="font-mono text-sm font-bold">
-                                {product?.batchNumber}
-                              </p>
-                            </div>
-                          </Card>
-                          {!isAuthenticated && (
-                            <Card className="p-5 rounded-3xl border-border/50 bg-card/50">
-                              <p className="text-sm text-muted-foreground text-center mb-4">
-                                Log in to your member account to save this
-                                medicine and track your health journey.
-                              </p>
-                              <div className="flex flex-col gap-3">
-                                <Button
-                                  className="w-full rounded-2xl h-10 font-bold"
-                                  asChild
-                                >
-                                  <Link href="/login">Login to Save</Link>
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  className="w-full rounded-2xl h-10 font-bold"
-                                  asChild
-                                >
-                                  <Link href="/register">Become a Member</Link>
-                                </Button>
-                              </div>
-                            </Card>
-                          )}
-                          <Card className="p-5 rounded-3xl border-border/50 bg-card/50">
-                            <p className="text-[10px] font-bold tracking-tight text-muted-foreground mb-3">
-                              Unit Tracking
-                            </p>
-                            <div className="flex items-center gap-3">
-                              <PackageCheck className="h-5 w-5 text-primary" />
-                              <p className="font-bold">
-                                Unit {product?.unitNumber}
-                              </p>
-                            </div>
-                          </Card>
-                        </div>
-
-                        {product?.description && (
-                          <Card className="p-6 rounded-[2rem] border-border/50 bg-card/50">
-                            <h3 className="text-sm font-black tracking-tight mb-4">
-                              Patient Guide
-                            </h3>
-                            <div className="text-sm text-muted-foreground leading-relaxed">
-                              {product.description}
-                            </div>
-                          </Card>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </div>
+                  )}
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+
+              <div className="flex-1 flex flex-col gap-6 sm:gap-8 pb-12">
+                {/* INTERACTIVE RESULT CARD (Extracted Component) */}
+                <InteractiveResultCard
+                  product={product}
+                  scanStats={scanStats}
+                  isMobileDevice={isMobileDevice}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                  <Card
+                    className={cn(
+                      "sm:col-span-3 p-6 sm:p-8 border rounded-[2rem] sm:rounded-[2.5rem] flex flex-col md:flex-row items-start md:items-center gap-6 shadow-sm transition-all duration-300",
+                      scanStats.isSuspicious
+                        ? "bg-amber-500/5 border-amber-500/30"
+                        : "bg-green-500/5 border-green-500/30",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "h-16 w-16 sm:h-20 sm:w-20 rounded-full flex items-center justify-center shrink-0 shadow-inner",
+                        scanStats.isSuspicious
+                          ? "bg-amber-500/20"
+                          : "bg-green-500/20",
+                      )}
+                    >
+                      {scanStats.isSuspicious ? (
+                        <AlertTriangle className="h-8 w-8 sm:h-10 sm:w-10 text-amber-600" />
+                      ) : (
+                        <ShieldCheck className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 w-full">
+                      <div className="mb-2">
+                        <span
+                          className={cn(
+                            "text-[10px] font-black tracking-[0.1em] uppercase px-2 py-0.5 rounded-full border",
+                            scanStats.isSuspicious
+                              ? "text-amber-600 border-amber-500/30 bg-amber-500/10"
+                              : "text-green-600 border-green-500/30 bg-green-500/10",
+                          )}
+                        >
+                          {scanStats.isSuspicious
+                            ? "Suspicion Alert"
+                            : "Authentic Status"}
+                        </span>
+                      </div>
+                      <p className="text-xl sm:text-2xl font-black leading-tight tracking-tight">
+                        {scanStats.isSuspicious
+                          ? "High Scan Activity Warning"
+                          : "Verified Secure & Authentic"}
+                      </p>
+                      {scanStats.isSuspicious && scanStats.suspiciousReason ? (
+                        <p className="text-sm text-amber-700/80 mt-2 font-medium leading-relaxed max-w-prose">
+                          {scanStats.suspiciousReason}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] sm:text-xs text-muted-foreground mt-2 font-mono break-all pr-4">
+                          VERIFIED BLOCKCHAIN HASH: <br className="sm:hidden" />
+                          <span className="opacity-70">
+                            {scanStats.blockchainHash.slice(0, 32)}...
+                          </span>
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-row md:flex-col justify-between md:justify-center items-center md:items-end bg-background p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border border-border/50 shrink-0 w-full md:w-auto md:min-w-[140px] shadow-sm">
+                      <p className="text-[10px] uppercase font-black text-muted-foreground md:mt-1 opacity-60 order-2 md:order-1">
+                        Total Scans
+                      </p>
+                      <p
+                        className={cn(
+                          "text-3xl sm:text-4xl font-black tabular-nums order-1 md:order-2",
+                          scanStats.isSuspicious
+                            ? "text-amber-600"
+                            : "text-primary",
+                        )}
+                      >
+                        {scanStats.count}
+                      </p>
+                    </div>
+                  </Card>
+
+                  {product?.images && product.images.length > 0 && (
+                    <div className="sm:col-span-3 space-y-4">
+                      <div className="flex items-center justify-between px-2">
+                        <h3 className="text-[10px] sm:text-xs font-black tracking-widest uppercase text-muted-foreground/60">
+                          Product Media Assets
+                        </h3>
+                        <Badge
+                          variant="secondary"
+                          className="font-mono text-[10px] rounded-full px-2 sm:px-3"
+                        >
+                          {product.images.length} Image
+                          {product.images.length !== 1 && "s"}
+                        </Badge>
+                      </div>
+
+                      <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-6 snap-x snap-mandatory hide-scrollbar">
+                        {product.images.map((img, i) => (
+                          <div
+                            key={i}
+                            className="shrink-0 w-[240px] sm:w-[300px] h-[180px] sm:h-[225px] rounded-[1.5rem] sm:rounded-[2.5rem] overflow-hidden border border-border/50 bg-muted/20 snap-center relative shadow-md hover:scale-[1.02] transition-transform duration-300"
+                          >
+                            <img
+                              src={resolveMediaUrl(img)}
+                              alt={`${product.productName} photo ${i + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <Card className="p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border-border/50 bg-card/50 hover:bg-card transition-colors shadow-sm">
+                    <p className="text-[10px] font-black tracking-widest text-muted-foreground mb-3 sm:mb-4 uppercase opacity-60">
+                      Expiration
+                    </p>
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="p-2 sm:p-3 bg-primary/10 rounded-xl sm:rounded-2xl text-primary shrink-0">
+                        <Clock className="h-5 w-5 sm:h-6 sm:w-6" />
+                      </div>
+                      <p className="font-black text-base sm:text-lg">
+                        {product?.expiryDate
+                          ? new Date(product.expiryDate).toLocaleDateString(
+                              undefined,
+                              {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              },
+                            )
+                          : "N/A"}
+                      </p>
+                    </div>
+                  </Card>
+
+                  <Card className="p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border-border/50 bg-card/50 hover:bg-card transition-colors shadow-sm">
+                    <p className="text-[10px] font-black tracking-widest text-muted-foreground mb-3 sm:mb-4 uppercase opacity-60">
+                      Unit Serial
+                    </p>
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="p-2 sm:p-3 bg-primary/10 rounded-xl sm:rounded-2xl text-primary shrink-0">
+                        <PackageCheck className="h-5 w-5 sm:h-6 sm:w-6" />
+                      </div>
+                      <p className="font-black text-base sm:text-lg truncate">
+                        #{product?.unitNumber}
+                      </p>
+                    </div>
+                  </Card>
+
+                  <Card className="p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border-border/50 bg-card/50 hover:bg-card transition-colors shadow-sm">
+                    <p className="text-[10px] font-black tracking-widest text-muted-foreground mb-3 sm:mb-4 uppercase opacity-60">
+                      Provenance
+                    </p>
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="p-2 sm:p-3 bg-primary/10 rounded-xl sm:rounded-2xl text-primary shrink-0">
+                        <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                      </div>
+                      <p className="font-black text-base sm:text-lg truncate">
+                        Registered
+                      </p>
+                    </div>
+                  </Card>
+
+                  {!isAuthenticated && (
+                    <Card className="sm:col-span-3 p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border-primary/20 bg-primary/5 shadow-inner overflow-hidden relative mt-2 sm:mt-0">
+                      <div className="absolute top-0 right-0 p-6 sm:p-8 text-primary/10 pointer-events-none">
+                        <ShieldCheck className="w-24 h-24 sm:w-32 sm:h-32" />
+                      </div>
+                      <div className="relative z-10 max-w-xl">
+                        <h3 className="text-lg sm:text-xl font-black mb-2 tracking-tight">
+                          Protect Your Health Journey
+                        </h3>
+                        <p className="text-xs sm:text-sm text-foreground/70 font-medium mb-6 leading-relaxed">
+                          Log in to save this medicine and receive critical
+                          safety alerts if this batch is ever recalled or
+                          flagged.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                          <Button
+                            className="w-full sm:w-auto rounded-full h-12 px-8 font-black shadow-lg shadow-primary/20"
+                            asChild
+                          >
+                            <Link href="/login">Login to Save</Link>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="w-full sm:w-auto rounded-full h-12 px-8 font-black border-primary/20 bg-background/50 hover:bg-primary/5"
+                            asChild
+                          >
+                            <Link href="/register">Become a Member</Link>
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+
+                  {product?.description && (
+                    <Card className="sm:col-span-3 p-6 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] border-border/50 bg-card/50 shadow-sm mt-2 sm:mt-0">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="h-1.5 w-6 sm:w-8 bg-primary rounded-full shrink-0"></div>
+                        <h3 className="text-xs sm:text-sm font-black tracking-widest uppercase text-muted-foreground/80">
+                          Patient Guide & Information
+                        </h3>
+                      </div>
+                      <div className="text-sm sm:text-base text-foreground/80 leading-relaxed font-medium">
+                        {product.description
+                          .split("\n")
+                          .filter(Boolean)
+                          .map((paragraph, idx) => (
+                            <p key={idx} className={idx > 0 ? "mt-4" : ""}>
+                              {paragraph}
+                            </p>
+                          ))}
+                      </div>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       <AlertDialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
-        <AlertDialogContent className="rounded-[2.5rem] p-8">
+        <AlertDialogContent className="rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-8 w-[90vw] sm:max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-black tracking-tight">
+            <AlertDialogTitle className="text-xl sm:text-2xl font-black tracking-tight">
               Save your medications
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-base">
+            <AlertDialogDescription className="text-sm sm:text-base">
               Create an account to track your medication history across devices
               and receive safety alerts if a batch is recalled.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="mt-6">
-            <AlertDialogCancel className="rounded-full">
+          <AlertDialogFooter className="mt-6 flex-col sm:flex-row gap-3">
+            <AlertDialogCancel className="rounded-full h-12 sm:h-10 mt-0">
               Not Now
             </AlertDialogCancel>
             <AlertDialogAction
               asChild
-              className="rounded-full bg-primary shadow-lg shadow-primary/20"
+              className="rounded-full bg-primary shadow-lg shadow-primary/20 h-12 sm:h-10"
             >
               <Link href="/login">Sign In / Register</Link>
             </AlertDialogAction>

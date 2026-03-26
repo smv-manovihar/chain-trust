@@ -32,7 +32,8 @@ export function UserNav() {
   };
 
   const getDashboardLink = () => {
-    return "/verify";
+    if (!user) return "/login";
+    return user.role === "manufacturer" ? "/manufacturer" : "/customer";
   };
 
   if (isLoading) {

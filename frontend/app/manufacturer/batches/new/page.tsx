@@ -77,7 +77,7 @@ export default function CreateBatchWizard() {
   const [batchData, setBatchData] = useState({
     batchNumber: "",
     quantity: "",
-    manufactureDate: undefined as Date | undefined,
+    manufactureDate: new Date() as Date | undefined,
     expiryDate: undefined as Date | undefined,
     description: "",
   });
@@ -175,7 +175,8 @@ export default function CreateBatchWizard() {
       step === 2 &&
       (!batchData.batchNumber ||
         !batchData.quantity ||
-        !batchData.manufactureDate)
+        !batchData.manufactureDate ||
+        !batchData.expiryDate)
     ) {
       toast.error("Please fill in all mandatory details.");
       return;
@@ -190,10 +191,11 @@ export default function CreateBatchWizard() {
     if (targetStep === 2) return selectedProduct !== null;
     if (targetStep === 3)
       return (
-        selectedProduct &&
-        batchData.batchNumber &&
-        batchData.quantity &&
-        batchData.manufactureDate
+        selectedProduct !== null &&
+        batchData.batchNumber !== "" &&
+        batchData.quantity !== "" &&
+        batchData.manufactureDate !== undefined &&
+        batchData.expiryDate !== undefined
       );
     return false;
   };
@@ -358,8 +360,24 @@ export default function CreateBatchWizard() {
                           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                         </div>
                       ) : filteredProducts.length === 0 ? (
-                        <div className="p-6 text-center text-sm text-muted-foreground">
-                          No products found.
+                        <div className="p-8 text-center space-y-4">
+                          <div className="mx-auto h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                            <Package className="h-6 w-6" />
+                          </div>
+                          <div className="max-w-[200px] mx-auto">
+                            <p className="text-sm font-semibold">
+                              No products found
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              You must create a product first before you can
+                              initiate a production batch for it.
+                            </p>
+                          </div>
+                          <Button asChild variant="outline" size="sm" className="gap-2">
+                            <Link href="/manufacturer/products/new">
+                              <Plus className="h-4 w-4" /> Add Product
+                            </Link>
+                          </Button>
                         </div>
                       ) : (
                         filteredProducts.map((p) => (
@@ -500,7 +518,7 @@ export default function CreateBatchWizard() {
 
                     {/* V9 COMPATIBLE EXPIRY DATE */}
                     <div className="space-y-2 flex flex-col">
-                      <Label className="mb-1">Expiry Date (Optional)</Label>
+                      <Label className="mb-1">Expiry Date</Label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
