@@ -7,7 +7,6 @@ import {
   BarChart3,
   Boxes,
   PanelLeft,
-  Users,
   Bot,
   QrCode,
 } from "lucide-react";
@@ -65,11 +64,6 @@ export const navGroups = [
   {
     label: "Configuration",
     items: [
-      {
-        label: "Team Management",
-        href: "/manufacturer/team",
-        icon: Users,
-      },
       {
         label: "Settings",
         href: "/manufacturer/settings",

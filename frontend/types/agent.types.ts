@@ -11,7 +11,7 @@ export interface CompositeToolThought {
   message?: string;
   input?: Record<string, any>;
   result?: any;
-  status: 'running' | 'completed' | 'failed';
+  status: "running" | "completed" | "failed" | "thinking";
   execution_time_ms?: number;
   tool_call_id?: string;
   run_id?: string;
@@ -30,7 +30,7 @@ export interface AgentMessage {
 }
 
 export type AgentSSEEvent = {
-  type: 'token' | 'tool_start' | 'tool_end' | 'done' | 'error' | 'name_updated'| 'partial_response';
+  type: "token" | "tool_start" | "tool_end" | "done" | "error" | "name_updated" | "shift_to_thought" | 'partial_response';
   message_id?: string;
   [key: string]: any;
 };

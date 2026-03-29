@@ -91,6 +91,7 @@ export function AgentChat({
     hasMoreSessions,
     isLoadingMoreSessions,
     loadMoreSessions,
+    resetChat,
   } = useAgent();
   const isMobile = useIsMobile();
 
@@ -214,8 +215,7 @@ export function AgentChat({
   }, []);
 
   const handleCreateSession = () => {
-    handleSetCurrentSessionId(undefined);
-    setHistoryOpen(false);
+    resetChat();
   };
 
   const handleRenameSession = async (id: string) => {
@@ -292,7 +292,7 @@ export function AgentChat({
       <div className="absolute top-0 left-0 right-0 z-[60] w-full px-2 sm:px-4 pt-2 sm:pt-4 pointer-events-none">
         <div className="flex items-center justify-between px-3 sm:px-4 py-1.5 sm:py-2 bg-card/50 backdrop-blur-xl border border-primary/10 shadow-lg rounded-xl sm:rounded-2xl pointer-events-auto w-full max-w-full">
           <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 pr-2">
-            <div className="shrink-0 p-1 sm:p-1.5 rounded-lg bg-primary/10 text-primary transition-colors duration-300">
+            <div className="shrink-0 p-1 sm:p-1.5 rounded-full bg-primary/10 text-primary transition-colors duration-300">
               {isHistoryOpen ? (
                 <History
                   className={cn(
@@ -746,13 +746,15 @@ export function AgentChat({
           <div
             key={currentSessionId || "new"}
             className={cn(
-              "max-w-3xl mx-auto w-full pt-20 sm:pt-24 px-3 sm:px-6 md:px-8 lg:px-10 pb-0 sm:pb-8 flex flex-col min-h-full transition-all duration-300 animate-in fade-in fill-mode-both",
-              compact ? "px-2 pt-20 sm:pt-24" : "",
+              "max-w-3xl mx-auto w-full pt-20 sm:pt-24 pb-0 sm:pb-8 flex flex-col min-h-full transition-all duration-300 animate-in fade-in fill-mode-both",
+              compact 
+                ? "px-1 sm:px-1.5" 
+                : "px-3 sm:px-6 md:px-8 lg:px-10",
             )}
           >
             {!currentSessionId ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 py-12">
-                <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
                   <Sparkles className="w-6 h-6 text-primary/40" />
                 </div>
                 <div className="max-w-[200px]">
@@ -765,10 +767,19 @@ export function AgentChat({
               </div>
             ) : (
               <div className="space-y-4 sm:space-y-6 flex-1">
-                {isLoadingMessages && (
-                  <div className="flex justify-center p-4">
-                    <Loader2 className="w-5 h-5 animate-spin text-primary/40" />
+                {isLoadingMessages && messages.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center py-20 animate-in fade-in duration-500">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary/30" />
+                    <p className="text-xs text-muted-foreground mt-4 font-medium animate-pulse">
+                      Retrieving Secure History...
+                    </p>
                   </div>
+                ) : (
+                  isLoadingMessages && (
+                    <div className="flex justify-center p-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-primary/40" />
+                    </div>
+                  )
                 )}
 
                 {messages.map((msg: AgentMessage) => (

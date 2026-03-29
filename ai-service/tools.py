@@ -98,8 +98,20 @@ class GetViewDataArgs(BaseModel):
     )
     params: Optional[dict] = Field(
         default=None,
-        description="Optional query parameters (overrides current query context).",
+        description="JSON parameters for the API call (e.g., query, page, limit).",
     )
+
+
+class GetGeographicScanDistributionArgs(BaseModel):
+    """No arguments required."""
+
+    pass
+
+
+class GetThreatIntelligenceArgs(BaseModel):
+    """No arguments required."""
+
+    pass
 
 
 # --- Tools Class ---
@@ -552,6 +564,30 @@ class Tools:
         except Exception as e:
             return f"Error simulating view data for {target_route}: {str(e)}"
 
+    async def get_geographic_scan_distribution(self, args: GetGeographicScanDistributionArgs) -> dict:
+        """
+        Fetches the geographic distribution of product scans (top countries and cities).
+        Useful for market analysis and identifying high-engagement regions.
+        """
+        try:
+            target_route = "/batches/analytics/geo"
+            data = await self._api_get(target_route)
+            return data
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def get_threat_intelligence(self, args: GetThreatIntelligenceArgs) -> dict:
+        """
+        Fetches threat intelligence data, identifying suspicious scanning patterns 
+        (e.g., single units scanned by many unique visitors), which may indicate counterfeiting.
+        """
+        try:
+            target_route = "/batches/analytics/threats"
+            data = await self._api_get(target_route)
+            return data
+        except Exception as e:
+            return {"error": str(e)}
+
     # --- Tool Registration Router ---
 
     def get_tools(self) -> List[StructuredTool]:
@@ -618,6 +654,18 @@ class Tools:
                         name="search_manufacturer_products",
                         description=self.search_manufacturer_products.__doc__,
                         args_schema=SearchManufacturerProductsArgs,
+                    ),
+                    StructuredTool.from_function(
+                        coroutine=self.get_geographic_scan_distribution,
+                        name="get_geographic_scan_distribution",
+                        description=self.get_geographic_scan_distribution.__doc__,
+                        args_schema=GetGeographicScanDistributionArgs,
+                    ),
+                    StructuredTool.from_function(
+                        coroutine=self.get_threat_intelligence,
+                        name="get_threat_intelligence",
+                        description=self.get_threat_intelligence.__doc__,
+                        args_schema=GetThreatIntelligenceArgs,
                     ),
                 ]
             )

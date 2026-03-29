@@ -1,35 +1,29 @@
 # Route: /manufacturer/products/new (Product Enrollment Wizard)
 
-A multi-step guide to onboarding new pharmaceutical products onto the ChainTrust registry.
+The centralized workflow for onboarding new pharmaceutical medicine registrations (Product SKUs) onto the ChainTrust corporate registry.
 
-## Enrollment Workflow & User Actions
+## Layout Overview (Progressive Wizard)
+- **Step 1: Core Identity**: Enter the primary product metadata:
+  - **Medicine Name**: e.g., Amoxicillin 500mg.
+  - **Product ID (SKU/UPC)**: Unique serialized string used for batch linking.
+  - **Brand / Manufacturer**: The corporate entity responsible for the product.
+  - **Category Tokens**: Multi-select tags (e.g., Antibiotics, Pediatrics) to organize the internal catalog.
+- **Step 2: Market Specifications**:
+  - **Pricing (USDT)**: Real-time unit pricing for blockchain record-keeping.
+  - **Therapeutic Description**: Full details regarding use-cases, contraindications, and general information.
+- **Step 3: Visual Identity (IPFS/MinIO)**: 
+  - **Image Gallery**: Upload high-resolution packaging previews. Supports multi-photo uploads via decentralized storage nodes.
 
-### Pre-requisite: Wallet Connection
-- Users must connect their **MetaMask** or **Etherum-compatible wallet** to start.
-- **Action**: "Connect Wallet" button; checks for an active account from the manufacturer's address.
+## Key Management Features
+### 1. Progressive State Validation
+- **Requirement Logic**: Each step highlights missing mandatory fields (Name, SKU, Category). The "Next Step" action is only enabled once the core identity is complete.
+- **Wallet Parity**: While product templates are stored in the decentralized metadata layer, they serve as the "Root Template" for all subsequent blockchain-verified batches.
 
-### Step 1: Core Details
-- **Form Fields**:
-  - `name`: "Product Name" (e.g., Amoxicillin 500mg). *Required*.
-  - `productId`: "Product ID (SKU/UPC/HRI)" - a unique string. *Required*.
-  - `categories`: Multi-select checkboxes (e.g., Antibiotics, Pain Relief). *At least one required*.
-  - `brand`: "Brand / Manufacturer". *Required*.
-- **Interaction**: "Next Step" button (Bottom right, Rounded-2xl).
-
-### Step 2: Specifications
-- **Form Fields**:
-  - `price`: "Market Price (USDT/USD)" - numeric input. *Required*.
-  - `description`: "Full Description" - a multi-line `textarea`. *Required*.
-- **Interaction**: Previous Step (Bottom left) / Next Step (Bottom right).
-
-### Step 3: Visual Identity
-- **Action**: **Image Upload Gallery**.
-- **Requirement**: At least one product image is highly recommended. Supports multiple photos (min 1).
-- **Final Action**: **"Enroll Product Profile"**. This creates the template used for all future batches.
+### 2. Catalogue Optimization
+- **Template Reusability**: Enrolling a product once allows for unlimited production batch runs without re-entering medicine metadata.
 
 ## AI Guidance & Context
-- **Validation Refinement**: If a user is missing a field on Step 1, tell them exactly which one (e.g., "The Product ID is required to continue").
-- **Product vs. Batch**: If a user is confused, explain: "A Product is the template (like 'Amoxicillin 500mg'), while a Batch is a specific production run (like 'Batch #A-01')."
-- **Blockchain**: Note that while the Product profile is stored off-chain (IPFS/DB), it's the foundation for on-chain batch security.
-- **Success**: Upon creation, encourage the user to "Create a Batch" for this product.
-- If a user is stuck, identify which step they are on based on the UI context and guide them on what info is required (e.g., "It looks like you're on the Visual Identity step. You'll need to upload at least one clear image of the packaging").
+- **Product Architecture**: If a user is confused, explain: "A Product is your static template (SKU), while a Batch is a specific production run of that product."
+- **Data Accuracy**: If a user provides product details in chat, the AI should confirm the `productId` (SKU) before calling the `createProduct` tool.
+- **Market Positioning**: Suggest optimal category tags (e.g., "Prescription Only") based on the product description provided by the manufacturer.
+- **Visuals**: If the user is on Step 3, the AI should remind them that "High-quality packaging images are essential for consumer trust during the verification process."

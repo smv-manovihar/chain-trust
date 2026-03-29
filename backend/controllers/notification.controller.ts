@@ -7,7 +7,14 @@ export const getNotifications = async (req: Request, res: Response) => {
 		const limit = parseInt(req.query.limit as string) || 20;
 		const skip = parseInt(req.query.skip as string) || 0;
 
-		const notifications = await Notification.find({ user: userId })
+		const query: any = { user: userId };
+		const type = req.query.type as string; // e.g. "medicine_expiry,batch_recall"
+		if (type) {
+			const types = type.split(',');
+			query.type = { $in: types };
+		}
+
+		const notifications = await Notification.find(query)
 			.sort({ createdAt: -1 })
 			.skip(skip)
 			.limit(limit);

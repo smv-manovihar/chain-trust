@@ -1,33 +1,24 @@
 # Route: /manufacturer/products (Product Catalog)
 
-The central repository for all product SKUs enrolled by the manufacturer.
+The central repository for all product SKUs enrolled by the manufacturer on the ChainTrust blockchain.
 
-## Dashboard Layout & User Actions
+## Layout Overview (Bento Grid)
+- **Fluid Header**: Contains the "Enroll Product" button and "Manage Categories" action. Supports a sticky, responsive search bar that synchronizes with the URL.
+- **Product Inventory Cards**: Rich cards that display:
+  - **Identity**: Name and Serialized SKU.
+  - **Market Position**: Current unit price (USDT) and assigned categories.
+  - **Production Maturity**: Count of active batches associated with the SKU.
+  - **Visuals**: High-resolution packaging previews managed via decentralized S3/MinIO storage.
 
-### 1. Product Inventory Cards
-Each product in the catalogue is displayed as a sleek card with:
-- **Image**: High-res packaging preview.
-- **Identity**: Name and SKU (Product ID).
-- **Meta**:
-  - `Price`: (Badge) e.g., $45.00.
-  - `Batches`: (Badge) Total number of batches created for this SKU.
-  - `Categories`: List of assigned categories.
-- **View Details**: Navigation to see the full product profile.
+## Key Management Features
+### 1. Categories & Organization
+- **Dynamic Grouping**: Manufacturers can create custom category tags (e.g., "Antibiotics," "Pediatrics") to organize their internal catalog.
+- **Filter State**: URL parameters (`?categories=` and `?search=`) are maintained in real-time for shareable and AI-observable views.
 
-### 2. Category Management
-- **Action**: **"Manage Categories"** button (located in the page header next to Add Product").
-- Opens a specialized dialog to add/remove custom categories for the manufacturer's catalogue.
-
-### 3. Search & URL Synchronization
-- Global Search Bar (Sticky) that filters the inventory in real-time.
-- URL Parameters: `?search=...` and `?categories=...`.
-- The AI uses `get_current_view_data` to see what is currently in the manufacturer's view.
+### 2. Batch Linking
+- **Direct Integration**: Each product card monitors its linked batches. If a product has 0 active batches, it is flagged for further production enrollment.
 
 ## AI Guidance & Context
-- **Tooling**: Use `search_manufacturer_products` to help users find specific items.
-- **Inventory Health**: If a product has 0 batches, suggest the user "Register a Batch" to start tracking production.
-- **Pricing Advice**: If the user is on this page, they might be considering market updates. Suggest "Update Product" if they need to adjust the price (USDT).
-ws batch history.
-
-## AI Guidance
-Use this page to help manufacturers organize their SKUs or check which products have missing batch coverage.
+- **Inventory Health**: If the user is viewing the catalog, the AI should observe which products have "0 Batches" and suggest: "Would you like to register a production run for [Product Name]?"
+- **Price Optimization**: If the user asks about market positioning, the AI can call the `updateProduct` tool to adjust unit pricing (USDT) for the blockchain record.
+- **Shareable Views**: The AI observes the current search and category filters to understand exactly what product subset the user is focusing on.

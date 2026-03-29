@@ -14,7 +14,6 @@ import {
   ArrowRight,
   ShieldCheck,
   Activity,
-  Users,
   BarChart3,
   Bell,
   Loader2,
@@ -26,6 +25,7 @@ import { listBatches, getScanHistory } from "@/api/batch.api";
 import { getNotifications, Notification } from "@/api/notification.api";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export default function ManufacturerDashboard() {
   const { user } = useAuth();
@@ -39,6 +39,7 @@ export default function ManufacturerDashboard() {
   const [recentNotifications, setRecentNotifications] = useState<
     Notification[]
   >([]);
+  const [tendency, setTendency] = useState<string | undefined>(undefined);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -56,7 +57,7 @@ export default function ManufacturerDashboard() {
             listProducts({}, controller.signal),
             listBatches({}, controller.signal),
             getScanHistory(7, controller.signal),
-            getNotifications(5, 0, controller.signal),
+            getNotifications(5, 0, undefined, controller.signal),
           ]);
 
         const products = productsRes.products || [];
@@ -68,15 +69,32 @@ export default function ManufacturerDashboard() {
         // Find today's scans in the history array
         const todayData = history.find((h: any) => h.date === todayStr);
 
+        // Calculate tendency from yesterday
+        let calculatedTendency = undefined;
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = format(yesterday, "yyyy-MM-dd");
+        const yesterdayData = history.find((h: any) => h.date === yesterdayStr);
+
+        if (yesterdayData && yesterdayData.count > 0 && todayData) {
+          const diff =
+            ((todayData.count - yesterdayData.count) / yesterdayData.count) *
+            100;
+          calculatedTendency = `${diff >= 0 ? "+" : ""}${diff.toFixed(0)}%`;
+        } else if (todayData && todayData.count > 0 && !yesterdayData) {
+          calculatedTendency = "+100%";
+        }
+
         setStats({
           products: products.length,
           batches: batches.length,
           scansToday: todayData ? todayData.count : 0,
           unreadNotifications: unreadCount,
         });
+        setTendency(calculatedTendency);
         setRecentNotifications(notifications);
       } catch (error: any) {
-        if (error.name === 'AbortError') return;
+        if (error.name === "AbortError") return;
         console.error("Failed to fetch dashboard data:", error);
         toast.error("Could not load dashboard metrics.");
       } finally {
@@ -159,8 +177,8 @@ export default function ManufacturerDashboard() {
           title="Scans Today"
           value={stats.scansToday}
           icon={TrendingUp}
-          tendency="+12%"
-          description="Since midnight"
+          tendency={tendency}
+          description={`Date: ${format(new Date(), "MMM dd")}`}
           color="green"
         />
 
@@ -183,38 +201,41 @@ export default function ManufacturerDashboard() {
             {[
               {
                 title: "Manage Products",
-                desc: "View and edit your product catalogue.",
+                desc: "View and edit your product catalog",
                 icon: Package,
                 href: "/manufacturer/products",
                 color: "bg-blue-500/10 text-blue-600",
               },
               {
                 title: "Enroll Batch",
-                desc: "Register a new production run.",
+                desc: "Register a new production run",
                 icon: Plus,
                 href: "/manufacturer/batches/new",
                 color: "bg-primary/10 text-primary",
               },
               {
                 title: "View Analytics",
-                desc: "Deep dive into scan locations and trends.",
+                desc: "Deep dive into scan locations and trends",
                 icon: BarChart3,
                 href: "/manufacturer/analytics",
                 color: "bg-purple-500/10 text-purple-600",
               },
               {
-                title: "Team Management",
-                desc: "Invite and manage company employees.",
-                icon: Users,
-                href: "/manufacturer/team",
-                color: "bg-amber-500/10 text-amber-600",
+                title: "View Scan activity",
+                desc: "Investigate suspicious scan activity",
+                icon: Activity,
+                href: "/manufacturer/analytics/scans",
+                color: "bg-emerald-500/10 text-emerald-600",
               },
             ].map((action, i) => (
               <div key={i} className="flex flex-col h-full">
                 <Link href={action.href} className="flex-1">
                   <Card className="p-5 rounded-[2rem] border-border/40 bg-card/40 backdrop-blur-md hover:bg-muted/40 transition-all group h-full flex flex-col">
                     <div
-                      className={`h-12 w-12 rounded-2xl ${action.color} flex items-center justify-center mb-4 transition-transform group-hover:scale-110`}
+                      className={cn(
+                        "h-12 w-12 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110",
+                        action.color,
+                      )}
                     >
                       <action.icon className="h-6 w-6" />
                     </div>
@@ -234,7 +255,9 @@ export default function ManufacturerDashboard() {
         {/* Recent Activity Feed */}
         <section className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-black tracking-tight">Recent Activity</h2>
+            <h2 className="text-xl font-black tracking-tight">
+              Recent Activity
+            </h2>
             <Button
               variant="link"
               className="text-xs text-primary p-0 h-auto"
@@ -278,28 +301,6 @@ export default function ManufacturerDashboard() {
                   </p>
                 </div>
               )}
-            </div>
-          </Card>
-
-          {/* Quick Help / Info Card */}
-          <Card className="p-6 rounded-[2.5rem] bg-zinc-900 border-none text-white relative overflow-hidden group">
-            <div className="absolute -bottom-6 -right-6 opacity-10 group-hover:scale-110 transition-transform">
-              <ShieldCheck className="h-32 w-32" />
-            </div>
-            <div className="relative z-10">
-              <h3 className="text-lg font-black tracking-tight mb-2">
-                Operational Integrity
-              </h3>
-              <p className="text-xs text-zinc-400 leading-relaxed font-medium mb-4">
-                Your manufacturing nodes are synchronized. All product scans are
-                being tracked in real-time across the secure blockchain network.
-              </p>
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-bold tracking-tight text-emerald-500">
-                  Online & Secure
-                </span>
-              </div>
             </div>
           </Card>
         </section>

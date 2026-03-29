@@ -1,32 +1,27 @@
 # Route: /verify (Product Verification)
 
-The public-facing verification portal for consumers to validate product authenticity.
+The public-facing verification gateway for Decentralized Product Authentication. It operates as the "root source of truth" by querying the blockchain directly before enriching data with metadata.
+
+## Layout Overview (Trust Architecture)
+- **Authenticity Shield (Hero)**: A prominent, color-coded status area that fills the upper viewport. 
+  - **Authentic (Emerald)**: Verified on the blockchain; salt is valid.
+  - **Suspicious (Amber)**: Valid salt but high scan count (>5).
+  - **Counterfeit/Recalled (Red)**: Invalid salt or manufacturer-initiated recall.
+- **Product Passport (Bento)**:
+  - **Identity**: High-resolution packaging images and Batch Number details.
+  - **Provenance**: Manufacturing date and localized expiry information.
+  - **Scan Intel**: Real-time counter of how many times this specific unit has been scanned globally.
+- **Blockchain Ledger**: A live view of the cryptographic transaction hash and decentralized record.
 
 ## Usage Modes
-1. **Direct Scan**: Scanning a QR code takes the user to `/verify?salt=[UNIT_SALT]`.
-2. **Manual Lookup**: Users can type the salt directly into the input field.
+1. **QR-Direct**: Scanning a serialized QR code routes to `/verify?salt=[UNIT_SALT]`.
+2. **Manual Audit**: Users can type a unit salt or batch ID directly into the secure portal.
 
-## Visual Outcomes & Verification Data
-
-### 1. Authenticity Status Labels
-- **Authentic (Green)**: Verified on the blockchain, salt matches. Use this to reassure the user: "This item is genuine and safe."
-- **Potential Counterfeit (Amber)**: Salt matches but **scan count is high (>5)**. Advice: "This code has been scanned too many times; it might be a copy."
-- **Recalled (Red)**: Batch marked as recalled by the manufacturer. Advice: "Do not consume this medicine. It has been recalled for safety reasons."
-- **Counterfeit (Red)**: QR code salt does not exist on the blockchain. Advice: "Error: No record of this item found. This product may be a counterfeit."
-
-### 2. Identification Data
-- **Header**: Large status badge + "Verified by ChainTrust" stamp.
-- **Display Fields**:
-  - `Medicine Name` (Brand).
-  - `Product ID` / `Batch Number`.
-  - `Expiry Date` (Check if expired).
-  - `Scan History`: Total count of times this specific unit has been looked up.
-
-## Actions
-- **Save to My Medicines**: Logged-in customers can add this verified instance to their cabinet.
-- **Check Real-time**: Re-fetches data directly from the blockchain node.
+## Actions & Transitions
+- **Vault Integration**: Logged-in users can select "Save to My Medicines" to transfer the verified record into their persistent Cabinet inventory.
+- **Real-time Recalibration**: A "Check Real-time" action that forces a fresh query to the blockchain nodes, bypassing local caches.
 
 ## AI Guidance & Context
-- **Tooling**: Use `get_batch_details` if the user provides a salt or batch number manually.
-- **Clarity is Safety**: In this route, the AI must be extremely clear. Never use vague terms. Use "Authentic," "Recalled," or "Counterfeit."
-- **Next Steps**: If authentic, suggest the user **"Save to My Medicines"**. If counterfeit or recalled, provide the manufacturer's contact info or recall link if available.
+- **Determinism**: In this route, the AI must be absolute. Use terms like "Authentic," "Recalled," or "Risk Detected."
+- **Inventory Advice**: If the scan count is high (Suspicious), the AI should proactively advise the user: "This item's security code has been accessed multiple times. It may be a duplicate."
+- **Next Steps**: If authentic, suggest the user **"Save to My Medicines"** for 24/7 background security monitoring.

@@ -1,16 +1,26 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface INotification extends Document {
-	user: Types.ObjectId; // The user (manufacturer/employee) receiving the notification
-	type: 'alert' | 'scan_milestone' | 'system' | 'expiry';
+	user: Types.ObjectId; // Receiver of the notification
+	type: 
+		| 'medicine_expiry'    // Customer
+		| 'batch_recall'       // Customer
+		| 'dose_reminder'      // Customer
+		| 'suspicious_scan'    // Manufacturer
+		| 'scan_milestone'     // Manufacturer
+		| 'system';
 	title: string;
 	message: string;
 	isRead: boolean;
-	link?: string; // Optional path to navigate to when clicked
+	channel: 'in_app' | 'email' | 'both';
+	link?: string;
 	metadata?: {
 		batchId?: Types.ObjectId;
 		productId?: Types.ObjectId;
-		alertId?: Types.ObjectId;
+		cabinetItemId?: Types.ObjectId;
+		medicineName?: string;
+		expiryDate?: Date; // Corrected to Date as per v11 Standard
+		ip?: string;
 	};
 	createdAt: Date;
 	updatedAt: Date;
@@ -25,7 +35,10 @@ const notificationSchema = new Schema<INotification>(
 		},
 		type: {
 			type: String,
-			enum: ['alert', 'scan_milestone', 'system', 'expiry'],
+			enum: [
+				'medicine_expiry', 'batch_recall', 'dose_reminder',
+				'suspicious_scan', 'scan_milestone', 'system'
+			],
 			required: true,
 		},
 		title: {
@@ -42,6 +55,11 @@ const notificationSchema = new Schema<INotification>(
 			type: Boolean,
 			default: false,
 		},
+		channel: {
+			type: String,
+			enum: ['in_app', 'email', 'both'],
+			default: 'in_app'
+		},
 		link: {
 			type: String,
 			trim: true,
@@ -49,7 +67,10 @@ const notificationSchema = new Schema<INotification>(
 		metadata: {
 			batchId: { type: Schema.Types.ObjectId, ref: 'Batch' },
 			productId: { type: Schema.Types.ObjectId, ref: 'Product' },
-			alertId: { type: Schema.Types.ObjectId, ref: 'Alert' },
+			cabinetItemId: { type: Schema.Types.ObjectId, ref: 'CabinetItem' },
+			medicineName: { type: String },
+			expiryDate: { type: Date }, // Updated to Date for UTC
+			ip: { type: String },
 		},
 	},
 	{

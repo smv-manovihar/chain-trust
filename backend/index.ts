@@ -8,7 +8,6 @@ import { connectDB, getDBStatus } from './database/db.js';
 
 import companyRouter from './routers/company.router.js';
 import authRouter from './routers/auth.router.js';
-import alertRouter from './routers/alert.router.js';
 import productRouter from './routers/product.router.js';
 import mediaRouter from './routers/media.router.js';
 import userRouter from './routers/user.router.js';
@@ -26,7 +25,7 @@ app.set('trust proxy', 1);
 // CORS
 app.use(
 	cors({
-		origin: [FRONTEND_URL, 'http://127.0.0.1:3000', 'http://[::1]:3000'],
+		origin: [FRONTEND_URL, 'http://127.0.0.1:3000', 'http://localhost:3000'],
 		credentials: true,
 		methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
 		allowedHeaders: [
@@ -72,7 +71,6 @@ app.get('/api/health', (_req, res) => {
 // Routes
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/company', authLimiter, companyRouter);
-app.use('/api/alerts', alertRouter);
 app.use('/api/products', productRouter);
 app.use('/api/batches', batchRouter);
 app.use('/api/media', mediaRouter);

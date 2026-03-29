@@ -18,8 +18,16 @@ export interface IUser extends Document {
 	city?: string;
 	postalCode?: string;
 	country?: string;
-	companyName?: string;
-	website?: string;
+	
+	// Notification preferences
+	notificationDefaults: {
+		medicine_expiry: { inApp: boolean; email: boolean };
+		batch_recall: { inApp: boolean; email: boolean };
+		dose_reminder: { inApp: boolean; email: boolean };
+		suspicious_scan: { inApp: boolean; email: boolean };
+		scan_milestone: { inApp: boolean; email: boolean };
+		system: { inApp: boolean; email: boolean };
+	};
 
 	// Company association
 	companyId?: Types.ObjectId;
@@ -77,8 +85,34 @@ const userSchema = new Schema<IUser>(
 		city: { type: String, trim: true },
 		postalCode: { type: String, trim: true },
 		country: { type: String, trim: true },
-		companyName: { type: String, trim: true },
-		website: { type: String, trim: true },
+
+		// Notification preferences
+		notificationDefaults: {
+			medicine_expiry: {
+				inApp: { type: Boolean, default: true },
+				email: { type: Boolean, default: true },
+			},
+			batch_recall: {
+				inApp: { type: Boolean, default: true },
+				email: { type: Boolean, default: true },
+			},
+			dose_reminder: {
+				inApp: { type: Boolean, default: true },
+				email: { type: Boolean, default: false },
+			},
+			suspicious_scan: {
+				inApp: { type: Boolean, default: true },
+				email: { type: Boolean, default: true },
+			},
+			scan_milestone: {
+				inApp: { type: Boolean, default: true },
+				email: { type: Boolean, default: false },
+			},
+			system: {
+				inApp: { type: Boolean, default: true },
+				email: { type: Boolean, default: false },
+			},
+		},
 
 		// Company association
 		companyId: { type: Schema.Types.ObjectId, ref: 'Company' },

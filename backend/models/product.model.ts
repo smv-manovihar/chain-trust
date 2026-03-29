@@ -6,8 +6,11 @@ export interface IProduct extends Document {
 	categories: string[];
 	brand: string;
 	price: number;
+	composition: string;
 	description?: string;
 	images: string[]; // S3/MinIO URLs
+	imageAccessLevel?: 'public' | 'verified_only' | 'internal_only';
+	customerVisibleImages?: number[]; // Indices of images visible to customers
 	qrSettings: {
 		qrSize: number;
 		columns: number;
@@ -53,6 +56,19 @@ const productSchema = new Schema<IProduct>(
 		images: {
 			type: [String],
 			default: [],
+		},
+		imageAccessLevel: {
+			type: String,
+			enum: ['public', 'verified_only', 'internal_only'],
+			default: 'public',
+		},
+		customerVisibleImages: {
+			type: [Number],
+			default: [],
+		},
+		composition: {
+			type: String,
+			trim: true,
 		},
 		qrSettings: {
 			qrSize: { type: Number, default: 40 }, // mm

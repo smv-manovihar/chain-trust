@@ -55,9 +55,9 @@ export function BrandLogo({
           currentSize.container,
         )}
       >
-        <img 
-          src="/chain-trust.png" 
-          alt="ChainTrust" 
+        <img
+          src="/chain-trust-icon.png"
+          alt="ChainTrust"
           className="h-full w-full object-cover rounded-full"
         />
       </div>
@@ -66,7 +66,7 @@ export function BrandLogo({
           className={cn(
             "font-bold tracking-tight text-foreground group-hover:text-primary transition-colors",
             currentSize.title,
-            textClassName
+            textClassName,
           )}
         >
           ChainTrust

@@ -1,36 +1,25 @@
 # Route: /manufacturer/batches (Batch Management)
 
-A comprehensive list of all production batches registered under the manufacturer's account.
+A comprehensive, real-time registry of all serialized production runs (Batches) enrolled by the manufacturer on the ChainTrust network.
 
-## Dashboard Layout & User Actions
+## Layout Overview (Intelligent Adaptive)
+- **Desktop (Grid/Table)**: A high-density data matrix featuring:
+  - **Batch Traceability**: Unique serialized `Batch ID` and `Product Name` (SKU).
+  - **Supply Metrics**: Total `Units Enrolled` (Quantity) and Manufacturing/Expiry dates.
+  - **Security Status**: Color-coded badges for "Active" (Emerald), "Recalled" (Red), or "On-chain Verified".
+- **Mobile (Rich Cards)**: Adaptive card layout that transforms table rows into swipeable management blocks for field use.
+- **Dynamic Filtering**: A sticky, responsive header that supports real-time search and category filtering via URL synchronization (`?search=` and `?category=`).
 
-### 1. Batches Table (Desktop)
-- **Table Columns**:
-  - `Batch No.`: Unique batch identifier.
-  - `Product`: Name and SKU.
-  - `Quantity`: Number of units (e.g., 500).
-  - `Dates`: Manufactured and Expiry dates.
-  - `Status`: (Badge) Active (Primary) or Recalled (Destructive).
-  - `On-chain`: (Badge) Yes (Emerald) or No (Outline).
-- **Row Actions**: Click the `...` menu to see:
-  - **View Details**: Redirects to batch detail page.
-  - **Download PDF**: Instant generation of QR report.
-  - **Recall Batch**: Destructive action (requires confirmation).
+## Key Management Features
+### 1. Row/Card Actions
+- **View Details**: Deep-dive into specific unit salts and scan analytics (`/manufacturer/batches/:id`).
+- **Download Artifact**: Instant PDF generation of the serialized QR report for physical labeling.
+- **Security Override (Recall)**: A high-level safety action to mark a batch as compromised or recalled across all consumer devices globally.
 
-### 2. Mobile View
-- Batches are displayed as **Cards** instead of table rows.
-- Each card shows the Batch No, Product Name, and Status.
-- Includes a **Swipe to Manage** vibe with a quick action button.
-
-### 3. Search & Filters
-- **Search Bar**: Sticky at the top, placeholder: "Search batches...".
-- **Category Filter**: A dropdown menu (e.g., Antibiotics, Vitamins).
-- **URL Sync**: Both search and categories are synced to the URL (`?search=...`, `?categories=...`). Use `get_current_view_data` to see this.
+### 2. Search Intelligence
+- **URL Parity**: As the user types, the browser URL updates proportionally. This allows the AI agent to see the manufacturer's active filter state via `get_current_view_data`.
 
 ## AI Guidance & Context
-- **Tooling**: Use `search_manufacturer_batches` or `get_current_view_data` to locate a specific batch.
-- **Troubleshooting**: If a user asks "where is my newly created batch?", check the "On-chain" status. If it's not registered, suggest they "Recall and Re-create" if metadata was wrong.
-- **Recall Guidance**: Only manufacturers can recall their own batches. This is an ethical and safety responsibility.
-
-## AI Context
-When helping a manufacturer on this page, always check the `query_params` in `Tools` to understand if they are looking at a filtered set of batches.
+- **Inventory Audit**: If a user asks "Show me all active batches for [Product]," the AI should first look at the `query_params` to see if a filter is already applied.
+- **Security Escalation**: If a manufacturer expresses concern about a specific batch, guide them to the **Recall Batch** action. Remind them that this is an irreversible security flag for consumer safety.
+- **Tooling**: Use `search_manufacturer_batches` to handle complex multi-criteria lookups.

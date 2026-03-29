@@ -41,6 +41,17 @@ interface AgentChatMessageProps {
   isGenerating?: boolean;
 }
 
+/**
+ * Sanitizes message content for the 'Copy' feature.
+ * Strips [action:...] tags and replaces them with their labels or empty strings.
+ */
+const sanitizeForCopy = (content: string): string => {
+  if (!content) return "";
+  return content
+    .replace(/\[action:\s*\w+\s*\|\s*[^\]]*label:([^\]|]+)[^\]]*\]/g, "$1")
+    .replace(/\[action:\s*\w+\s*(?:\|[^\]]+)?\]/g, "");
+};
+
 const AgentChatMessageBase = ({
   message,
   onEdit,
@@ -99,11 +110,11 @@ const AgentChatMessageBase = ({
       textarea.focus();
     }
   }, [isEditing]);
-  
+
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       const textarea = textareaRef.current;
-      textarea.style.height = 'auto';
+      textarea.style.height = "auto";
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
   }, [editValue, isEditing]);
@@ -151,34 +162,45 @@ const AgentChatMessageBase = ({
         >
           <div
             className={cn(
-              "shrink-0 rounded-xl border flex items-center justify-center shadow-sm mt-1 transition-all duration-300",
+              "shrink-0 rounded-xl border flex items-center justify-center shadow-sm mt-1 transition-all duration-300 relative",
               message.status === "error"
                 ? "bg-destructive/10 border-destructive/20 text-destructive"
                 : "bg-card border-border text-primary",
               compact
-                ? "w-5 h-5 sm:w-6 sm:h-6 rounded-lg"
-                : "w-7 h-7 sm:w-8 sm:h-8",
+                ? "w-5 h-5 sm:w-6 sm:h-6 rounded-full"
+                : "w-7 h-7 sm:w-8 sm:h-8 rounded-full",
+              message.status === "generating" && "border-primary/50",
             )}
           >
+            {message.status === "generating" && isGenerating && (
+              <div className="absolute inset-[-1px] rounded-full border-t-2 border-primary/40 animate-spin" />
+            )}
             <Sparkles
               className={cn(
                 "transition-all duration-300",
-                compact
-                  ? "w-2.5 h-2.5 sm:w-3 sm:h-3"
-                  : "w-3.5 h-3.5 sm:w-4 sm:h-4",
+                compact ? "w-3 h-3" : "w-3.5 h-3.5",
+                message.status === "generating" &&
+                  isGenerating &&
+                  "text-primary animate-pulse",
               )}
             />
           </div>
 
-          <div className="flex flex-col flex-1 min-w-0 mt-0.5 transition-all duration-300 ease-in-out">
-            {message.thoughts && message.thoughts.length > 0 && (
+          <div
+            className={cn(
+              "flex flex-col flex-1 min-w-0 transition-all duration-300 ease-in-out",
+              !compact && "mt-0.5",
+            )}
+          >
+            {((message.thoughts && message.thoughts.length > 0) ||
+              isGenerating) && (
               <div className="transition-all duration-300 ease-in-out origin-top border-b border-dashed border-border/20 mt-1 -mb-2">
                 <ChainOfThoughtPreview
-                  thoughts={message.thoughts.map((t: any) => ({
+                  thoughts={(message.thoughts || []).map((t: any) => ({
                     ...t,
                     message: t.message || `Running ${t.tool}...`,
                   }))}
-                  isStreaming={message.status === "generating"}
+                  isStreaming={message.status === "generating" && isGenerating}
                   hasContent={!!message.content}
                 />
               </div>
@@ -189,9 +211,7 @@ const AgentChatMessageBase = ({
                 message.status === "error"
                   ? "text-destructive font-medium bg-destructive/5 rounded-xl px-3 py-2 border border-destructive/10"
                   : "text-foreground/90",
-                compact
-                  ? "text-[11px] sm:text-xs py-1"
-                  : "text-sm py-1.5 sm:py-2",
+                compact ? "text-[11px] sm:text-xs py-1" : "text-sm",
               )}
             >
               <div className="text-[13px] sm:text-sm leading-relaxed overflow-x-auto">
@@ -200,19 +220,13 @@ const AgentChatMessageBase = ({
                   isStreaming={message.status === "generating"}
                 />
               </div>
-              {message.status === "generating" && !message.content && (
-                <div className="flex items-center gap-1.5 text-muted-foreground text-[9px] sm:text-[10px] mt-1 animate-pulse">
-                  <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                  <span>Thinking...</span>
-                </div>
-              )}
             </div>
             {message.content && message.status !== "generating" && (
               <div className="flex items-center gap-1 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <CopyButton
-                      value={message.content}
+                      value={sanitizeForCopy(message.content || "")}
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground"
@@ -340,7 +354,7 @@ const AgentChatMessageBase = ({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <CopyButton
-                      value={message.content}
+                      value={sanitizeForCopy(message.content || "")}
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 sm:h-8 sm:w-8 text-foreground/70 hover:text-foreground transition-all duration-300"

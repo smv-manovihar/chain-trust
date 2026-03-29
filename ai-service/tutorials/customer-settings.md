@@ -1,55 +1,27 @@
-# Customer Settings Tutorial
+# Route: /customer/settings (Account Preferences)
 
-The Customer Settings page (`/customer/settings`) allows users to manage their personal profile, security preferences, and notification settings. It is designed to be mobile-first and follows a clean, tabbed layout.
+The Customer Settings page is the primary point for managing the user's personal identity, security posture, and global notification preferences.
 
-## Page Structure
+## Layout Overview (Mobile-Optimized)
+- **Fluid Tab Navigation**: Uses the `useScroll` hook to ensure the navigation bar stays responsive. 
+- **Tab Structure**:
+  - **General**: Personal identity (Name, Address, Phone). Note: Email is read-only.
+  - **Security**: Manage authentication layers, password updates, and Google OAuth linking status.
+  - **Notifications**: Granular toggles for "Supply Safety Alerts," "Health Adherence Insights," and platform updates.
+  - **Account Control (Danger Zone)**: High-security actions including global logout and irreversible account deletion.
 
-The page is divided into four main sections via a `Tabs` component:
-- **General**: Personal profile information.
-- **Security**: Authentication and account security.
-- **Notifications**: Alert preferences.
-- **Advanced**: Critical account actions (Danger Zone).
+## Key Management Features
+### 1. Profile Synchronization
+- **Identity Fields**: Supports name, physical address for local pharmacy tracking, and phone number for SMS alerts.
+- **Save Action**: Updates the profile via `updateProfile` with instantaneous "Toast" feedback.
 
----
+### 2. Google OAuth Integration
+- **Direct Connection**: Displays a "Connect to Google" or "Unlink" button based on the `isGoogleConnected` server-side flag. This ensures account recovery parity.
 
-## 1. General (Personal Profile)
-- **Purpose**: Allows users to update their name, email (read-only), phone number, and physical address.
-- **Form**: Uses `react-hook-form` with `zod` validation and `shadcn/ui` form components.
-- **Fields**:
-    - Full Name
-    - Email Address (Disabled/Read-only)
-    - Phone Number
-    - City
-    - Street Address
-    - Postal Code
-    - Country
-- **Save Action**: Updates the user profile via the `updateProfile` API call.
+### 3. Safety Alerts Configuration
+- **Supply Recalls (Critical)**: When enabled, the background security agents will prioritize push notifications for any match in the user's Cabinet.
 
-## 2. Security
-- **Google Connection**: Shows the `GoogleConnection` component, allowing users to link/unlink their Google account.
-- **Password Settings**: Shows the `PasswordSettings` component for changing the account password. Requires the current password for verification.
-- **Privacy Controls**: A placeholder section for future features like biometric login.
-
-## 3. Notifications (Alert Preferences)
-- **Safety Recalls**: Toggle switch for critical alerts regarding recalled medicines.
-- **Health Insights**: Toggle switch for monthly tracking reports.
-- **Product Updates**: Toggle switch for platform news and features.
-
-## 4. Advanced (Danger Zone)
-- **Sign out of all devices**: Invalidates all active refresh tokens for the user.
-- **Delete Personal Account**: 
-    - Triggers a `DELETE /api/auth/me` request.
-    - **Cascading Delete**: Removes the user record, all saved "My Medicines" (`CabinetItem`), and all associated `RefreshToken` records.
-    - **UI**: Requires double confirmation via an `AlertDialog`.
-
----
-
-## Implementation Details
-- **Route**: `frontend/app/customer/settings/page.tsx`
-- **Components Used**:
-    - `DangerZoneSettings`: Handles account deletion and global logout.
-    - `PasswordSettings`: Handles password changes.
-    - `GoogleConnection`: Handles OAuth linking.
-- **API Calls**:
-    - `updateProfile(data)`: Saves general profile changes.
-    - `deleteAccount()`: Triggered via the Danger Zone.
+## AI Guidance & Context
+- **Privacy First**: The AI should never reveal raw password data. If a user asks to change their password, the AI should guide them to the **Security** tab.
+- **Account Deletion**: If a user asks to "Delete my account," the AI MUST warn them that this action is irreversible and triggers a cascading delete of their entire "My Medicines" history. Provide a direct link to the **Account Control** tab.
+- **Profile Updates**: If a user provides a new phone number or address in chat, the AI can offer to call the `updateProfile` tool to sync it automatically.

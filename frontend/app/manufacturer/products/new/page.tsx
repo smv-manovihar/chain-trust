@@ -44,13 +44,18 @@ import {
 import { fetchCategories, Category } from "@/api/category.api";
 import { CategoryFilter } from "@/components/manufacturer/category-filter";
 import { requestExecutionAccounts } from "@/api/web3-client";
+import { useWeb3 } from "@/contexts/web3-context";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function NewProductWizard() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const {
+    address: walletAddress,
+    connect: connectWallet,
+    status: walletStatus,
+  } = useWeb3();
+  const isConnecting = walletStatus === "connecting";
 
   // Form State
   const [form, setForm] = useState({
@@ -60,38 +65,13 @@ export default function NewProductWizard() {
     brand: "",
     price: "",
     description: "",
+    composition: "",
     images: [] as File[],
+    customerVisibleImages: [] as number[],
   });
 
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-    // Check if already connected
-    useEffect(() => {
-      const checkConn = async () => {
-        try {
-          const accounts = await (window as any).ethereum?.request({
-            method: "eth_accounts",
-          });
-          if (accounts?.[0]) setWalletAddress(accounts[0]);
-        } catch (e) {}
-      };
-      checkConn();
-    }, []);
-
-  const connectWallet = async () => {
-    setIsConnecting(true);
-    try {
-      const accounts = await requestExecutionAccounts();
-      if (accounts?.[0]) {
-        setWalletAddress(accounts[0]);
-        toast.success("Wallet connected successfully.");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Wallet connection failed.");
-    } finally {
-      setIsConnecting(false);
-    }
-  };
 
   const updateForm = (updates: Partial<typeof form>) =>
     setForm((f) => ({ ...f, ...updates }));
@@ -124,6 +104,7 @@ export default function NewProductWizard() {
         ...form,
         price: parseFloat(form.price) || 0,
         images: imageUrls,
+        customerVisibleImages: form.customerVisibleImages,
       });
 
       toast.success("Product created successfully.");
@@ -140,7 +121,7 @@ export default function NewProductWizard() {
   const canGoToStep = (targetStep: number) => {
     if (targetStep <= step) return true;
     if (targetStep === 2)
-      return form.name && form.productId && form.categories.length > 0 && form.brand;
+      return form.name && form.productId && form.categories.length > 0 && form.brand && form.composition;
     if (targetStep === 3)
       return (
         form.name &&
@@ -154,7 +135,7 @@ export default function NewProductWizard() {
   };
 
   const nextStep = () => {
-    if (step === 1 && (!form.name || !form.productId || form.categories.length === 0 || !form.brand)) {
+    if (step === 1 && (!form.name || !form.productId || form.categories.length === 0 || !form.brand || !form.composition)) {
       toast.error("Please fill in all basic details.");
       return;
     }
@@ -278,6 +259,14 @@ export default function NewProductWizard() {
                         onChange={(e) => updateForm({ productId: e.target.value })}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label>Composition / Active Ingredients</Label>
+                      <Input
+                        placeholder="e.g. Paracetamol 500mg"
+                        value={form.composition}
+                        onChange={(e) => updateForm({ composition: e.target.value })}
+                      />
+                    </div>
                     <div className="space-y-2 flex flex-col justify-end">
                       <Label className="mb-2">Categories</Label>
                       <CategoryFilter
@@ -350,9 +339,32 @@ export default function NewProductWizard() {
                         />
                         <button
                           onClick={() => removeImage(idx)}
-                          className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white"
+                          className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-white hover:bg-destructive"
                         >
-                          <X className="h-6 w-6" />
+                          <X className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const isVisible = form.customerVisibleImages.includes(idx);
+                            updateForm({
+                              customerVisibleImages: isVisible
+                                ? form.customerVisibleImages.filter(i => i !== idx)
+                                : [...form.customerVisibleImages, idx]
+                            });
+                          }}
+                          className={cn(
+                            "absolute bottom-2 right-2 p-1.5 rounded-full transition-all border",
+                            form.customerVisibleImages.includes(idx)
+                              ? "bg-primary text-white border-primary"
+                              : "bg-black/60 text-white/70 border-white/20 hover:bg-black/80"
+                          )}
+                          title={form.customerVisibleImages.includes(idx) ? "Visible to Customers" : "Hidden from Customers"}
+                        >
+                          {form.customerVisibleImages.includes(idx) ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <ShieldAlert className="h-4 w-4" />
+                          )}
                         </button>
                       </div>
                     ))}

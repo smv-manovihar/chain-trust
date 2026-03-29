@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, memo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Loader2 } from "lucide-react";
 
@@ -30,44 +30,51 @@ interface ChainStepProps {
 /**
  * Individual step in the chain - Uses a clean dot timeline
  */
-const ChainStep = ({ step, isLast, connectorClass }: ChainStepProps) => {
+const ChainStep = memo(({ step, isLast, connectorClass }: ChainStepProps) => {
+  const isThinking = step.status === "thinking";
   const isRunning = step.status === "running";
   const isFailed = step.status === "failed";
   const isCompleted = step.status === "completed";
 
   return (
-    <div className="relative pb-1.5">
+    <div className="relative pb-1.5 animate-in fade-in slide-in-from-left-1 duration-200">
       {/* Connector line */}
       {!isLast && (
         <div
           className={cn(
-            "absolute left-[11px] top-3 -bottom-4 w-px bg-primary/50",
+            "absolute left-[11px] top-3 -bottom-4 w-px bg-border/40",
             connectorClass,
           )}
           aria-hidden
         />
       )}
 
-      <div className="group/step flex gap-2 items-start pl-0 pr-2 rounded-lg hover:bg-muted/10 transition-colors duration-300">
+      <div className="group/step flex gap-2 items-start pl-0 pr-2 rounded-lg transition-colors duration-300">
         {/* Step Dot */}
         <div className="relative z-10 shrink-0 w-6 h-6 flex items-center justify-center mt-0.5">
           <div
             className={cn(
-              "w-2 h-2 rounded-full transition-all duration-300 ease-in-out",
+              "w-1.5 h-1.5 rounded-full transition-all duration-300 ease-in-out",
               isRunning
                 ? "bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.6)]"
-                : isFailed
-                  ? "bg-red-500"
-                  : isCompleted
-                    ? "bg-emerald-500"
-                    : "bg-muted-foreground/30",
+                : isThinking
+                  ? "bg-blue-500/80"
+                  : isFailed
+                    ? "bg-red-500"
+                    : isCompleted
+                      ? "bg-emerald-500"
+                      : "bg-muted-foreground/30",
             )}
           />
         </div>
 
         {/* Message Container */}
-        <div className="flex-1 min-w-0 flex items-center min-h-[28px]">
-          <span className="text-xs font-medium text-muted-foreground/75 group-hover/step:text-foreground transition-colors duration-300 truncate">
+        <div className="flex-1 min-w-0 flex items-center py-1.5">
+          <span
+            className={cn(
+              "text-xs font-medium text-muted-foreground/75 group-hover/step:text-foreground transition-colors duration-300 line-clamp-3",
+            )}
+          >
             {step.message ||
               step.tool
                 .split("_")
@@ -78,7 +85,9 @@ const ChainStep = ({ step, isLast, connectorClass }: ChainStepProps) => {
       </div>
     </div>
   );
-};
+});
+
+ChainStep.displayName = "ChainStep";
 
 /**
  * Premium chain-of-thought visualization
@@ -100,7 +109,7 @@ export function ChainOfThoughtPreview({
       : isStreaming && !hasContent,
   );
 
-  // Expand by default when streaming and no content, collapsed otherwise
+  // Auto-expand while streaming with no content, collapse when content arrives
   useEffect(() => {
     if (controlledExpanded === undefined) {
       setInternalExpanded(isStreaming && !hasContent);
@@ -131,8 +140,25 @@ export function ChainOfThoughtPreview({
     setMounted(true);
   }, []);
 
-  if (!mounted || toolThoughts.length === 0) {
+  // Only return null if not mounted, or if we have no thoughts AND we aren't currently streaming/generating.
+  if (!mounted || (toolThoughts.length === 0 && !isStreaming)) {
     return null;
+  }
+
+  // Initial Thinking State (No tool events received yet, and no final content streaming either)
+  if (isStreaming && toolThoughts.length === 0 && !hasContent) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors duration-300 group/thought min-w-[80px]">
+        <span className="text-xs font-semibold text-muted-foreground/80 group-hover/thought:text-foreground transition-colors duration-300">
+          Thinking
+        </span>
+        <div className="flex gap-0.5 items-center mt-1">
+          <div className="w-1 h-1 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:-0.3s]" />
+          <div className="w-1 h-1 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:-0.15s]" />
+          <div className="w-1 h-1 rounded-full bg-muted-foreground/50 animate-bounce" />
+        </div>
+      </div>
+    );
   }
 
   const currentStep = isStreaming
@@ -141,19 +167,30 @@ export function ChainOfThoughtPreview({
   const stepCount = toolThoughts.length;
 
   return (
-    <div className="w-full font-sans">
+    <div className="w-full font-sans" onClick={(e) => e.stopPropagation()}>
       <Collapsible open={isExpanded} onOpenChange={handleExpandedChange}>
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <CollapsibleTrigger asChild>
               <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-muted/50 transition-colors duration-300 group/thought cursor-pointer focus:outline-none focus:ring-0">
-                <span className="text-xs font-semibold text-muted-foreground/70 group-hover/thought:text-foreground transition-colors duration-300">
-                  Thought process
-                </span>
-                <span className="text-xs text-muted-foreground/50">
-                  ({stepCount} step{stepCount !== 1 ? "s" : ""})
-                </span>
+                <div className="flex items-center gap-1.5 min-w-[80px]">
+                  <span className="text-xs font-semibold text-muted-foreground/70 group-hover/thought:text-foreground transition-colors duration-300">
+                    {isStreaming ? "Thinking" : "Thought Process"}
+                  </span>
+                  {isStreaming && (
+                    <div className="flex gap-0.5 items-center mt-1">
+                      <div className="w-1 h-1 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:-0.3s]" />
+                      <div className="w-1 h-1 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:-0.15s]" />
+                      <div className="w-1 h-1 rounded-full bg-muted-foreground/50 animate-bounce" />
+                    </div>
+                  )}
+                </div>
+                {toolThoughts.length > 0 && (
+                  <span className="text-xs text-muted-foreground/50 tabular-nums">
+                    ({stepCount} step{stepCount !== 1 ? "s" : ""})
+                  </span>
+                )}
                 <ChevronDown
                   className={cn(
                     "w-4 h-4 text-muted-foreground/50 transition-transform duration-200",
@@ -162,12 +199,6 @@ export function ChainOfThoughtPreview({
                 />
               </button>
             </CollapsibleTrigger>
-            {isStreaming && currentStep && (
-              <div className="flex items-center gap-1.5 text-xs text-blue-500">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                <span>Running...</span>
-              </div>
-            )}
           </div>
 
           {toolThoughts.length > 5 &&
@@ -192,9 +223,7 @@ export function ChainOfThoughtPreview({
             {displayedThoughts.map((step, idx) => (
               <div
                 key={
-                  step.run_id
-                    ? `${step.run_id}-${idx}`
-                    : `${step.tool}-${idx}`
+                  step.run_id ? `${step.run_id}-${idx}` : `${step.tool}-${idx}`
                 }
                 className="animate-in fade-in slide-in-from-left-1 duration-200 fill-mode-both"
               >

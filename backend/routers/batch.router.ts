@@ -9,6 +9,8 @@ import {
 	getBatchPDF,
 	getScanHistory,
 	getBatchScanDetails,
+	getGeographicDistribution,
+	getThreatIntelligence,
 } from '../controllers/batch.controller.js';
 import { authenticateJWT, authenticateJWTOptional, checkRole } from '../middlewares/auth.middleware.js';
 
@@ -19,6 +21,9 @@ const checkManufacturer = checkRole(['manufacturer', 'employee']);
 router.post('/verify-scan', authenticateJWTOptional, verifyScan);
 
 // Protected endpoints - manufacturer only
+router.get('/analytics/geo', authenticateJWT, checkManufacturer, getGeographicDistribution);
+router.get('/analytics/threats', authenticateJWT, checkManufacturer, getThreatIntelligence);
+
 router.post('/', authenticateJWT, checkManufacturer, createBatch);
 router.get('/', authenticateJWT, checkManufacturer, listBatches);
 router.get('/scan-history', authenticateJWT, checkManufacturer, getScanHistory);

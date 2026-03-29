@@ -7,7 +7,9 @@ export interface ProductDto {
 	brand: string;
 	price?: number;
 	description?: string;
+	composition?: string;
 	images?: string[];
+	customerVisibleImages?: number[];
 	qrSettings?: {
 		qrSize: number;
 		columns: number;

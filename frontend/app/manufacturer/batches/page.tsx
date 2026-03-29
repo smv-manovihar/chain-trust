@@ -182,6 +182,36 @@ export default function BatchesPage() {
     toast.success("Transaction hash copied!");
   };
 
+  const handleExportCSV = () => {
+    if (batches.length === 0) {
+      toast.error("No batches to export.");
+      return;
+    }
+
+    const headers = ["Batch Number", "Product Name", "Product ID", "Quantity", "Manufacture Date", "Status", "Total Scans", "Tx Hash"];
+    const rows = batches.map(b => [
+      b.batchNumber,
+      `"${b.productName}"`,
+      b.productId,
+      b.quantity,
+      format(new Date(b.manufactureDate), "yyyy-MM-dd"),
+      b.isRecalled ? "Recalled" : "Active",
+      b.totalScans,
+      b.blockchainHash
+    ]);
+
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `batches_report_${format(new Date(), "yyyy-MM-dd")}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("CSV Export starting...");
+  };
+
   const handleRecall = async (batch: Batch) => {
     if (
       !confirm(
@@ -233,6 +263,14 @@ export default function BatchesPage() {
             <RefreshCw
               className={cn("h-4 w-4", isRefreshing && "animate-spin")}
             />
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleExportCSV}
+            className="gap-2 hidden md:flex rounded-xl"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Export CSV
           </Button>
           <Button
             asChild

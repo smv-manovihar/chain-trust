@@ -9,6 +9,7 @@ from tools import Tools
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from config import get_settings
+from store import chat_store as naming_store
 
 
 class ChatService:
@@ -50,41 +51,53 @@ class ChatService:
         sse_manager.clear_buffer(session_id)
         sse_manager.mark_active(session_id)
 
-        # Automatic Session Naming (only if name is default and NOT manually updated)
+        # 1. Extract context early so it can be used for session naming
+        ctx = req_context.get("context") or {}
+        route = ctx.get("route") or self.current_route
+        query_params = ctx.get("params") or self.query_params
+        active_data = ctx.get("active_data") or self.active_data
+
+        context_obj = {
+            "route": route,
+            "params": query_params,
+            "active_data": active_data,
+        }
+
+        # 2. Fetch history early
+        history = await self.chat_store.list_messages(session_id, sort_order=1)
+
+        # 3. Automatic Session Naming
         session_data = await self.chat_store.get_session(session_id)
+        current_name = session_data.get("name") if session_data else ""
+
         if (
             session_data
             and not session_data.get("name_updated")
             and (
-                session_data.get("name") == "New Conversation"
-                or "..." in session_data.get("name", "")
+                not current_name
+                or current_name == "New Conversation"
+                or "..." in current_name
             )
         ):
             first_msg = req_context.get("message")
+            if not first_msg:
+                user_msgs = [
+                    m["content"]
+                    for m in history
+                    if m.get("role") == "user" and m.get("content")
+                ]
+                if user_msgs:
+                    first_msg = user_msgs[0]
+
             if first_msg:
-                # Direct await to ensure naming finishes before 'done' event
-                await self._auto_name_session(session_id, first_msg)
+                await self._auto_name_session(session_id, first_msg, context_obj)
 
         try:
             messages = []
 
-            # --- Robust Context Handling ---
-            # Try to get fresh context from request body, fallback to initialization context
-            ctx = req_context.get("context") or {}
-            route = ctx.get("route") or self.current_route
-            query_params = ctx.get("params") or self.query_params
-            active_data = ctx.get("active_data") or self.active_data
-
             # Bind fresh context to the tools instance
             self.tools_instance.current_route = route
             self.tools_instance.query_params = query_params
-
-            # Formulate context object for tool messages and situational context
-            context_obj = {
-                "route": route,
-                "params": query_params,
-                "active_data": active_data,
-            }
 
             # Formulate the situational context block
             context_blocks = [f"<current_route>{route}</current_route>"]
@@ -105,8 +118,7 @@ class ChatService:
             )
             messages.append(SystemMessage(content=ui_context_msg))
 
-            # Fetch history exclusively via the Store
-            history = await self.chat_store.list_messages(session_id, sort_order=1)
+            # Build message history (already fetched above)
             for msg in history:
                 if msg["id"] == assistant_message_id:
                     continue  # Skip the placeholder being generated
@@ -142,7 +154,6 @@ class ChatService:
             full_response = ""
             thoughts_buffer = []
             tool_event_buffers: Dict[str, Dict[str, Any]] = {}
-            last_event_was_tool = False
 
             # We use the instance agent which is configured for this specific request/user
             async for event in self.agent.astream_events(
@@ -154,24 +165,12 @@ class ChatService:
                 if event_type == "on_chat_model_stream":
                     chunk = event["data"]["chunk"]
                     if isinstance(chunk.content, str) and chunk.content:
-                        # Conditional newline injection
-                        content_to_add = chunk.content
-                        if last_event_was_tool:
-                            last_event_was_tool = False
-                            # Ensure at least one newline for separation from thoughts,
-                            # and two newlines if we are appending to existing text for a markdown paragraph break.
-                            if full_response and not full_response.endswith("\n\n"):
-                                if full_response.endswith("\n") and not content_to_add.startswith("\n"):
-                                    content_to_add = "\n" + content_to_add
-                                elif not full_response.endswith("\n") and not content_to_add.startswith("\n"):
-                                    content_to_add = "\n\n" + content_to_add
-
-                        full_response += content_to_add
+                        full_response += chunk.content
                         await sse_manager.broadcast(
                             session_id,
                             "token",
                             {
-                                "content": content_to_add,
+                                "content": chunk.content,
                                 "message_id": assistant_message_id,
                             },
                             save_to_buffer=True,
@@ -195,6 +194,30 @@ class ChatService:
                         "input": tool_input,
                         "message": display_message,
                     }
+
+                    # Shift existing content to a "thinking" thought if present
+                    if full_response.strip():
+                        thinking_thought = {
+                            "tool": "thinking",
+                            "status": "thinking",
+                            "message": full_response.strip(),
+                            "execution_time_ms": 0,
+                            "tool_call_id": f"thought_{run_id}",
+                        }
+                        thoughts_buffer.append(thinking_thought)
+
+                        # Broadcast shift to frontend for state synchronization
+                        await sse_manager.broadcast(
+                            session_id,
+                            "shift_to_thought",
+                            {
+                                "content": full_response.strip(),
+                                "message_id": assistant_message_id,
+                            },
+                        )
+
+                        # Clear current response as it's now part of history/thoughts
+                        full_response = ""
 
                     await sse_manager.broadcast(
                         session_id,
@@ -260,8 +283,6 @@ class ChatService:
                         }
                     )
 
-                    last_event_was_tool = True
-
                     await sse_manager.broadcast(
                         session_id,
                         "tool_end",
@@ -299,32 +320,91 @@ class ChatService:
             sse_manager.clear_accumulator(session_id)
             sse_manager.mark_inactive(session_id)
 
-    async def _auto_name_session(self, session_id: str, message: str):
-        """Asynchronously updates the session title using an LLM."""
-        title = await self._generate_session_title(message)
+    async def _auto_name_session(
+        self, session_id: str, message: str, context: dict = None
+    ):
+        """Asynchronously updates the session title using an LLM with optional page context."""
+        title = await self._generate_session_title(message, context)
         if title:
             await self.chat_store.update_session(
                 session_id, {"name": title, "name_updated": True}
             )
             await sse_manager.broadcast(session_id, "name_updated", {"name": title})
 
-    async def _generate_session_title(self, first_message: str) -> str:
-        """Generates a concise (2-4 words) title using OpenRouter."""
+    async def _generate_session_title(
+        self, first_message: str, context: dict = None
+    ) -> str:
+        """Generates a concise (2-4 words) title using OpenRouter.
+
+        For non-/agent routes, fetches real view data via get_view_data to provide
+        rich context (e.g. batch names, product info) for better titles.
+        """
         try:
             settings = get_settings()
             llm = ChatOpenAI(
                 model="stepfun/step-3.5-flash:free",
                 api_key=settings.OPENROUTER_API_KEY,
                 base_url="https://openrouter.ai/api/v1",
-                temperature=0.1,
-                max_tokens=15,
+                temperature=0.7,
+                max_tokens=50,
             )
-            prompt = (
-                "Only generate a very short, professional title (2-4 words) for a chat conversation starting with this message. "
-                "Do not include any quotes, preamble, or punctuation. Output ONLY the title text.\n\n"
-                f"User Message: {first_message}"
+
+            # Build context string for the prompt
+            context_str = ""
+            if context:
+                route = context.get("route", "/")
+                normalized_route = "/" + route.strip("/")
+
+                context_str = "\n\n### Application Context ###\n"
+                context_str += f"- Current Route: {normalized_route}\n"
+
+                if context.get("params"):
+                    context_str += (
+                        f"- Active Filters: {json.dumps(context['params'])}\n"
+                    )
+
+                # For non-/agent routes, fetch real view data for richer naming
+                if not normalized_route.startswith("/agent"):
+                    try:
+                        view_data = await naming_store.get_view_data(
+                            route=normalized_route,
+                            user_id=self.user_id,
+                            role=self.role,
+                            params=context.get("params"),
+                        )
+                        if view_data and not view_data.startswith("Error"):
+                            # Truncate to avoid burning tokens
+                            context_str += (
+                                f"- Page Data Summary: {view_data[:400]}...\n"
+                            )
+                    except Exception as e:
+                        logger.debug(
+                            f"Could not fetch view data for naming: {e}"
+                        )
+
+                if context.get("active_data"):
+                    data_str = json.dumps(context["active_data"])
+                    context_str += (
+                        f"- Active Data Summary: {data_str[:300]}...\n"
+                    )
+
+            system_prompt = (
+                "You are a professional assistant that generates very concise chat session titles. "
+                "Your goal is to describe exactly what the user is looking at or doing in 2 to 4 words. "
+                "STRICT RULES:\n"
+                "1. Output ONLY the raw title text.\n"
+                "2. No quotes, no preamble, no trailing punctuation.\n"
+                "3. Use specific names (Product IDs, Batches, Product Names) if provided in context.\n"
+                "4. If context is sparse, extract 2-4 key words from the User Message.\n"
+                "5. NEVER return an empty string. Fallback to extracting keywords from the message."
             )
-            response = await llm.ainvoke(prompt)
+
+            user_data = f"User Message: {first_message}\n\n{context_str}"
+
+            response = await llm.ainvoke([
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_data)
+            ])
             raw_content = response.content or ""
             title = raw_content.strip().strip('"').strip("'").strip(".")
 
@@ -332,7 +412,9 @@ class ChatService:
                 logger.warning(
                     f"LLM returned empty title for message. Raw: '{raw_content}'"
                 )
-                title = first_message[:40] + ("..." if len(first_message) > 40 else "")
+                title = first_message[:40] + (
+                    "..." if len(first_message) > 40 else ""
+                )
 
             logger.info(f"Session title resolved to: {title}")
             return title[:50]

@@ -48,6 +48,8 @@ interface AgentContextType {
   refreshSessions: () => Promise<void>;
   loadMoreSessions: () => Promise<void>;
   setSearchQuery: (query: string) => void;
+  stopGeneration: () => void;
+  resetChat: () => void;
 }
 
 const AgentContext = createContext<AgentContextType | undefined>(undefined);
@@ -236,6 +238,30 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
                       ...m,
                       content: data.content!,
                       status: "generating" as const,
+                    }
+                  : m,
+              ),
+            );
+          }
+          break;
+
+        case "shift_to_thought":
+          if (msgId && data.content) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === msgId
+                  ? {
+                      ...m,
+                      content: "", // Clear the content as it's being shifted to thoughts
+                      thoughts: [
+                        ...(m.thoughts || []),
+                        {
+                          tool: "thinking",
+                          status: "thinking" as const,
+                          message: data.content!,
+                          execution_time_ms: 0,
+                        },
+                      ],
                     }
                   : m,
               ),
@@ -636,6 +662,24 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const stopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    disconnect();
+    setIsGenerating(false);
+    setIsSending(false);
+    isSubmittingRef.current = false;
+  }, [disconnect]);
+
+  const resetChat = useCallback(() => {
+    stopGeneration();
+    handleSetCurrentSessionId(undefined);
+    setInput("");
+    setHistoryOpen(false);
+  }, [handleSetCurrentSessionId, stopGeneration]);
+
   const loadMoreSessions = useCallback(async () => {
     if (isLoadingMoreSessions || !hasMoreSessions) return;
 
@@ -719,6 +763,8 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         refreshSessions,
         loadMoreSessions,
         setSearchQuery,
+        stopGeneration,
+        resetChat,
       }}
     >
       {children}

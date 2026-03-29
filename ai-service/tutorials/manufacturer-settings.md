@@ -1,61 +1,28 @@
-# Manufacturer Settings Tutorial
+# Route: /manufacturer/settings (Corporate Preferences)
 
-The Manufacturer Settings page (`/manufacturer/settings`) allows corporate users to manage their company identity, security protocols, and blockchain connectivity. It is streamlined for corporate administration.
+The Manufacturer Settings page is the primary point for managing the corporate identity, security protocols, and blockchain connectivity.
 
-## Page Structure
+## Layout Overview (Corporate Control)
+- **Fluid Tab Navigation**: Uses the `useScroll` hook for responsiveness.
+- **Tab Structure**:
+  - **General**: Company identity (Corporate Name, Website, Primary Phone). Note: Email is read-only.
+  - **Security**: Manage authentication layers and corporate Google OAuth linking.
+  - **Notifications**: Granular toggles for "Production Alerts," "Scan Velocity Warnings," and "Security Intelligence Updates."
+  - **Web3**: Direct link to blockchain wallet management and cryptographic signing status.
+  - **Account Control (Danger Zone)**: High-security actions including corporate logout and full company deletion.
 
-The page is divided into five main sections via a `Tabs` component:
-- **General**: Company profile and corporate identity.
-- **Security**: Authentication and security keys.
-- **Notifications**: Corporate alert preferences.
-- **Web3**: Blockchain wallet management.
-- **Advanced**: Critical account and company actions (Danger Zone).
+## Key Management Features
+### 1. Corporate Identity Synchronization
+- **Identity Fields**: Supports corporate name, official website for consumer validation, and phone number for critical alerts.
+- **Save Action**: Updates the profile via `updateProfile` with instantaneous "Toast" feedback.
 
----
+### 2. Google OAuth Integration
+- **Direct Connection**: Displays a "Connect to Google" or "Unlink" button based on the `isGoogleConnected` server-side flag. This ensures account recovery parity for corporate admins.
 
-## 1. General (Company Profile)
-- **Purpose**: Allows manufacturers to update their corporate name, phone number, and official website.
-- **Fields**:
-    - Corporate Name (defaults to the registered company name)
-    - Primary Email (Read-only)
-    - Contact Phone
-    - Official Website
-- **Save Action**: Updates the user's profile and company details via the `updateProfile` API call.
+### 3. Cascading Deletion (Danger Zone)
+- **Extreme Warning**: If the user is a company admin, deleting their account WIPS the entire company! This includes all employee records, product catalogues, and production batch data.
 
-## 2. Security
-- **Google Connection**: Manages the link between the corporate identity and a Google account.
-- **Password Settings**: Handles password updates for the manufacturer's account.
-- **Two-Factor Authentication**: A placeholder for upcoming hardware key and MFA features.
-
-## 3. Notifications (Corporate Alerts)
-- **Email Summaries**: Daily breakdown of production batches and scan activity.
-- **Inventory Warnings**: Instant alerts when unit counts drop below a threshold (e.g., 10%).
-- **Security Alerts**: Notifications for unusual scan velocities or geographic jumps (anti-counterfeiting).
-
-## 4. Web3 (Wallet Settings)
-- **Purpose**: Manages the cryptographic identity of the manufacturer on the blockchain.
-- **Component**: `WalletSettings`.
-- **Functionality**: Allows the manufacturer to connect a digital wallet (e.g., MetaMask) to sign batch enrollment transactions.
-
-## 5. Advanced (Danger Zone)
-- **Sign out of all devices**: Log out of all active corporate sessions.
-- **Delete Manufacturer Account**: 
-    - Triggers a `DELETE /api/auth/me` request.
-    - **CRITICAL Cascading Delete (If Admin)**: If the user is a company admin, deleting their account WIPS the entire company! This includes:
-        - The `Company` record itself.
-        - ALL associated `User` records (employees).
-        - ALL `Product` and `Batch` data created by any user in the company.
-        - ALL `CabinetItems` and `RefreshTokens` for all users in the company.
-    - **UI**: Requires double confirmation via an `AlertDialog` with a clear warning about data loss.
-
----
-
-## Implementation Details
-- **Route**: `frontend/app/manufacturer/settings/page.tsx`
-- **Components Used**:
-    - `DangerZoneSettings`: Handles cascading company/account deletion.
-    - `WalletSettings`: Handles blockchain connectivity.
-    - `GoogleConnection`, `PasswordSettings`.
-- **API Calls**:
-    - `updateProfile(data)`: Saves company information.
-    - `deleteAccount()`: Triggered via the Danger Zone.
+## AI Guidance & Context
+- **Corporate Privacy**: The AI should never reveal raw password data. If a user asks to change their password, the AI should guide them to the **Security** tab.
+- **Company Deletion**: If a user asks to "Delete my company," the AI MUST warn them that this action is irreversible and triggers a cascading delete of all production and employee records. Provide a direct link to the **Account Control** tab.
+- **Profile Updates**: If a user provides a new corporate phone number or website in chat, the AI can offer to call the `updateProfile` tool to sync it automatically.

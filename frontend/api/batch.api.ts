@@ -64,3 +64,13 @@ export const getBatchScanDetails = async (id: string, signal?: AbortSignal) => {
 	const response = await client.get(`/batches/${id}/scan-details`, { signal });
 	return response.data;
 };
+
+export const getGeoDistribution = async (signal?: AbortSignal) => {
+	const response = await client.get('/batches/analytics/geo', { signal });
+	return response.data.distribution;
+};
+
+export const getThreatIntelligence = async (signal?: AbortSignal) => {
+	const response = await client.get('/batches/analytics/threats', { signal });
+	return response.data.threats;
+};

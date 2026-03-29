@@ -54,7 +54,7 @@ export default function CreateBatchWizard() {
   const [step, setStep] = useState(1);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [mintProgress, setMintProgress] = useState(0);
+  const [registerProgress, setRegisterProgress] = useState(0);
   const [successId, setSuccessId] = useState<string | null>(null);
 
   const {
@@ -105,7 +105,7 @@ export default function CreateBatchWizard() {
   const handleCreate = async () => {
     setLoading(true);
     setError("");
-    setMintProgress(20);
+    setRegisterProgress(20);
 
     try {
       if (!selectedProduct) throw new Error("No product template selected.");
@@ -119,10 +119,10 @@ export default function CreateBatchWizard() {
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
 
-      setMintProgress(40);
+      setRegisterProgress(40);
       if (!walletAddress) throw new Error("Wallet disconnect detected.");
 
-      setMintProgress(60);
+      setRegisterProgress(60);
       const txResult = await registerBatchOnChain(
         {
           productId: selectedProduct.productId,
@@ -141,7 +141,7 @@ export default function CreateBatchWizard() {
         walletAddress!,
       );
 
-      setMintProgress(90);
+      setRegisterProgress(90);
       const savedBatch = await createBatch({
         productRef: selectedProduct._id,
         batchNumber: batchData.batchNumber,
@@ -155,7 +155,7 @@ export default function CreateBatchWizard() {
         blockchainHash: txResult.transactionHash || txResult.blockHash,
       });
 
-      setMintProgress(100);
+      setRegisterProgress(100);
       setSuccessId(savedBatch.batch._id);
       toast.success("Batch created successfully.");
     } catch (err: any) {
@@ -623,13 +623,13 @@ export default function CreateBatchWizard() {
                       <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                         <motion.div
                           initial={{ width: 0 }}
-                          animate={{ width: `${mintProgress}%` }}
+                          animate={{ width: `${registerProgress}%` }}
                           className="h-full bg-primary"
                         />
                       </div>
                       <div className="flex justify-between text-xs text-muted-foreground font-medium">
                         <span>Writing to blockchain...</span>
-                        <span>{mintProgress}%</span>
+                        <span>{registerProgress}%</span>
                       </div>
                     </div>
                   )}

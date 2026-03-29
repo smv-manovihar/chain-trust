@@ -192,28 +192,34 @@ export const sendEmployeeInvitation = async (
 
 export const sendExpiryAlert = async (
 	email: string,
-	hash: string,
-	expiryDate: Date,
+	medicineName: string,
+	expiryDate: string,
+	daysLeft: number,
 ): Promise<boolean> => {
 	const content = `
-		<p class="text">This is an automated alert regarding a product batch that is expiring soon.</p>
+		<p class="text">This is an automated alert regarding your medicine that is expiring soon.</p>
 		
 		<div class="card">
-			<div class="label">Product Identifier</div>
-			<div class="monospace" style="margin: 0; background: none; border: none; padding: 0;">${hash}</div>
+			<div class="label">Medicine Name</div>
+			<div class="otp" style="font-size: 24px; color: #18181b; letter-spacing: normal;">${medicineName}</div>
 			
 			<div class="divider"></div>
 			
-			<div class="label">Expiry Date</div>
-			<div class="highlight-date">${new Date(expiryDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+			<div class="label">Expiry Status</div>
+			<div class="highlight-date">${daysLeft === 0 ? 'Expires Today' : `Expires in ${daysLeft} days`}</div>
+			<p class="text" style="font-size: 13px; margin-top: 8px;">Date: ${expiryDate}</p>
+		</div>
+
+		<div class="btn-wrapper">
+			<a href="${FRONTEND_URL}/customer/cabinet" class="btn">View My Medicines</a>
 		</div>
 	`;
 
 	const mailOptions = {
 		from: EMAIL_FROM,
 		to: email,
-		subject: 'Product Expiry Alert',
-		html: wrapTemplate('Expiry alert', content),
+		subject: `Medicine Expiry Alert: ${medicineName}`,
+		html: wrapTemplate('Expiry Alert', content),
 	};
 
 	try {
@@ -221,6 +227,42 @@ export const sendExpiryAlert = async (
 		return true;
 	} catch (error) {
 		console.error('Error sending expiry alert email:', error);
+		return false;
+	}
+};
+
+export const sendDoseReminder = async (
+	email: string,
+	medicineName: string,
+	dosage?: string,
+	mealContext?: string,
+): Promise<boolean> => {
+	const mealText = mealContext ? `<p class="label label-blue">${mealContext.replace('_', ' ')}</p>` : '';
+	const content = `
+		<p class="text">It's time to take your scheduled dose.</p>
+		
+		<div class="card card-blue">
+			<div class="label label-blue">Now Taking</div>
+			<div class="otp" style="font-size: 32px; color: #1d4ed8; letter-spacing: -0.02em;">${medicineName}</div>
+			${dosage ? `<p class="text" style="font-size: 18px; font-weight: 600; margin: 12px 0 0 0;">Dosage: ${dosage}</p>` : ''}
+			${mealText}
+		</div>
+
+		<p class="text" style="font-size: 13px; color: #71717a;">Please stay consistent with your medication for the best results.</p>
+	`;
+
+	const mailOptions = {
+		from: EMAIL_FROM,
+		to: email,
+		subject: `Dose Reminder: ${medicineName}`,
+		html: wrapTemplate('Medication Reminder', content),
+	};
+
+	try {
+		await transporter.sendMail(mailOptions);
+		return true;
+	} catch (error) {
+		console.error('Error sending dose reminder email:', error);
 		return false;
 	}
 };

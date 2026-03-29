@@ -26,7 +26,7 @@ export function GoogleConnection({
 
   if (!user) return null;
 
-  const isConnected = user.provider === "google";
+  const isConnected = !!user.providerId || user.provider === "google";
 
   return (
     <Card className="border border-border bg-muted/20">

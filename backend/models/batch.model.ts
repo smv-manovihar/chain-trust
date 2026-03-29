@@ -9,6 +9,7 @@ export interface IBatch extends Document {
 	categories: string[];
 	brand: string;
 	images: string[];
+	customerVisibleImages?: number[]; // Cached from Product
 	// Batch-specific fields
 	quantity: number;
 	manufactureDate: Date;
@@ -58,6 +59,10 @@ const batchSchema = new Schema<IBatch>(
 		},
 		images: {
 			type: [String],
+			default: [],
+		},
+		customerVisibleImages: {
+			type: [Number],
 			default: [],
 		},
 		// Batch-specific

@@ -1,38 +1,31 @@
 # Route: /manufacturer/batches/[id] (Batch Detail & QR Management)
 
-Deep-dive view for a specific batch, focusing on unit-level tracking and label generation.
+A deep-dive investigative and operational view for a specific production batch, focusing on serialized unit-level tracking and physical label generation.
 
-## Batch Controls & QR Management
+## Layout Overview (Operational Analytics)
+- **Batch Intelligence Dashboard**:
+  - **Traceability Summary**: High-level view of the associated Product, Batch ID, and total unit count.
+  - **On-chain Status**: Live verification of the blockchain ledger entry.
+- **Unit Grid & Scan Tracking**:
+  - **Unit Indexing**: Every unit is displayed as a unique cryptographic serialized card.
+  - **Real-time Scan Metrics**: Individual unit cards display a "Scans" badge. 
+  - **Security Flags**: If a unit's scan count exceeds the safety threshold (e.g., >5), the badge turns Red (`destructive`), signaling a potential security breach or duplicate.
 
-### 1. High-Level Actions
-- **Prepare All**: Located in the header. If the batch has more units than the current page, this generates all QR codes in memory. *Warning*: Large batches (>1000 units) may take time.
-- **Download PDF**: Generates a high-quality PDF report with all QR labels.
-- **Print Labels**: Opens the browser print dialog (Styled for label sheets).
+## Key Management Features
+### 1. Label Design & Print Engine
+- **Global Print Actions**:
+  - **Prepare All**: Processes all serialized unit salts in memory for large batch generation.
+  - **Download Artifact**: Instant PDF report generation for the entire batch.
+  - **Print Layout**: Dedicated action that opens a browser-optimized print dialog (supports `grid-cols` customization).
+- **Design Layout (Side Panel)**: Accessible via the "Design" button. Allows manufacturers to customize:
+  - **QR Size & Padding**: Precision sliders (15mm to 80mm) for different packaging sizes.
+  - **Print Columns**: Adjust from 1 to 6 columns based on label sheet standards.
+  - **Serialized Data**: Toggles for showing "Product Name," "Batch ID," or "Unit Index" on the physical label.
 
-### 2. Design Layout Panel (Settings)
-Triggered by the **"Design"** (Settings2 icon) button.
-- **Sliders**:
-  - `QR Size`: 15mm to 80mm.
-  - `Print Columns`: 1 to 6.
-  - `Label Padding`: 0mm to 20mm.
-- **Switches**:
-  - `Show Product Name`: Toggle visibility on the label.
-  - `Show Unit Index`: Toggle "Unit #X".
-  - `Show Batch No.`: Toggle inclusion of the batch ID.
-- **Save as Default**: Persists these settings to the product template for future batches.
-
-### 3. Unit Grid & Scan Tracking
-- **Search**: "Find Unit ID..." input to locate specific codes.
-- **QR Cards**:
-  - **Unit #X Badge**: Indicates the unit index.
-  - **Scans Badge**: Shows current scan count (e.g., "3 Scans").
-  - **Counterfeit Alert**: If a unit has **>5 scans**, the badge turns Red (`destructive`). Use this to explain potential security breaches to the manufacturer.
+### 2. Investigative Search
+- **Unit ID Lookup**: A dedicated search input to filter the unit grid and find specific serial numbers for audit purposes.
 
 ## AI Guidance & Context
-- **Tooling**: Use `get_batch_details(batch_number)` to get accurate scan data and unit information.
-- **Troubleshooting**: If a user says "the QR codes are too small," guide them to the **Design** button and suggest increasing the `QR Size` slider.
-- **Security Advice**: If you notice units with high scan counts, proactively warn the user: "Units #34 and #89 have high scan counts. You may want to investigate potential counterfeit activity."
-- **Recall Batch**: (If not already recalled) Mark the entire batch as unsafe and commit the status to the blockchain.
-
-## AI Guidance
-The AI can help with printing issues (suggesting Chrome/Edge for best results) or explain how unit salts work (derived from `SHA-256(batchSalt + "-" + unitIndex)`).
+- **Security Audit**: If a manufacturer asks "Are there any problems with this batch?", the AI should check the "Unit Grid" for units with high scan counts (>5) and report them instantly.
+- **Printing Assistance**: If the user has issues with label alignment, guide them to the **Design Layout** panel to adjust the `Columns` and `Padding` for their specific sheet type.
+- **Traceability Logic**: Explain that unit salts are derived via `SHA-256(batchSalt + "-" + unitIndex)` to ensure cryptographic integrity.

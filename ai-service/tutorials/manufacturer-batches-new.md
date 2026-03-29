@@ -1,31 +1,24 @@
-# Route: /manufacturer/batches/new (Batch Creation Wizard)
+# Route: /manufacturer/batches/new (Batch Enrollment Wizard)
 
-A multi-step process for enrolling a specific production run of a registered product.
+The centralized workflow for enrolling a serialized production run (Batch) of a registered medicine on the ChainTrust blockchain.
 
-## Wizard Steps & User Actions
+## Layout Overview (Progressive Wizard)
+- **Step 1: Product Template**: Choose an existing medicine from the corporate catalog. Use the `Search` and `Category` filters to locate the correct SKU.
+- **Step 2: Batch Inventory Stats**: Enter precise production data:
+  - **Batch Traceability**: Unique serialized Identification Number.
+  - **Inventory Volume**: Total units to be manufactured/distributed.
+  - **Temporal Data**: Manufacturing date and Expiry date (managed via a Calendar popover).
+- **Step 3: Blockchain Commit**: Final summary card and cryptographic registration warning. This action requires a connected digital wallet (e.g., MetaMask) to sign the transaction.
 
-### Step 1: Select Product Template
-- **Action**: User must select an existing product from their catalogue to serve as a template.
-- **Controls**: Includes a **Search Bar** and **Category Filter** (checkboxes).
-- **Selection**: Clicking a product card highlights it and enables the "Next" button.
+## Key Management Features
+### 1. Progressive Validation
+- **Requirement Logic**: Each step is strictly validated. The "Next Step" action remains locked until all mandatory fields (Batch ID, Quantity, Mfg Date) are populated.
+- **Unit Serials**: Explain that the system will automatically derive unique salts for the requested quantity upon successful registration.
 
-### Step 2: Batch Details
-- **Form Fields**:
-  - `batchNumber`: "Batch Number" (e.g., B-2024-001). *Required, must be unique*.
-  - `quantity`: "Total Quantity (Units)" - an integer field. *Required, min 1*.
-  - `manufactureDate`: "Manufacture Date" - triggers a Calendar popover. *Required*.
-  - `expiryDate`: "Expiry Date (Optional)" - triggers a Calendar popover.
-- **Interaction**: The "Next" button remains disabled until all required fields are valid.
-
-### Step 3: Review & Commit
-- **Summary**: Displays all entered data for final verification.
-- **Blockchain Alert**: A warning card explains that batch registration on the blockchain is permanent and requires a wallet signature.
-- **Action**: **"Create & Register Batch"** button. Requires an active Wallet Connection.
+### 2. Digital Ledger Entry
+- **Immutable Proof**: Once "Create & Register" is selected, the batch is permanently anchored to the blockchain for decentralized consumer verification.
 
 ## AI Guidance & Context
-- **Pre-requisite**: Ensure the user has created a product before trying to create a batch.
-- **Wallet Requirement**: If the user is stuck on Step 3, check if their wallet is connected. The agent should remind them that "This action will incur a small gas fee for on-chain integrity."
-- **Data Precision**: When the user provides batch details, confirm them back: "I've noted Batch #X with {Y} units, manufactured on {Z}."
-
-## AI Context
-The AI should help users locate their product templates if they can't find them, or explain why wallet connection is required for batch creation (for decentralized proof of origin).
+- **Inventory Precision**: If a user is providing batch details in chat, the AI should double-confirm the values: "I've processed a production run of [Quantity] units for [Batch ID]."
+- **Wallet Readiness**: If a user is stalled at Step 3, the AI should verify their wallet connection via `get_current_view_data` and provide guidance on MetaMask signing.
+- **Error Handling**: If a Batch ID already exists, the AI should suggest using a unique serialization pattern (e.g., Year-Month-Index).

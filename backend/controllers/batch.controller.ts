@@ -8,8 +8,8 @@ import * as pdfService from '../services/pdf.service.js';
 import geoip from 'geoip-lite';
 import requestIp from 'request-ip';
 import { calculateSuspiciousness } from '../utils/suspicious.util.js';
-import { Alert } from '../models/alert.model.js';
 import { Notification } from '../models/notification.model.js';
+import CabinetItem from '../models/cabinet.model.js';
 
 /**
  * Derive a unit-level salt from a batch salt and unit index.
@@ -109,6 +109,7 @@ export const createBatch = async (req: Request, res: Response) => {
 			categories: product.categories,
 			brand: product.brand,
 			images: product.images,
+			customerVisibleImages: product.customerVisibleImages || [],
 			// Batch-specific
 			quantity,
 			manufactureDate,
@@ -257,6 +258,9 @@ export const verifyScan = async (req: Request, res: Response) => {
 		}
 
 		const { batch, unitIndex } = result;
+		// Populate product to check access levels
+		await batch.populate('product');
+		const product = batch.product as any;
 		// Extract request metadata
 		const ip = requestIp.getClientIp(req) || req.socket.remoteAddress || 'unknown';
 		const userAgent = req.headers['user-agent'] || '';
@@ -283,35 +287,20 @@ export const verifyScan = async (req: Request, res: Response) => {
 		// Calculate Suspiciousness using the history of scans
 		const suspiciousResult = await calculateSuspiciousness(batch._id, unitIndex, ip, latitude, longitude);
 
-		// If suspicious, create an Alert for the manufacturer
+		// If suspicious, create a Notification for the manufacturer
 		if (suspiciousResult.isSuspicious) {
-			try {
-				await Alert.create({
-					type: 'suspicious_scan',
-					message: `Suspicious scan detected for ${batch.productName} (Batch: ${batch.batchNumber}). Reason: ${suspiciousResult.reason}`,
-					metadata: {
-						batchId: batch._id,
-						unitIndex,
-						ip,
-						visitorId: visitorId || `legacy-${ip}`
-					},
-					createdBy: batch.createdBy
-				});
-			} catch (alertError) {
-				console.error('Error creating suspicious scan alert:', alertError);
-			}
-
-			// Also create a Notification for the dashboard bell
 			try {
 				await Notification.create({
 					user: batch.createdBy,
-					type: 'alert',
+					type: 'suspicious_scan',
 					title: 'Suspicious Scan Detected',
-					message: `A suspicious scan was flagged for ${batch.productName} (Batch: ${batch.batchNumber}).`,
-					link: `/manufacturer/analytics`, // Link to the security section
+					message: `A suspicious scan was flagged for ${batch.productName} (Batch: ${batch.batchNumber}). Reason: ${suspiciousResult.reason}`,
+					link: `/manufacturer/batches/${batch._id}`,
 					metadata: {
 						batchId: batch._id,
-						productId: batch.product
+						productId: batch.product,
+						ip,
+						medicineName: batch.productName
 					}
 				});
 			} catch (notifError) {
@@ -364,7 +353,8 @@ export const verifyScan = async (req: Request, res: Response) => {
 							link: `/manufacturer/batches/${batch._id}`,
 							metadata: {
 								batchId: batch._id,
-								productId: batch.product
+								productId: batch.product,
+								medicineName: batch.productName
 							}
 						});
 					} catch (milestoneError) {
@@ -376,20 +366,32 @@ export const verifyScan = async (req: Request, res: Response) => {
 			console.error('Unique scan tracking error:', scanError);
 		}
 
+		// Filter images for customer visibility based on Product settings
+		let filteredImages = [];
+		const accessLevel = product?.imageAccessLevel || 'public';
+
+		if (accessLevel === 'public' || accessLevel === 'verified_only') {
+			const customerVisibleIndices = batch.customerVisibleImages || [];
+			filteredImages = customerVisibleIndices.length > 0 
+				? customerVisibleIndices.map((idx: number) => batch.images[idx]).filter((img: string) => !!img)
+				: batch.images;
+		} else {
+			// internal_only: hide images from consumer verification view
+			filteredImages = [];
+		}
+
 		res.json({
 			isValid: !batch.isRecalled,
 			product: {
-				productId: batch.productId,
+				// Masked: productId, categories, totalUnits NOT sent to customer
 				productName: batch.productName,
-				categories: batch.categories,
 				brand: batch.brand,
 				batchNumber: batch.batchNumber,
 				manufactureDate: batch.manufactureDate,
 				expiryDate: batch.expiryDate,
-				images: batch.images,
+				images: filteredImages,
 				unitIndex,
 				unitNumber: unitIndex + 1,
-				totalUnits: batch.quantity,
 			},
 			scanCount: newCount,
 			isRecalled: batch.isRecalled,
@@ -418,6 +420,34 @@ export const recallBatch = async (req: Request, res: Response) => {
 
 		batch.isRecalled = true;
 		await batch.save();
+
+		// Notify users who have this batch in their cabinet
+		try {
+			const affectedCabinetItems = await CabinetItem.find({
+				batchNumber: batch.batchNumber,
+				isUserAdded: false // Only for verified batches
+			});
+
+			if (affectedCabinetItems.length > 0) {
+				const notifications = affectedCabinetItems.map(item => ({
+					user: item.userId,
+					type: 'batch_recall',
+					title: 'Safety Recall Alert',
+					message: `The product "${item.name}" (Batch: ${item.batchNumber}) has been recalled by the manufacturer for safety reasons. Please discontinue use immediately and contact your pharmacy.`,
+					link: `/customer/cabinet/${item._id}`,
+					metadata: {
+						batchId: batch._id,
+						productId: batch.product,
+						cabinetItemId: item._id,
+						medicineName: item.name
+					}
+				}));
+
+				await Notification.insertMany(notifications);
+			}
+		} catch (notificationError) {
+			console.error('Error creating recall notifications:', notificationError);
+		}
 
 		res.json({ message: 'Batch recalled successfully', batch });
 	} catch (error) {
@@ -526,6 +556,82 @@ export const getBatchScanDetails = async (req: Request, res: Response) => {
 		} });
 	} catch (error) {
 		console.error('Error fetching batch scan details:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+};
+
+// GET /api/batches/analytics/geo — Get scan distribution by location
+export const getGeographicDistribution = async (req: Request, res: Response) => {
+	try {
+		const userId = (req as any).user?.id;
+		const batches = await Batch.find({ createdBy: userId }).select('_id');
+		const batchIds = batches.map(b => b._id);
+
+		if (batchIds.length === 0) return res.json({ distribution: [] });
+
+		const distribution = await Scan.aggregate([
+			{ $match: { batch: { $in: batchIds } } },
+			{
+				$group: {
+					_id: { country: "$country", city: "$city" },
+					count: { $sum: 1 }
+				}
+			},
+			{ $sort: { count: -1 } },
+			{ $limit: 20 }
+		]);
+
+		res.json({ 
+			distribution: distribution.map(d => ({
+				country: d._id.country || 'Unknown',
+				city: d._id.city || 'Unknown',
+				count: d.count
+			}))
+		});
+	} catch (error) {
+		console.error('Geo analytics error:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+};
+
+// GET /api/batches/analytics/threats — Get suspicious scan patterns
+export const getThreatIntelligence = async (req: Request, res: Response) => {
+	try {
+		const userId = (req as any).user?.id;
+		const batches = await Batch.find({ createdBy: userId }).select('_id');
+		const batchIds = batches.map(b => b._id);
+
+		if (batchIds.length === 0) return res.json({ threats: [] });
+
+		// Identify units with > 3 unique visitors (potential counterfeit/leak)
+		const threats = await Scan.aggregate([
+			{ $match: { batch: { $in: batchIds } } },
+			{
+				$group: {
+					_id: { batch: "$batch", unit: "$unitIndex" },
+					uniqueVisitors: { $addToSet: "$visitorId" },
+					totalScans: { $sum: 1 }
+				}
+			},
+			{
+				$project: {
+					batch: "$_id.batch",
+					unit: "$_id.unit",
+					visitorCount: { $size: "$uniqueVisitors" },
+					totalScans: 1
+				}
+			},
+			{ $match: { visitorCount: { $gt: 3 } } },
+			{ $sort: { visitorCount: -1 } },
+			{ $limit: 10 }
+		]);
+
+		// Populate batch info for the threats
+		const populatedThreats = await Batch.populate(threats, { path: 'batch', select: 'batchNumber productName' });
+
+		res.json({ threats: populatedThreats });
+	} catch (error) {
+		console.error('Threat analytics error:', error);
 		res.status(500).json({ message: 'Internal server error' });
 	}
 };

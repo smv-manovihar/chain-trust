@@ -81,7 +81,7 @@ export function DangerZoneSettings({ role }: DangerZoneSettingsProps) {
           <p className="text-xs text-muted-foreground leading-relaxed px-1">
             Deleting your account is permanent. All associated{" "}
             {role === "manufacturer"
-              ? "batch data, team links,"
+              ? "batch data,"
               : "medication history"}{" "}
             and personal information will be wiped from our secure servers.
           </p>

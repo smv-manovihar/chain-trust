@@ -54,7 +54,9 @@ interface ScanResult {
     batchNumber: string;
     manufactureDate: string;
     expiryDate?: string;
+    composition?: string;
     images: string[];
+    customerVisibleImages?: number[];
     unitIndex: number;
     unitNumber: number;
     totalUnits: number;
@@ -74,6 +76,7 @@ function InteractiveResultCard({
   product,
   scanStats,
   isMobileDevice,
+  isAuthenticated,
 }: {
   product: ScanResult["product"] | null;
   scanStats: {
@@ -83,6 +86,7 @@ function InteractiveResultCard({
     suspiciousReason?: string | null;
   };
   isMobileDevice: boolean;
+  isAuthenticated: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
@@ -193,8 +197,14 @@ function InteractiveResultCard({
                 {product?.productName}
               </h2>
               <p className="text-muted-foreground text-sm sm:text-base font-medium tracking-tight break-words pr-4">
-                {product?.brand}
+                {isAuthenticated ? product?.brand : "Authenticated Manufacturer"}
               </p>
+              {product?.composition && (
+                <div className="mt-4 flex items-center gap-2 text-xs font-bold text-primary/60 uppercase tracking-widest bg-primary/5 w-fit px-3 py-1 rounded-full border border-primary/10">
+                  <ShieldCheck className="h-3 w-3" />
+                  {product.composition}
+                </div>
+              )}
             </div>
           </div>
 
@@ -204,7 +214,7 @@ function InteractiveResultCard({
                 Manufacturing Batch
               </p>
               <p className="font-mono text-lg sm:text-xl tracking-[0.2em] font-black break-all">
-                {product?.batchNumber?.toUpperCase()}
+                {isAuthenticated ? product?.batchNumber?.toUpperCase() : (product?.batchNumber ? `${product.batchNumber.slice(0, 3)}***${product.batchNumber.slice(-1)}` : "****")}
               </p>
             </div>
             <div className="text-left sm:text-right shrink-0">
@@ -319,6 +329,7 @@ function VerifyContent() {
           blockchainResult.record.timestamp,
         ).toISOString(),
         images: blockchainResult.record.images || [],
+        composition: "", // Will be enriched by DB if available
         unitIndex,
         unitNumber: unitIndex + 1,
         totalUnits: 0,
@@ -576,6 +587,7 @@ function VerifyContent() {
                   product={product}
                   scanStats={scanStats}
                   isMobileDevice={isMobileDevice}
+                  isAuthenticated={isAuthenticated}
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
@@ -669,18 +681,23 @@ function VerifyContent() {
                       </div>
 
                       <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-6 snap-x snap-mandatory hide-scrollbar">
-                        {product.images.map((img, i) => (
-                          <div
-                            key={i}
-                            className="shrink-0 w-[240px] sm:w-[300px] h-[180px] sm:h-[225px] rounded-[1.5rem] sm:rounded-[2.5rem] overflow-hidden border border-border/50 bg-muted/20 snap-center relative shadow-md hover:scale-[1.02] transition-transform duration-300"
-                          >
-                            <img
-                              src={resolveMediaUrl(img)}
-                              alt={`${product.productName} photo ${i + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        ))}
+                        {product.images
+                          .filter((_, i) => {
+                            if (!product.customerVisibleImages || product.customerVisibleImages.length === 0) return true;
+                            return product.customerVisibleImages.includes(i);
+                          })
+                          .map((img, i) => (
+                            <div
+                              key={i}
+                              className="shrink-0 w-[240px] sm:w-[300px] h-[180px] sm:h-[225px] rounded-[1.5rem] sm:rounded-[2.5rem] overflow-hidden border border-border/50 bg-muted/20 snap-center relative shadow-md hover:scale-[1.02] transition-transform duration-300"
+                            >
+                              <img
+                                src={resolveMediaUrl(img)}
+                                alt={`${product.productName} photo ${i + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ))}
                       </div>
                     </div>
                   )}

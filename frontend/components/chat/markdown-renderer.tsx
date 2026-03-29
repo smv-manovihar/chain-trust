@@ -3,16 +3,16 @@
 import { code } from "@streamdown/code";
 import { type ClassValue, clsx } from "clsx";
 import Image from "next/image";
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 import { Streamdown } from "streamdown";
 import { twMerge } from "tailwind-merge";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { ArrowRight, Sparkles } from "lucide-react";
+import { useAgent } from "@/contexts/agent-context";
 
 /**
  * Merges Tailwind classes with conflict resolution.
- * Args:
- * - inputs (ClassValue[]): Array of class values to merge.
- * Returns:
- * - string: The merged class string.
  */
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -24,10 +24,7 @@ interface MarkdownRendererProps {
   isStreaming?: boolean;
 }
 
-// Type definitions for component props to replace 'any' using standard React types
-
-// Pre-defined base component overrides to ensure stable references and avoid re-creation on every render.
-const BASE_COMPONENTS = {
+const BASE_COMPONENTS = (onAction?: () => void) => ({
   h1: ({ children }: React.ComponentPropsWithoutRef<"h1">) => (
     <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-6 sm:mt-8 mb-3 sm:mb-4 border-b pb-2 first:mt-0">
       {children}
@@ -43,8 +40,10 @@ const BASE_COMPONENTS = {
       {children}
     </h3>
   ),
-  p: ({ children }: React.ComponentPropsWithoutRef<"div">) => (
-    <div className="mb-2 sm:mb-4 leading-relaxed sm:leading-7 text-pretty first:mt-0">{children}</div>
+  p: ({ children }: React.ComponentPropsWithoutRef<"p">) => (
+    <p className="mb-2 sm:mb-4 leading-relaxed sm:leading-7 first:mt-0">
+      {renderContentWithActions(children, onAction)}
+    </p>
   ),
   strong: ({ children }: React.ComponentPropsWithoutRef<"strong">) => (
     <strong className="font-semibold text-foreground">{children}</strong>
@@ -55,15 +54,22 @@ const BASE_COMPONENTS = {
     </blockquote>
   ),
   ul: ({ children }: React.ComponentPropsWithoutRef<"ul">) => (
-    <ul className="my-4 sm:my-6 ml-6 list-disc [&>li]:mt-1 sm:[&>li]:mt-2">{children}</ul>
+    <ul className="my-4 sm:my-6 ml-6 list-disc [&>li]:mt-1 sm:[&>li]:mt-2">
+      {children}
+    </ul>
   ),
   ol: ({ children, ...props }: React.ComponentPropsWithoutRef<"ol">) => (
-    <ol className="my-4 sm:my-6 ml-6 list-decimal [&>li]:mt-1 sm:[&>li]:mt-2" {...props}>
+    <ol
+      className="my-4 sm:my-6 ml-6 list-decimal [&>li]:mt-1 sm:[&>li]:mt-2"
+      {...props}
+    >
       {children}
     </ol>
   ),
   li: ({ children }: React.ComponentPropsWithoutRef<"li">) => (
-    <li className="text-foreground/90">{children}</li>
+    <li className="text-foreground/90">
+      {renderContentWithActions(children, onAction)}
+    </li>
   ),
   img: ({ src, alt }: React.ComponentPropsWithoutRef<"img">) => {
     const imageSrc = typeof src === "string" ? src : "";
@@ -101,7 +107,7 @@ const BASE_COMPONENTS = {
   ),
   td: ({ children }: React.ComponentPropsWithoutRef<"td">) => (
     <td className="p-4 align-middle [&:has([role=checkbox])]:pr-0">
-      {children}
+      {renderContentWithActions(children, onAction)}
     </td>
   ),
   a: ({ href, children, ...props }: React.ComponentPropsWithoutRef<"a">) => {
@@ -117,7 +123,87 @@ const BASE_COMPONENTS = {
       </a>
     );
   },
+});
+
+/**
+ * Recursive function to parse [action:TYPE|key:val] inside text nodes.
+ */
+const renderContentWithActions = (
+  node: React.ReactNode,
+  onAction?: () => void,
+): React.ReactNode => {
+  if (typeof node !== "string") {
+    if (Array.isArray(node)) {
+      return node.map((n, i) => (
+        <React.Fragment key={i}>
+          {renderContentWithActions(n, onAction)}
+        </React.Fragment>
+      ));
+    }
+    if (React.isValidElement(node) && (node.props as any).children) {
+      return React.cloneElement(
+        node as React.ReactElement,
+        {},
+        renderContentWithActions((node.props as any).children, onAction),
+      );
+    }
+    return node;
+  }
+
+  const regex = /\[action:\s*(\w+)\s*(?:\|\s*([^\]]+))?\]/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(node)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(node.substring(lastIndex, match.index));
+    }
+
+    const type = match[1];
+    const metaRaw = match[2];
+    const meta: Record<string, string> = {};
+    if (metaRaw) {
+      metaRaw.split("|").forEach((seg) => {
+        const [k, v] = seg.split(":");
+        if (k && v) meta[k.trim()] = v.trim();
+      });
+    }
+
+    if (type === "navigate" && meta.href) {
+      parts.push(
+        <span
+          key={match.index}
+          className="inline-flex items-center gap-2 mx-1.5 align-baseline whitespace-nowrap"
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-3 text-[10px] font-bold gap-1.5 border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary rounded-full transition-all shadow-sm"
+            asChild
+            onClick={() => onAction?.()}
+          >
+            <Link href={meta.href}>
+              {meta.label || "Continue"}
+              <ArrowRight className="w-3 h-3" />
+            </Link>
+          </Button>
+        </span>,
+      );
+    } else {
+      parts.push(match[0]);
+    }
+
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < node.length) {
+    parts.push(node.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : node;
 };
+
 
 // A streaming-ready Markdown renderer handling incomplete blocks, code highlighting, and custom components.
 export function MarkdownRenderer({
@@ -125,45 +211,8 @@ export function MarkdownRenderer({
   className,
   isStreaming = false,
 }: MarkdownRendererProps) {
-  // Memoized Values
-  const memoContent = useMemo(() => {
-    const sanitizedBase = content ?? "";
-    if (typeof window === "undefined") {
-      return sanitizedBase;
-    }
-
-    // Lazy load isomorphic-dompurify on client only to avoid server prerendering issues
-    const DOMPurify = require("isomorphic-dompurify");
-    return DOMPurify.sanitize(sanitizedBase, {
-      ALLOWED_TAGS: [
-        "p",
-        "br",
-        "b",
-        "i",
-        "em",
-        "strong",
-        "a",
-        "img",
-        "h1",
-        "h2",
-        "h3",
-        "h4",
-        "h5",
-        "h6",
-        "ul",
-        "ol",
-        "li",
-        "blockquote",
-        "code",
-        "pre",
-        "span",
-        "div",
-      ],
-      ALLOWED_ATTR: ["href", "src", "alt", "title", "target", "rel"],
-    });
-  }, [content]);
-
-  const components = useMemo(() => BASE_COMPONENTS as any, []);
+  const { setOpen } = useAgent();
+  const components = useMemo(() => BASE_COMPONENTS(() => setOpen(true)) as any, [setOpen]);
 
   // JSX Return Statement
   return (
@@ -179,7 +228,7 @@ export function MarkdownRenderer({
         mode={isStreaming ? "streaming" : "static"}
         caret={isStreaming ? "block" : undefined}
       >
-        {memoContent}
+        {content}
       </Streamdown>
     </div>
   );

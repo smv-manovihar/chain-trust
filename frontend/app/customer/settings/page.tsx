@@ -23,6 +23,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
 import { updateProfile } from "@/api";
+import { 
+  getNotificationPreferences, 
+  updateNotificationPreferences 
+} from "@/api/notification.api";
 import {
   Form,
   FormControl,
@@ -45,6 +49,8 @@ const profileSchema = z.object({
 export default function CustomerSettingsPage() {
   const { user, refreshUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [notificationPrefs, setNotificationPrefs] = useState<any>(null);
+  const [prefsLoading, setPrefsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
@@ -72,6 +78,40 @@ export default function CustomerSettingsPage() {
       });
     }
   }, [user, form]);
+
+  useEffect(() => {
+    const fetchPrefs = async () => {
+      setPrefsLoading(true);
+      try {
+        const prefs = await getNotificationPreferences();
+        setNotificationPrefs(prefs);
+      } catch (error) {
+        console.error("Failed to fetch notification preferences:", error);
+      } finally {
+        setPrefsLoading(false);
+      }
+    };
+    fetchPrefs();
+  }, []);
+
+  const handlePrefToggle = async (key: string, enabled: boolean) => {
+    if (!notificationPrefs) return;
+    
+    const newPrefs = {
+      ...notificationPrefs,
+      [key]: { inApp: enabled, email: enabled }
+    };
+    
+    setNotificationPrefs(newPrefs);
+    try {
+      await updateNotificationPreferences(newPrefs);
+      toast.success("Preferences updated");
+    } catch (error) {
+      toast.error("Failed to update preferences");
+      // Revert on failure
+      setNotificationPrefs(notificationPrefs);
+    }
+  };
 
   const onProfileSubmit = async (data: z.infer<typeof profileSchema>) => {
     setIsLoading(true);
@@ -105,31 +145,31 @@ export default function CustomerSettingsPage() {
       </div>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="mb-8 bg-muted/50 p-1 rounded-2xl border border-border/50 h-14 w-full sm:w-auto overflow-x-auto sm:overflow-visible">
+        <TabsList className="mb-8 bg-muted/50 p-1.5 rounded-2xl border border-border/50 h-auto w-full flex justify-start sm:w-auto sm:inline-flex overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <TabsTrigger
             value="general"
-            className="flex items-center gap-2 rounded-xl px-6 data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all"
+            className="flex items-center gap-2 rounded-xl px-4 py-2.5 sm:px-6 whitespace-nowrap shrink-0 data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all"
           >
             <User className="h-4 w-4" />
             General
           </TabsTrigger>
           <TabsTrigger
             value="security"
-            className="flex items-center gap-2 rounded-xl px-6 data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all"
+            className="flex items-center gap-2 rounded-xl px-4 py-2.5 sm:px-6 whitespace-nowrap shrink-0 data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all"
           >
             <Shield className="h-4 w-4" />
             Security
           </TabsTrigger>
           <TabsTrigger
             value="notifications"
-            className="flex items-center gap-2 rounded-xl px-6 data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all"
+            className="flex items-center gap-2 rounded-xl px-4 py-2.5 sm:px-6 whitespace-nowrap shrink-0 data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all"
           >
             <Bell className="h-4 w-4" />
             Notifications
           </TabsTrigger>
           <TabsTrigger
             value="advanced"
-            className="flex items-center gap-2 rounded-xl px-6 data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all"
+            className="flex items-center gap-2 rounded-xl px-4 py-2.5 sm:px-6 whitespace-nowrap shrink-0 data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all"
           >
             <AlertCircle className="h-4 w-4" />
             Advanced
@@ -257,7 +297,7 @@ export default function CustomerSettingsPage() {
                         </FormItem>
                       )}
                     />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="postalCode"
@@ -300,7 +340,7 @@ export default function CustomerSettingsPage() {
                   <div className="flex justify-end pt-6 border-t border-border mt-8">
                     <Button
                       disabled={isLoading}
-                      className="rounded-full px-10 h-12 shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                      className="rounded-full w-full sm:w-auto px-10 h-12 shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
                     >
                       {isLoading && (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -354,7 +394,7 @@ export default function CustomerSettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-0 divide-y divide-border">
-              <div className="flex items-center justify-between py-6">
+              <div className="flex items-center justify-between gap-4 py-6">
                 <div className="space-y-1">
                   <Label className="text-sm font-bold">Safety Recalls</Label>
                   <p className="text-xs text-muted-foreground italic">
@@ -363,27 +403,39 @@ export default function CustomerSettingsPage() {
                   </p>
                 </div>
                 <Switch
-                  defaultChecked
-                  className="data-[state=checked]:bg-primary"
+                  checked={notificationPrefs?.batch_recall?.inApp || false}
+                  onCheckedChange={(checked) => handlePrefToggle('batch_recall', checked)}
+                  disabled={prefsLoading || !notificationPrefs}
+                  className="data-[state=checked]:bg-primary shrink-0"
                 />
               </div>
-              <div className="flex items-center justify-between py-6">
+              <div className="flex items-center justify-between gap-4 py-6">
                 <div className="space-y-1">
                   <Label className="text-sm font-bold">Health Insights</Label>
                   <p className="text-xs text-muted-foreground italic">
                     Monthly reports on your tracking habits and medicine safety.
                   </p>
                 </div>
-                <Switch className="data-[state=checked]:bg-primary" />
+                <Switch 
+                  checked={notificationPrefs?.medicine_expiry?.inApp || false}
+                  onCheckedChange={(checked) => handlePrefToggle('medicine_expiry', checked)}
+                  disabled={prefsLoading || !notificationPrefs}
+                  className="data-[state=checked]:bg-primary shrink-0" 
+                />
               </div>
-              <div className="flex items-center justify-between py-6">
+              <div className="flex items-center justify-between gap-4 py-6">
                 <div className="space-y-1">
                   <Label className="text-sm font-bold">Product Updates</Label>
                   <p className="text-xs text-muted-foreground italic">
                     News about new verification features and brand partnerships.
                   </p>
                 </div>
-                <Switch className="data-[state=checked]:bg-primary" />
+                <Switch 
+                  checked={notificationPrefs?.system?.inApp || false}
+                  onCheckedChange={(checked) => handlePrefToggle('system', checked)}
+                  disabled={prefsLoading || !notificationPrefs}
+                  className="data-[state=checked]:bg-primary shrink-0" 
+                />
               </div>
             </CardContent>
           </Card>

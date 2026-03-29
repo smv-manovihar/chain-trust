@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { requestExecutionAccounts, getWeb3 } from "@/api/web3-client";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/auth-context";
 
 interface Web3ContextType {
   address: string | null;
@@ -25,12 +26,15 @@ interface Web3ProviderProps {
 }
 
 export function Web3Provider({ children }: Web3ProviderProps) {
+  const { user, isAuthenticated } = useAuth();
   const [address, setAddress] = useState<string | null>(null);
   const [status, setStatus] = useState<'connected' | 'disconnected' | 'connecting'>('disconnected');
   const [error, setError] = useState<string | null>(null);
 
+  const isManufacturer = isAuthenticated && user?.role === "manufacturer";
+
   const checkConnection = async () => {
-    if (typeof window === "undefined" || !window.ethereum) return;
+    if (typeof window === "undefined" || !window.ethereum || !isManufacturer) return;
 
     try {
       const accounts = await window.ethereum.request({ method: 'eth_accounts' });
@@ -44,6 +48,10 @@ export function Web3Provider({ children }: Web3ProviderProps) {
   };
 
   const connect = async () => {
+    if (!isManufacturer) {
+      toast.error("Only manufacturers can connect a wallet");
+      return;
+    }
     setStatus('connecting');
     setError(null);
     try {
@@ -67,6 +75,14 @@ export function Web3Provider({ children }: Web3ProviderProps) {
   };
 
   useEffect(() => {
+    if (!isManufacturer) {
+      if (address) {
+        setAddress(null);
+        setStatus('disconnected');
+      }
+      return;
+    }
+    
     checkConnection();
 
     if (typeof window !== "undefined" && window.ethereum) {
