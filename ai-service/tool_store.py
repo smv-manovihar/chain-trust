@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import re
+from urllib.parse import unquote
 from models import PyObjectId
 from database import get_db
 
@@ -391,14 +392,14 @@ class ToolStore:
                 return await self.get_manufacturer_products_data(user_id)
 
             if route.startswith("/manufacturer/batches/"):
-                identifier = route.split("/")[-1]
+                identifier = unquote(route.split("/")[-1])
                 if identifier and identifier != "batches":
-                    return await self.get_batch_summary_by_id_or_number(identifier)
+                    return await self.get_batch_summary_by_id_or_number(identifier, user_id)
 
             if route.startswith("/manufacturer/products/"):
-                identifier = route.split("/")[-1]
+                identifier = unquote(route.split("/")[-1])
                 if identifier and identifier != "products":
-                    return await self.get_product_summary_by_id_or_code(identifier)
+                    return await self.get_product_summary_by_id_or_code(identifier, user_id)
 
             if route == "/verify":
                 salt = params.get("salt") or params.get("id")
@@ -577,13 +578,13 @@ class ToolStore:
 
         return "\n".join(summary)
 
-    async def get_batch_summary_by_id_or_number(self, identifier: str) -> str:
+    async def get_batch_summary_by_id_or_number(self, identifier: str, user_id: str) -> str:
         """Fetch and format batch summary for view data using either _id or batchNumber."""
-        batch = await self.db.batches.find_one({"batchNumber": identifier})
+        u_id = PyObjectId(user_id)
+        batch = await self.db.batches.find_one({"batchNumber": identifier, "createdBy": u_id})
         if not batch:
             try:
-                # Use find_one instead of get_batch_details to avoid double serialization for now
-                batch = await self.db.batches.find_one({"_id": PyObjectId(identifier)})
+                batch = await self.db.batches.find_one({"_id": PyObjectId(identifier), "createdBy": u_id})
             except Exception:
                 pass
 
@@ -614,13 +615,14 @@ class ToolStore:
 
         return "\n".join(summary)
 
-    async def get_product_summary_by_id_or_code(self, identifier: str) -> str:
+    async def get_product_summary_by_id_or_code(self, identifier: str, user_id: str) -> str:
         """Fetch and format product summary for view data using either _id or productId."""
-        product = await self.db.products.find_one({"productId": identifier})
+        u_id = PyObjectId(user_id)
+        product = await self.db.products.find_one({"productId": identifier, "createdBy": u_id})
         if not product:
             try:
                 product = await self.db.products.find_one(
-                    {"_id": PyObjectId(identifier)}
+                    {"_id": PyObjectId(identifier), "createdBy": u_id}
                 )
             except Exception:
                 pass

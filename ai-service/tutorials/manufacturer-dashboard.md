@@ -11,7 +11,7 @@ The Manufacturer Dashboard is the automated command center for real-time product
 - **Quick Actions (4-Card Grid)**:
   - **Manage Products**: View and edit your entire product catalog (`/manufacturer/products`).
   - **Enroll Batch**: The primary entry point for registering new production runs on the blockchain (`/manufacturer/batches/new`).
-  - **View Analytics**: Deep dive into global scan locations and consumer trends (`/manufacturer/analytics`).
+  - **View Analytics**: Deep dive into global scan locations and consumer trends ([Supply Intelligence](/manufacturer/analytics)).
   - **Security Reports**: Investigative analytics for suspicious activity and security flags.
 - **Recent Activity Feed**: A list of the latest system events, scan attempts, and automated security monitoring logs.
 

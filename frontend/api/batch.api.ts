@@ -21,13 +21,13 @@ export const listBatches = async (params?: { search?: string; categories?: strin
 	return response.data;
 };
 
-export const getBatch = async (id: string, signal?: AbortSignal) => {
-	const response = await client.get(`/batches/${id}`, { signal });
+export const getBatch = async (batchNumber: string, signal?: AbortSignal) => {
+	const response = await client.get(`/batches/${batchNumber}`, { signal });
 	return response.data;
 };
 
-export const getBatchQRData = async (id: string, page = 1, limit = 50, signal?: AbortSignal) => {
-	const response = await client.get(`/batches/${id}/qr-data`, {
+export const getBatchQRData = async (batchNumber: string, page = 1, limit = 50, signal?: AbortSignal) => {
+	const response = await client.get(`/batches/${batchNumber}/qr-data`, {
 		params: { page, limit },
 		signal
 	});
@@ -39,38 +39,24 @@ export const verifyScan = async (salt: string, visitorId: string, lat?: number, 
 	return response.data;
 };
 
-export const recallBatch = async (id: string, signal?: AbortSignal) => {
-	const response = await client.post(`/batches/${id}/recall`, null, { signal });
+export const recallBatch = async (batchNumber: string, signal?: AbortSignal) => {
+	const response = await client.post(`/batches/${batchNumber}/recall`, null, { signal });
 	return response.data;
 };
 
-export const downloadBatchPDF = async (id: string, signal?: AbortSignal) => {
-	const response = await client.get(`/batches/${id}/pdf`, {
+export const downloadBatchPDF = async (batchNumber: string, signal?: AbortSignal) => {
+	const response = await client.get(`/batches/${batchNumber}/pdf`, {
 		responseType: 'blob',
 		signal
 	});
 	return response.data;
 };
 
-export const getScanHistory = async (days = 30, signal?: AbortSignal) => {
-	const response = await client.get('/batches/scan-history', {
-		params: { days },
+export const getBatchScanDetails = async (batchNumber: string, signal?: AbortSignal) => {
+	const response = await client.get('/analytics/details', {
+		params: { batchNumber, limit: 100 },
 		signal
 	});
 	return response.data;
 };
 
-export const getBatchScanDetails = async (id: string, signal?: AbortSignal) => {
-	const response = await client.get(`/batches/${id}/scan-details`, { signal });
-	return response.data;
-};
-
-export const getGeoDistribution = async (signal?: AbortSignal) => {
-	const response = await client.get('/batches/analytics/geo', { signal });
-	return response.data.distribution;
-};
-
-export const getThreatIntelligence = async (signal?: AbortSignal) => {
-	const response = await client.get('/batches/analytics/threats', { signal });
-	return response.data.threats;
-};

@@ -19,11 +19,13 @@ import {
   Loader2,
 } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useAuth } from "@/contexts/auth-context";
 import { listProducts } from "@/api/product.api";
-import { listBatches, getScanHistory } from "@/api/batch.api";
+import { listBatches } from "@/api/batch.api";
+import { getTimelineAnalytics } from "@/api/analytics.api";
 import { getNotifications, Notification } from "@/api/notification.api";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -50,21 +52,32 @@ export default function ManufacturerDashboard() {
 
       setIsLoading(true);
       try {
-        const todayStr = format(new Date(), "yyyy-MM-dd");
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const today = new Date();
 
-        const [productsRes, batchesRes, historyRes, notificationsRes] =
+        const [productsRes, batchesRes, timelineRes, notificationsRes] =
           await Promise.all([
             listProducts({}, controller.signal),
             listBatches({}, controller.signal),
-            getScanHistory(7, controller.signal),
+            getTimelineAnalytics(
+              {
+                from: startOfDay(sevenDaysAgo).toISOString(),
+                to: endOfDay(today).toISOString(),
+                groupBy: "total",
+              },
+              controller.signal,
+            ),
             getNotifications(5, 0, undefined, controller.signal),
           ]);
 
         const products = productsRes.products || [];
         const batches = batchesRes.batches || [];
-        const history = historyRes.history || [];
+        const history = timelineRes.history || [];
         const notifications = notificationsRes.notifications || [];
         const unreadCount = notificationsRes.unreadCount || 0;
+
+        const todayStr = format(new Date(), "yyyy-MM-dd");
 
         // Find today's scans in the history array
         const todayData = history.find((h: any) => h.date === todayStr);
@@ -109,12 +122,7 @@ export default function ManufacturerDashboard() {
   }, []);
 
   if (isLoading) {
-    return (
-      <div className="h-[60vh] flex flex-col items-center justify-center gap-4 text-muted-foreground">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm font-medium">Initializing command center...</p>
-      </div>
-    );
+    return <LoadingScreen message="Loading..." />;
   }
 
   return (

@@ -150,6 +150,13 @@
 
     /* ROUNDED DESIGN: Increased radius */
     --radius: 2rem;
+
+    /* Chart Colors: Fresh Clinical Suite */
+    --chart-1: 221 83% 53%;   /* Royal Blue (Primary) */
+    --chart-2: 150 100% 35%;  /* Emerald (Success) */
+    --chart-3: 38 92% 50%;    /* Amber (Warning) */
+    --chart-4: 180 100% 25%;  /* Deep Cyan (Accent) */
+    --chart-5: 0 84% 60%;     /* Coral (Destructive) */
   }
 
   .dark {
@@ -198,6 +205,13 @@
     --border: 217 33% 17%;
     --input: 217 33% 17%;
     --ring: 217 91% 60%;
+
+    /* Chart Colors: Deep Ocean Suite */
+    --chart-1: 217 91% 60%;   /* Luminous Azure (Primary) */
+    --chart-2: 150 80% 45%;   /* Neon Green (Success) */
+    --chart-3: 48 96% 53%;    /* Bright Amber (Warning) */
+    --chart-4: 180 80% 80%;   /* Soft Cyan (Accent) */
+    --chart-5: 0 62% 30%;     /* Muted Coral (Destructive) */
   }
 }
 

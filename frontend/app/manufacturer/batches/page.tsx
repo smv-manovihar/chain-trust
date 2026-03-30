@@ -77,7 +77,7 @@ const BatchActions = ({
   >
     <DropdownMenuItem asChild className="cursor-pointer py-2 px-3">
       <Link
-        href={`/manufacturer/batches/${batch._id}`}
+        href={`/manufacturer/batches/${encodeURIComponent(batch.batchNumber)}`}
         className="flex items-center text-sm"
       >
         <QrCode className="mr-2 h-4 w-4 text-primary" />
@@ -228,7 +228,7 @@ export default function BatchesPage() {
     try {
       toast.loading("Recalling batch on chain...");
       await recallProductOnChain(batch.batchSalt, walletAddress);
-      await recallBatch(batch._id);
+      await recallBatch(batch.batchNumber);
 
       fetchBatches();
       toast.success("Batch successfully recalled.");
@@ -330,7 +330,7 @@ export default function BatchesPage() {
                     <TableRow
                       key={batch._id}
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => router.push(`/manufacturer/batches/${batch._id}`)}
+                      onClick={() => router.push(`/manufacturer/batches/${encodeURIComponent(batch.batchNumber)}`)}
                     >
                       <TableCell className="font-medium">
                         {batch.batchNumber}
@@ -384,7 +384,7 @@ export default function BatchesPage() {
                 <Card
                   key={batch._id}
                   className="cursor-pointer hover:border-primary/40 transition-colors"
-                  onClick={() => router.push(`/manufacturer/batches/${batch._id}`)}
+                  onClick={() => router.push(`/manufacturer/batches/${encodeURIComponent(batch.batchNumber)}`)}
                 >
                   <CardContent className="p-5">
                     <div className="flex justify-between items-start mb-3">
@@ -423,7 +423,7 @@ export default function BatchesPage() {
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Button asChild className="w-full" variant="secondary">
-                        <Link href={`/manufacturer/batches/${batch._id}`}>
+                        <Link href={`/manufacturer/batches/${encodeURIComponent(batch.batchNumber)}`}>
                           <QrCode className="h-4 w-4 mr-2" />
                           View QR
                         </Link>

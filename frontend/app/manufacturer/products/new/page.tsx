@@ -67,6 +67,7 @@ export default function NewProductWizard() {
     description: "",
     composition: "",
     images: [] as File[],
+    imageAccessLevel: "public" as "public" | "verified_only" | "internal_only",
     customerVisibleImages: [] as number[],
   });
 
@@ -391,6 +392,33 @@ export default function NewProductWizard() {
                       />
                     </Label>
                   </div>
+
+                  <div className="space-y-4 pt-4 border-t border-border/40">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div>
+                        <Label className="text-sm font-bold">Image Access Level</Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">Control who can view these product images</p>
+                      </div>
+                      <div className="flex bg-muted/50 p-1 rounded-lg border border-border/50 w-full sm:w-auto">
+                        {(['public', 'verified_only', 'internal_only'] as const).map((level) => (
+                          <button
+                            key={level}
+                            type="button"
+                            onClick={() => updateForm({ imageAccessLevel: level })}
+                            className={cn(
+                              "px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all flex-1 sm:flex-none",
+                              form.imageAccessLevel === level
+                                ? "bg-background text-primary shadow-sm border border-border/50"
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            {level.replace('_', ' ')}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/40 text-muted-foreground">
                     <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" />
                     <p className="text-sm">

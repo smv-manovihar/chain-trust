@@ -1,15 +1,18 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
-import Batch from '../models/batch.model.js';
+import Batch, { IBatch } from '../models/batch.model.js';
 import Product from '../models/product.model.js';
 import Scan from '../models/scan.model.js';
 import * as pdfService from '../services/pdf.service.js';
 import geoip from 'geoip-lite';
 import requestIp from 'request-ip';
 import { calculateSuspiciousness } from '../utils/suspicious.util.js';
+import { getGeoLocation } from '../utils/geo.util.js';
 import { Notification } from '../models/notification.model.js';
 import CabinetItem from '../models/cabinet.model.js';
+
+const BATCH_NUMBER_REGEX = /^[a-zA-Z0-9\-_.]+$/;
 
 /**
  * Derive a unit-level salt from a batch salt and unit index.
@@ -79,6 +82,10 @@ export const createBatch = async (req: Request, res: Response) => {
 
 		if (!productRef || !batchNumber || !quantity || !manufactureDate || !batchSalt) {
 			return res.status(400).json({ message: 'Missing required fields (productRef, batchNumber, quantity, manufactureDate, batchSalt)' });
+		}
+
+		if (!BATCH_NUMBER_REGEX.test(batchNumber)) {
+			return res.status(400).json({ message: 'Batch number contains invalid characters.' });
 		}
 
 		if (quantity < 1 || quantity > 10000000) {
@@ -183,10 +190,22 @@ export const listBatches = async (req: Request, res: Response) => {
 	}
 };
 
-// GET /api/batches/:id — Get a single batch by ID
+// GET /api/batches/:batchNumber — Get a single batch
 export const getBatch = async (req: Request, res: Response) => {
 	try {
-		const batch = await Batch.findById(req.params.id).populate('product');
+		const userId = (req as any).user?.id;
+		const { batchNumber } = req.params;
+
+		let batch;
+		if (mongoose.isValidObjectId(batchNumber)) {
+			batch = await Batch.findOne({
+				$or: [{ _id: batchNumber }, { batchNumber }],
+				createdBy: userId,
+			}).populate('product');
+		} else {
+			batch = await Batch.findOne({ batchNumber, createdBy: userId }).populate('product');
+		}
+
 		if (!batch) {
 			return res.status(404).json({ message: 'Batch not found' });
 		}
@@ -197,10 +216,22 @@ export const getBatch = async (req: Request, res: Response) => {
 	}
 };
 
-// GET /api/batches/:id/qr-data — Get QR data for all units in a batch
+// GET /api/batches/:batchNumber/qr-data — Get QR data for all units in a batch
 export const getBatchQRData = async (req: Request, res: Response) => {
 	try {
-		const batch = await Batch.findById(req.params.id).populate('product');
+		const userId = (req as any).user?.id;
+		const { batchNumber } = req.params;
+
+		let batch;
+		if (mongoose.isValidObjectId(batchNumber)) {
+			batch = await Batch.findOne({
+				$or: [{ _id: batchNumber }, { batchNumber }],
+				createdBy: userId,
+			}).populate('product');
+		} else {
+			batch = await Batch.findOne({ batchNumber, createdBy: userId }).populate('product');
+		}
+
 		if (!batch) {
 			return res.status(404).json({ message: 'Batch not found' });
 		}
@@ -208,7 +239,7 @@ export const getBatchQRData = async (req: Request, res: Response) => {
 		const page = parseInt(req.query.page as string) || 1;
 		const limit = parseInt(req.query.limit as string) || 50;
 		const startIdx = (page - 1) * limit;
-		const endIdx = Math.min(startIdx + limit, batch.quantity);
+		const endIdx = Math.min(startIdx + limit, (batch as any).quantity);
 
 		const units = [];
 		for (let i = startIdx; i < endIdx; i++) {
@@ -272,14 +303,41 @@ export const verifyScan = async (req: Request, res: Response) => {
 		let city, country;
 
 		if (ip && ip !== 'unknown' && ip !== '::1' && ip !== '127.0.0.1') {
-			const geo = geoip.lookup(ip);
-			if (geo) {
-				city = geo.city;
-				country = geo.country;
-				// Fallback to IP-geo if frontend didn't provide precise coords
-				if (latitude === undefined && longitude === undefined) {
-					latitude = geo.ll[0];
-					longitude = geo.ll[1];
+			// Phase 1: Try FreeIPAPI for high accuracy (no API key required)
+			try {
+				const freeGeo = await getGeoLocation(ip);
+				if (freeGeo) {
+					console.log(`[Geolocation] FreeIPAPI success for ${ip}: ${freeGeo.cityName}, ${freeGeo.countryName}`);
+					city = freeGeo.cityName;
+					country = freeGeo.countryName;
+					
+					// Use coordinates from FreeIPAPI if available
+					if (latitude === undefined && longitude === undefined) {
+						latitude = freeGeo.latitude;
+						longitude = freeGeo.longitude;
+					}
+				} else {
+					// Phase 2: Fallback to local geoip-lite if API fails
+					const pGeo = geoip.lookup(ip);
+					if (pGeo) {
+						city = pGeo.city;
+						country = pGeo.country;
+						if (latitude === undefined && longitude === undefined) {
+							latitude = pGeo.ll[0];
+							longitude = pGeo.ll[1];
+						}
+					}
+				}
+			} catch (err) {
+				console.error("[Geolocation] Lookup error, falling back to local DB:", err);
+				const fallbackGeo = geoip.lookup(ip);
+				if (fallbackGeo) {
+					city = fallbackGeo.city;
+					country = fallbackGeo.country;
+					if (latitude === undefined && longitude === undefined) {
+						latitude = fallbackGeo.ll[0];
+						longitude = fallbackGeo.ll[1];
+					}
 				}
 			}
 		}
@@ -405,10 +463,22 @@ export const verifyScan = async (req: Request, res: Response) => {
 	}
 };
 
-// POST /api/batches/:id/recall — Recall a batch
+// POST /api/batches/:batchNumber/recall — Recall a batch
 export const recallBatch = async (req: Request, res: Response) => {
 	try {
-		const batch = await Batch.findById(req.params.id);
+		const userId = (req as any).user?.id;
+		const { batchNumber } = req.params;
+
+		let batch: IBatch | null;
+		if (mongoose.isValidObjectId(batchNumber)) {
+			batch = await Batch.findOne({
+				$or: [{ _id: batchNumber }, { batchNumber }],
+				createdBy: userId,
+			});
+		} else {
+			batch = await Batch.findOne({ batchNumber, createdBy: userId });
+		}
+
 		if (!batch) {
 			return res.status(404).json({ message: 'Batch not found' });
 		}
@@ -423,8 +493,9 @@ export const recallBatch = async (req: Request, res: Response) => {
 
 		// Notify users who have this batch in their cabinet
 		try {
+			const batchToRecall = batch; // Local constant for closure safety
 			const affectedCabinetItems = await CabinetItem.find({
-				batchNumber: batch.batchNumber,
+				batchNumber: batchToRecall.batchNumber,
 				isUserAdded: false // Only for verified batches
 			});
 
@@ -436,8 +507,8 @@ export const recallBatch = async (req: Request, res: Response) => {
 					message: `The product "${item.name}" (Batch: ${item.batchNumber}) has been recalled by the manufacturer for safety reasons. Please discontinue use immediately and contact your pharmacy.`,
 					link: `/customer/cabinet/${item._id}`,
 					metadata: {
-						batchId: batch._id,
-						productId: batch.product,
+						batchId: batchToRecall._id,
+						productId: batchToRecall.product,
 						cabinetItemId: item._id,
 						medicineName: item.name
 					}
@@ -456,16 +527,28 @@ export const recallBatch = async (req: Request, res: Response) => {
 	}
 };
 
-// GET /api/batches/:id/pdf — Generate and download a PDF label sheet
+// GET /api/batches/:batchNumber/pdf — Generate and download a PDF label sheet
 export const getBatchPDF = async (req: Request, res: Response) => {
 	try {
-		const batch = await Batch.findById(req.params.id).populate('product');
+		const userId = (req as any).user?.id;
+		const { batchNumber } = req.params;
+
+		let batch;
+		if (mongoose.isValidObjectId(batchNumber)) {
+			batch = await Batch.findOne({
+				$or: [{ _id: batchNumber }, { batchNumber }],
+				createdBy: userId,
+			}).populate('product');
+		} else {
+			batch = await Batch.findOne({ batchNumber, createdBy: userId }).populate('product');
+		}
+
 		if (!batch) {
 			return res.status(404).json({ message: 'Batch not found' });
 		}
 
 		// Ensure we have current QR settings from the product
-		const settings = (batch.product as any)?.qrSettings || {
+		const settings = ((batch as any).product as any)?.qrSettings || {
 			qrSize: 15,
 			columns: 4,
 			showProductName: true,
@@ -485,64 +568,29 @@ export const getBatchPDF = async (req: Request, res: Response) => {
 	}
 };
 
-// GET /api/batches/scan-history — Get aggregated scan counts by day
-export const getScanHistory = async (req: Request, res: Response) => {
-	try {
-		const userId = (req as any).user?.id;
-		const days = parseInt(req.query.days as string) || 30;
 
-		// Get all batch IDs owned by the user
-		const batches = await Batch.find({ createdBy: userId }).select('_id');
-		const batchIds = batches.map(b => b._id);
-
-		if (batchIds.length === 0) {
-			return res.json({ history: [] });
-		}
-
-		const startDate = new Date();
-		startDate.setDate(startDate.getDate() - days);
-
-		// Aggregate scans by day
-		const history = await Scan.aggregate([
-			{
-				$match: {
-					batch: { $in: batchIds },
-					createdAt: { $gte: startDate }
-				}
-			},
-			{
-				$group: {
-					_id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-					count: { $sum: 1 }
-				}
-			},
-			{ $sort: { _id: 1 } }
-		]);
-
-		// Map to expected format
-		const formattedHistory = history.map(item => ({
-			date: item._id,
-			count: item.count
-		}));
-
-		res.json({ history: formattedHistory });
-	} catch (error) {
-		console.error('Error fetching scan history:', error);
-		res.status(500).json({ message: 'Internal server error' });
-	}
-};
-
-// GET /api/batches/:id/scan-details — Get detailed scan records for a specific batch
+// GET /api/batches/:batchNumber/scan-details — Get detailed scan records for a specific batch
 export const getBatchScanDetails = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
-		const batchId = req.params.id;
+		const { batchNumber } = req.params;
 
 		// Verify batch ownership
-		const batch = await Batch.findOne({ _id: batchId, createdBy: userId });
+		let batch: IBatch | null;
+		if (mongoose.isValidObjectId(batchNumber)) {
+			batch = await Batch.findOne({
+				$or: [{ _id: batchNumber }, { batchNumber }],
+				createdBy: userId,
+			});
+		} else {
+			batch = await Batch.findOne({ batchNumber, createdBy: userId });
+		}
+
 		if (!batch) {
 			return res.status(404).json({ message: 'Batch not found' });
 		}
+
+		const batchId = batch._id;
 
 		// Get scan records
 		const scans = await Scan.find({ batch: batchId })
@@ -556,82 +604,6 @@ export const getBatchScanDetails = async (req: Request, res: Response) => {
 		} });
 	} catch (error) {
 		console.error('Error fetching batch scan details:', error);
-		res.status(500).json({ message: 'Internal server error' });
-	}
-};
-
-// GET /api/batches/analytics/geo — Get scan distribution by location
-export const getGeographicDistribution = async (req: Request, res: Response) => {
-	try {
-		const userId = (req as any).user?.id;
-		const batches = await Batch.find({ createdBy: userId }).select('_id');
-		const batchIds = batches.map(b => b._id);
-
-		if (batchIds.length === 0) return res.json({ distribution: [] });
-
-		const distribution = await Scan.aggregate([
-			{ $match: { batch: { $in: batchIds } } },
-			{
-				$group: {
-					_id: { country: "$country", city: "$city" },
-					count: { $sum: 1 }
-				}
-			},
-			{ $sort: { count: -1 } },
-			{ $limit: 20 }
-		]);
-
-		res.json({ 
-			distribution: distribution.map(d => ({
-				country: d._id.country || 'Unknown',
-				city: d._id.city || 'Unknown',
-				count: d.count
-			}))
-		});
-	} catch (error) {
-		console.error('Geo analytics error:', error);
-		res.status(500).json({ message: 'Internal server error' });
-	}
-};
-
-// GET /api/batches/analytics/threats — Get suspicious scan patterns
-export const getThreatIntelligence = async (req: Request, res: Response) => {
-	try {
-		const userId = (req as any).user?.id;
-		const batches = await Batch.find({ createdBy: userId }).select('_id');
-		const batchIds = batches.map(b => b._id);
-
-		if (batchIds.length === 0) return res.json({ threats: [] });
-
-		// Identify units with > 3 unique visitors (potential counterfeit/leak)
-		const threats = await Scan.aggregate([
-			{ $match: { batch: { $in: batchIds } } },
-			{
-				$group: {
-					_id: { batch: "$batch", unit: "$unitIndex" },
-					uniqueVisitors: { $addToSet: "$visitorId" },
-					totalScans: { $sum: 1 }
-				}
-			},
-			{
-				$project: {
-					batch: "$_id.batch",
-					unit: "$_id.unit",
-					visitorCount: { $size: "$uniqueVisitors" },
-					totalScans: 1
-				}
-			},
-			{ $match: { visitorCount: { $gt: 3 } } },
-			{ $sort: { visitorCount: -1 } },
-			{ $limit: 10 }
-		]);
-
-		// Populate batch info for the threats
-		const populatedThreats = await Batch.populate(threats, { path: 'batch', select: 'batchNumber productName' });
-
-		res.json({ threats: populatedThreats });
-	} catch (error) {
-		console.error('Threat analytics error:', error);
 		res.status(500).json({ message: 'Internal server error' });
 	}
 };

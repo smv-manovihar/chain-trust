@@ -1,6 +1,10 @@
 import { Request, Response } from 'express';
-import { Types } from 'mongoose';
+import { Types, isValidObjectId } from 'mongoose';
 import Product from '../models/product.model.js';
+import Batch from '../models/batch.model.js';
+import s3Service from '../services/s3.service.js';
+
+const PRODUCT_ID_REGEX = /^[a-zA-Z0-9\-_.]+$/;
 
 // POST /api/products — Create a new catalogue product
 export const createProduct = async (req: Request, res: Response) => {
@@ -9,6 +13,10 @@ export const createProduct = async (req: Request, res: Response) => {
 
 		if (!name || !productId || !categories || !Array.isArray(categories) || categories.length === 0 || !brand) {
 			return res.status(400).json({ message: 'Name, Product ID, Categories (array), and Brand are required.' });
+		}
+
+		if (!PRODUCT_ID_REGEX.test(productId)) {
+			return res.status(400).json({ message: 'Product ID contains invalid characters. Use alphanumeric, dashes, underscores, or dots.' });
 		}
 
 		const userId = (req as any).user?.id;
@@ -105,10 +113,23 @@ export const listProducts = async (req: Request, res: Response) => {
 	}
 };
 
-// GET /api/products/:id — Get a single product
+// GET /api/products/:productId — Get a single product
 export const getProduct = async (req: Request, res: Response) => {
 	try {
-		const product = await Product.findById(req.params.id);
+		const userId = (req as any).user?.id;
+		const { productId } = req.params;
+
+		// Smart lookup: support both ObjectId (for backward compat) and productId
+		let product;
+		if (isValidObjectId(productId)) {
+			product = await Product.findOne({
+				$or: [{ _id: productId }, { productId }],
+				createdBy: userId,
+			});
+		} else {
+			product = await Product.findOne({ productId, createdBy: userId });
+		}
+
 		if (!product) {
 			return res.status(404).json({ message: 'Product not found' });
 		}
@@ -119,31 +140,61 @@ export const getProduct = async (req: Request, res: Response) => {
 	}
 };
 
-// PUT /api/products/:id — Update a catalogue product
+// PUT /api/products/:productId — Update a catalogue product
 export const updateProduct = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
-		const product = await Product.findById(req.params.id);
+		const { productId: idParam } = req.params;
+
+		let product;
+		if (isValidObjectId(idParam)) {
+			product = await Product.findOne({
+				$or: [{ _id: idParam }, { productId: idParam }],
+				createdBy: userId,
+			});
+		} else {
+			product = await Product.findOne({ productId: idParam, createdBy: userId });
+		}
 
 		if (!product) {
 			return res.status(404).json({ message: 'Product not found' });
 		}
-		if (product.createdBy.toString() !== userId) {
-			return res.status(403).json({ message: 'Not authorized' });
-		}
 
 		const { name, productId, categories, brand, price, description, images, qrSettings } = req.body;
 
+		const oldProductId = product.productId;
+		let productIdChanged = false;
+
 		if (name) product.name = name;
-		if (productId) product.productId = productId;
+		if (productId && productId !== oldProductId) {
+			if (!PRODUCT_ID_REGEX.test(productId)) {
+				return res.status(400).json({ message: 'Product ID contains invalid characters.' });
+			}
+			product.productId = productId;
+			productIdChanged = true;
+		}
 		if (categories) product.categories = categories;
 		if (brand) product.brand = brand;
 		if (price !== undefined) product.price = price;
 		if (description !== undefined) product.description = description;
-		if (images) product.images = images;
 		if (qrSettings) product.qrSettings = { ...product.qrSettings, ...qrSettings };
+		
+		// IMAGE CLEANUP: Identify removed images
+		if (images) {
+			const oldImages = product.images || [];
+			const removedImages = oldImages.filter(img => !images.includes(img));
+			
+			// Best-effort non-blocking deletion
+			if (removedImages.length > 0) {
+				Promise.all(removedImages.map(img => s3Service.deleteFile(img)))
+					.catch(err => console.error('Failed to cleanup some images during product update:', err));
+			}
+			
+			product.images = images;
+		}
 
 		await product.save();
+
 		res.json({ message: 'Product updated.', product });
 	} catch (error: any) {
 		console.error('Update product error:', error);
@@ -154,17 +205,30 @@ export const updateProduct = async (req: Request, res: Response) => {
 	}
 };
 
-// DELETE /api/products/:id — Remove a catalogue product
+// DELETE /api/products/:productId — Remove a catalogue product
 export const deleteProduct = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
-		const product = await Product.findById(req.params.id);
+		const { productId } = req.params;
+
+		let product;
+		if (isValidObjectId(productId)) {
+			product = await Product.findOne({
+				$or: [{ _id: productId }, { productId }],
+				createdBy: userId,
+			});
+		} else {
+			product = await Product.findOne({ productId, createdBy: userId });
+		}
 
 		if (!product) {
 			return res.status(404).json({ message: 'Product not found' });
 		}
-		if (product.createdBy.toString() !== userId) {
-			return res.status(403).json({ message: 'Not authorized' });
+
+		// IMAGE CLEANUP: Delete all images associated with this product
+		if (product.images && product.images.length > 0) {
+			Promise.all(product.images.map(img => s3Service.deleteFile(img)))
+				.catch(err => console.error('Failed to cleanup images during product deletion:', err));
 		}
 
 		await product.deleteOne();

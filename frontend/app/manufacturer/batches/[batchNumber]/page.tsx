@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getBatch, getBatchQRData, downloadBatchPDF, getBatchScanDetails } from "@/api/batch.api";
+import { getBatch, getBatchQRData, downloadBatchPDF, getBatchScanDetails, recallBatch } from "@/api/batch.api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { updateProduct } from "@/api/product.api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useWeb3 } from "@/contexts/web3-context";
 import { Settings2, Save, ScanLine, FileText, CheckCircle2, History, AlertCircle, TrendingUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -31,7 +32,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function BatchDetailPage() {
-  const { id: batchId } = useParams() as { id: string };
+  const { batchNumber } = useParams() as { batchNumber: string };
   const router = useRouter();
 
   const [batch, setBatch] = useState<any>(null);
@@ -59,7 +60,7 @@ export default function BatchDetailPage() {
     if (!batch) return;
     try {
       setIsDownloading(true);
-      const blob = await downloadBatchPDF(batchId);
+      const blob = await downloadBatchPDF(batchNumber);
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement("a");
       link.href = url;
@@ -115,7 +116,7 @@ export default function BatchDetailPage() {
   };
 
   useEffect(() => {
-    if (!batchId) return;
+    if (!batchNumber) return;
 
     const loadData = async () => {
       if (fetchAbortRef.current) fetchAbortRef.current.abort();
@@ -125,15 +126,15 @@ export default function BatchDetailPage() {
       setLoading(true);
       try {
         const [batchRes, qrRes] = await Promise.all([
-          getBatch(batchId, controller.signal),
-          getBatchQRData(batchId, page, pageSize, controller.signal),
+          getBatch(batchNumber, controller.signal),
+          getBatchQRData(batchNumber, page, pageSize, controller.signal),
         ]);
         setBatch(batchRes.batch);
         setQrData(qrRes);
 
         // Fetch analytics in background or parallel
         setAnalyticsLoading(true);
-        getBatchScanDetails(batchId, controller.signal)
+        getBatchScanDetails(batchNumber, controller.signal)
           .then(res => setScanDetails(res))
           .catch(e => console.error("Analytics fetch failed", e))
           .finally(() => setAnalyticsLoading(false));
@@ -150,7 +151,37 @@ export default function BatchDetailPage() {
 
     loadData();
     return () => fetchAbortRef.current?.abort();
-  }, [batchId, page, pageSize]);
+  }, [batchNumber, page, pageSize]);
+
+  const { address: walletAddress } = useWeb3();
+
+  const handleRecall = async () => {
+    if (
+      !confirm(
+        `Are you sure you want to recall batch ${batch.batchNumber}? This action is irreversible on the blockchain.`
+      )
+    )
+      return;
+
+    if (!walletAddress) {
+      toast.error("Wallet not connected. Connect your wallet first.");
+      return;
+    }
+
+    try {
+      toast.loading("Recalling batch on chain...");
+      const { recallProductOnChain } = await import("@/api/web3-client");
+      await recallProductOnChain(batch.batchSalt, walletAddress);
+      await recallBatch(batch.batchNumber);
+
+      // Refresh data
+      const batchRes = await getBatch(batchNumber);
+      setBatch(batchRes.batch);
+      toast.success("Batch successfully recalled.");
+    } catch (err: any) {
+      toast.error(err.message || "Recall failed.");
+    }
+  };
 
   // Just standard client-side printing
   const handlePrint = () => {
@@ -502,7 +533,12 @@ export default function BatchDetailPage() {
                 <p className="text-xs text-muted-foreground leading-relaxed mb-4">
                   If this batch is compromised, initiating a recall will invalidate all related QR codes on public ledger.
                 </p>
-                <Button variant="destructive" className="w-full rounded-xl h-10 text-xs font-bold uppercase tracking-wider" disabled={batch.isRecalled}>
+                <Button 
+                  variant="destructive" 
+                  className="w-full rounded-xl h-10 text-xs font-bold uppercase tracking-wider" 
+                  disabled={batch.isRecalled}
+                  onClick={handleRecall}
+                >
                   {batch.isRecalled ? 'Already Recalled' : 'Emergency Recall'}
                 </Button>
               </Card>

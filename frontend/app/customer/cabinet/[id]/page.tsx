@@ -20,11 +20,8 @@ import {
   Activity,
   FileText,
   Plus,
-  X,
   CheckCircle2,
-  ExternalLink,
   Image as ImageIcon,
-  Fingerprint,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +33,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { format } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import {
   Popover,
   PopoverContent,
@@ -249,12 +247,7 @@ export default function MedicineDetailPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center p-20 text-muted-foreground">
-        <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-        <p className="font-bold tracking-tight">Syncing medication data...</p>
-      </div>
-    );
+    return <LoadingScreen message="Loading..." />;
   }
 
   if (!medicine) return null;

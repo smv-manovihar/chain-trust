@@ -43,7 +43,7 @@ export function NotificationBell() {
 
     if (isInitial) setIsLoading(true);
     try {
-      const data = await getNotifications(20, 0, controller.signal);
+      const data = await getNotifications(20, 0, undefined, controller.signal);
       setNotifications(data.notifications || []);
       setUnreadCount(data.unreadCount || 0);
     } catch (error: any) {

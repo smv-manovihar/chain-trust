@@ -43,6 +43,7 @@ import { navGroups as manufacturerNav } from "@/components/layout/manufacturer-s
 import { VideoScanner } from "@/components/verify/video-scanner";
 import { UploadScanner } from "@/components/verify/upload-scanner";
 import { useDevice } from "@/hooks/use-device";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 
 interface ScanResult {
   isValid: boolean;
@@ -466,21 +467,7 @@ function VerifyContent() {
 
       <main className="overflow-hidden relative flex-1 flex flex-col">
         {loading ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 z-10 animate-in fade-in zoom-in-95 duration-300">
-            <div className="relative h-24 w-24 mb-8">
-              <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
-              <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <ShieldCheck className="h-10 w-10 text-primary animate-pulse" />
-              </div>
-            </div>
-            <h3 className="text-2xl font-black tracking-tight mb-2 text-center">
-              Verifying Authenticity
-            </h3>
-            <p className="text-muted-foreground text-sm font-medium text-center">
-              Querying secure blockchain records...
-            </p>
-          </div>
+          <LoadingScreen message="Loading..." className="flex-1" />
         ) : !scanned ? (
           <div
             className={cn(

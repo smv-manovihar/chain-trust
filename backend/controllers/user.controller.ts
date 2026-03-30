@@ -157,10 +157,28 @@ export const getPersonalCabinet = async (req: Request, res: Response): Promise<v
 		const items = await CabinetItem.find(query)
 			.sort({ createdAt: -1 })
 			.skip((page - 1) * limit)
-			.limit(limit);
+			.limit(limit)
+			.lean();
+
+		// Enrich with live status if salt exists
+		const enrichedItems = await Promise.all(items.map(async (item: any) => {
+			if (item.salt && item.salt.includes(':')) {
+				const batchSalt = item.salt.split(':')[0];
+				const batch = await Batch.findOne({ batchSalt }).select('isRecalled scanCounts');
+				if (batch) {
+					const unitIndex = item.salt.split(':')[1];
+					return {
+						...item,
+						isRecalled: batch.isRecalled,
+						liveScanCount: batch.scanCounts?.get(String(unitIndex)) || 0
+					};
+				}
+			}
+			return item;
+		}));
 
 		res.json({ 
-			cabinet: items,
+			cabinet: enrichedItems,
 			pagination: {
 				total,
 				page,
@@ -178,13 +196,26 @@ export const getCabinetItem = async (req: Request, res: Response): Promise<void>
 	try {
 		const userId = (req as any).user.id;
 		const { id } = req.params;
-		const item = await CabinetItem.findOne({ userId, _id: id });
+		const item = await CabinetItem.findOne({ userId, _id: id }).lean();
 		
 		if (!item) {
 			res.status(404).json({ message: 'Cabinet item not found' });
 			return;
 		}
-		res.json({ item });
+
+		// Enrich with live status
+		let enrichedItem: any = { ...item };
+		if (item.salt && item.salt.includes(':')) {
+			const batchSalt = item.salt.split(':')[0];
+			const batch = await Batch.findOne({ batchSalt }).select('isRecalled scanCounts');
+			if (batch) {
+				const unitIndex = item.salt.split(':')[1];
+				enrichedItem.isRecalled = batch.isRecalled;
+				enrichedItem.liveScanCount = batch.scanCounts?.get(String(unitIndex)) || 0;
+			}
+		}
+
+		res.json({ item: enrichedItem });
 	} catch (err) {
 		console.error("Error getting cabinet item:", err);
 		res.status(500).json({ message: 'Server error' });

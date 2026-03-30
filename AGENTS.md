@@ -1,5 +1,12 @@
 # ChainTrust - System Context & Principles
 
+## Project Architecture
+ChainTrust is a multi-tier pharmaceutical supply chain verification platform:
+1. **Frontend (`/frontend`)**: A Next.js (React) application with Tailwind CSS. It serves two primary user roles: Customers (Consumers) and Manufacturers.
+2. **Backend (`/backend`)**: A Node.js and Express server that handles core business logic, authentication, and database interactions with MongoDB.
+3. **AI Service (`/ai-service`)**: A Python-based microservice (FastAPI) that powers the AI assistant. It manages chat sessions, medical knowledge retrieval, and executes situational tools.
+4. **Blockchain**: A decentralized ledger used as the immutable source of truth for batch salts and product authenticity. Handled via specialized APIs.
+
 ## UI/UX Principles
 1. **Contained Layout Design (Preference for No-Scroll):**
    - While not strictly enforced, applications and dashboards should aim to fit within the viewport height (`100vh` or `h-screen`) whenever possible for a superior UX.
@@ -23,9 +30,16 @@
    - **Button Collapse:** Universally understood actions (Delete, Refresh, Print, Export) should collapse to icons or compact versions on `sm` screens. Use `hidden sm:inline` for button text.
    - **Sticky Headers:** Application layouts should use the `useScrollDirection` hook to auto-hide the header on scroll-down and show it on scroll-up for mobile users.
    - **Grid Adaptability:** Use `grid-cols-1` or `grid-cols-2` on mobile, scaling to `md:grid-cols-3` or `lg:grid-cols-4` for dashboards.
-6. **"My Medicines" Rename:**
+7. **"My Medicines" Rename:**
    - Always refer to the user's saved medications as "My Medicines" instead of "Cabinet".
    - Local storage keys should use `my_medicines`.
+
+## Identification & Data Modeling
+1. **Primary Identifiers**: Use `productId` (SKU/Catalog ID) and `batchNumber` (Production Run ID) as the primary keys for all user-facing interactions, API routing, and business logic.
+2. **Technical vs. Business Unique Keys**: 
+   - While MongoDB uses `_id` for technical uniqueness at the document level, the system must enforce uniqueness for `productId` and `batchNumber` within the scope of a single user/company. 
+   - Overlapping IDs between different companies/users are acceptable at the database level, but the UI and API should always resolve them in the context of the authenticated session.
+3. **Consistency**: Avoid exposing or relying on `_id` in frontend URLs or human-readable communications. Always prioritize the business identifiers for unique identification.
 
 ## Frontend Context
 - **Framework:** Next.js (React) with Tailwind CSS.
@@ -45,5 +59,10 @@
   - **Unit Salts:** QR codes embed a unit index. The exact salt is deterministically derived via `SHA-256(batchSalt + "-" + unitIndex)`.
   - **Scan Tracking:** When a QR is scanned, the `/api/batches/verify-scan` endpoint checks the salt, increments a tracking counter in MongoDB for that specific unit, and returns the scan count to alert the consumer of potential counterfeits (e.g., >5 scans).
   - **S3/MinIO:** Used for decentralized-style or self-hosted image storage for product packaging. The backend is configured to automatically initialize MinIO buckets on first upload.
+
+## AI Service & Situational Awareness
+1. **Situational Tool (`get_view_data`)**: The AI agent uses the `get_view_data` tool to "see" what the user sees on their current page. This tool aggregates real-time data from MongoDB to mimic the frontend's state.
+2. **Synchronization Rule**: Any changes to the frontend's data-fetching logic (e.g., adding a new stat to a dashboard, changing a filter, or modifying a table's data source) MUST be mirrored in the `get_view_data` tool within the `ai-service`. This ensures the assistant remains context-aware and accurate.
+
 ## Documentation & Tutorials
 1. **Tutorial Updates**: AI agents MUST update the corresponding tutorial files in `ai-service/tutorials` whenever they make UI changes to the pages or components described in those tutorials. This ensures user-facing documentation remains synchronized with the latest UI enhancements.

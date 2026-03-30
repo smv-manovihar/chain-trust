@@ -38,7 +38,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
   return (
     <Link
-      href={`/manufacturer/products/${product._id}`}
+      href={`/manufacturer/products/${encodeURIComponent(product.productId)}`}
       className="block group h-full"
     >
       <Card className="h-full flex flex-col bg-card border-border/40 shadow-sm transition-all duration-300 hover:shadow-md hover:border-border overflow-hidden rounded-xl">

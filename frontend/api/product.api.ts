@@ -9,6 +9,7 @@ export interface ProductDto {
 	description?: string;
 	composition?: string;
 	images?: string[];
+	imageAccessLevel?: 'public' | 'verified_only' | 'internal_only';
 	customerVisibleImages?: number[];
 	qrSettings?: {
 		qrSize: number;
@@ -30,17 +31,17 @@ export const listProducts = async (params?: { search?: string; categories?: stri
 	return response.data;
 };
 
-export const getProduct = async (id: string, signal?: AbortSignal) => {
-	const response = await client.get(`/products/${id}`, { signal });
+export const getProduct = async (productId: string, signal?: AbortSignal) => {
+	const response = await client.get(`/products/${productId}`, { signal });
 	return response.data;
 };
 
-export const updateProduct = async (id: string, data: Partial<ProductDto>, signal?: AbortSignal) => {
-	const response = await client.put(`/products/${id}`, data, { signal });
+export const updateProduct = async (productId: string, data: Partial<ProductDto>, signal?: AbortSignal) => {
+	const response = await client.put(`/products/${productId}`, data, { signal });
 	return response.data;
 };
 
-export const deleteProduct = async (id: string, signal?: AbortSignal) => {
-	const response = await client.delete(`/products/${id}`, { signal });
+export const deleteProduct = async (productId: string, signal?: AbortSignal) => {
+	const response = await client.delete(`/products/${productId}`, { signal });
 	return response.data;
 };

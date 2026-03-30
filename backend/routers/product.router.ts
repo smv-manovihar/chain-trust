@@ -10,8 +10,8 @@ router.use(authenticateJWT, checkManufacturer);
 
 router.post('/', createProduct);
 router.get('/', listProducts);
-router.get('/:id', getProduct);
-router.put('/:id', updateProduct);
-router.delete('/:id', deleteProduct);
+router.get('/:productId', getProduct);
+router.put('/:productId', updateProduct);
+router.delete('/:productId', deleteProduct);
 
 export default router;

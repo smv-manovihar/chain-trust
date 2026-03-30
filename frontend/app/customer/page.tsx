@@ -21,6 +21,7 @@ import {
   ArrowRight,
   QrCode,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 import {
@@ -38,6 +39,7 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
@@ -117,6 +119,10 @@ export default function CustomerDashboard() {
     return qA - qB;
   });
 
+  if (isLoading || alertsLoading) {
+    return <LoadingScreen message="Loading..." />;
+  }
+
   return (
     <div className="space-y-8 lg:space-y-12 pb-12">
       {/* Welcome Banner */}
@@ -145,7 +151,7 @@ export default function CustomerDashboard() {
         {/* Safety Profile Hero (2 Columns) */}
         <div className="lg:col-span-2">
           <Card className="p-10 lg:p-16 border-border/40 bg-card/40 backdrop-blur-md rounded-[3rem] shadow-sm flex flex-col justify-center relative overflow-hidden group min-h-[450px] h-full">
-            <div className="absolute top-0 right-0 p-12 opacity-5 scale-150 rotate-12 group-hover:scale-175 transition-transform duration-1000">
+            <div className="absolute top-0 right-0 p-12 opacity-5 rotate-12 pointer-events-none transition-transform duration-1000 group-hover:scale-110">
               <ShieldCheck className="h-64 w-64 text-primary" />
             </div>
             <div className="relative">

@@ -14,7 +14,9 @@ import userRouter from './routers/user.router.js';
 import batchRouter from './routers/batch.router.js';
 import categoryRouter from './routers/category.router.js';
 import notificationRouter from './routers/notification.router.js';
+import analyticsRouter from './routers/analytics.router.js';
 import { startCronJobs } from './jobs/cron.js';
+import { initS3 } from './services/s3.service.js';
 
 // Initialize Express
 const app = express();
@@ -45,8 +47,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Request logging
-app.use((req, _res, next) => {
-	console.log(`${new Date().toISOString().replace('T', '-').replace('Z', '')} - ${req.method} ${req.url}`);
+app.use((req, res, next) => {
+	res.on('finish', () => {
+		console.log(`${new Date().toISOString().replace('T', '-').replace('Z', '')} - ${req.method} ${req.originalUrl} - ${res.statusCode}`);
+	});
 	next();
 });
 
@@ -77,6 +81,7 @@ app.use('/api/media', mediaRouter);
 app.use('/api/users', userRouter);
 app.use('/api/categories', categoryRouter);
 app.use('/api/notifications', notificationRouter);
+app.use('/api/analytics', analyticsRouter);
 
 // 404 handler
 app.use((_req, res) => {
@@ -92,6 +97,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // Start server
 const startServer = async () => {
 	await connectDB();
+	await initS3();
 	startCronJobs();
 
 	const server = app.listen(PORT, () => {
