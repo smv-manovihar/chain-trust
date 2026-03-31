@@ -4,30 +4,19 @@ import {
 	getUserById,
 	changeUserPassword,
 	updateUserDetails,
-	getPersonalCabinet,
-	getCabinetStats,
-	getRecentUserScans,
-	getCabinetItem,
-	addToCabinet,
-	updateCabinetItem,
-	removeFromCabinet
+	getNotificationPreferences,
+	updateNotificationPreferences
 } from '../controllers/user.controller.js';
 
 const router: RouterType = Router();
 
+// Profile & Account Management
 router.get('/:id', authenticate, getUserById);
 router.post('/change-password', authenticate, changeUserPassword);
 router.put('/update', authenticate, updateUserDetails);
 
-// Personal Cabinet stats
-router.get('/cabinet/stats', authenticate, getCabinetStats);
-router.get('/scans/recent', authenticate, getRecentUserScans);
-
-// Personal Cabinet CRUD
-router.get('/cabinet/list', authenticate, getPersonalCabinet);
-router.post('/cabinet/add', authenticate, addToCabinet);
-router.get('/cabinet/:id', authenticate, getCabinetItem);
-router.put('/cabinet/:id', authenticate, updateCabinetItem);
-router.delete('/cabinet/:id', authenticate, removeFromCabinet);
+// User Notifications
+router.get('/notifications/preferences', authenticate, getNotificationPreferences);
+router.put('/notifications/preferences', authenticate, updateNotificationPreferences);
 
 export default router;

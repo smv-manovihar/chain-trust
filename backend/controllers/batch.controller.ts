@@ -9,8 +9,9 @@ import geoip from 'geoip-lite';
 import requestIp from 'request-ip';
 import { calculateSuspiciousness } from '../utils/suspicious.util.js';
 import { getGeoLocation } from '../utils/geo.util.js';
-import { Notification } from '../models/notification.model.js';
+import Notification from '../models/notification.model.js';
 import CabinetItem from '../models/cabinet.model.js';
+import { resolveItem } from '../utils/identifier.util.js';
 
 const BATCH_NUMBER_REGEX = /^[a-zA-Z0-9\-_.]+$/;
 
@@ -156,6 +157,7 @@ export const listBatches = async (req: Request, res: Response) => {
 			matchQuery.$or = [
 				{ batchNumber: { $regex: search, $options: 'i' } },
 				{ productName: { $regex: search, $options: 'i' } },
+				{ productId: { $regex: search, $options: 'i' } },
 			];
 		}
 
@@ -194,17 +196,9 @@ export const listBatches = async (req: Request, res: Response) => {
 export const getBatch = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
-		const { batchNumber } = req.params;
+		const batchNumber = req.params.batchNumber as string;
 
-		let batch;
-		if (mongoose.isValidObjectId(batchNumber)) {
-			batch = await Batch.findOne({
-				$or: [{ _id: batchNumber }, { batchNumber }],
-				createdBy: userId,
-			}).populate('product');
-		} else {
-			batch = await Batch.findOne({ batchNumber, createdBy: userId }).populate('product');
-		}
+		const batch = await resolveItem(Batch, batchNumber, { createdBy: userId }, 'product');
 
 		if (!batch) {
 			return res.status(404).json({ message: 'Batch not found' });
@@ -220,17 +214,9 @@ export const getBatch = async (req: Request, res: Response) => {
 export const getBatchQRData = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
-		const { batchNumber } = req.params;
+		const batchNumber = req.params.batchNumber as string;
 
-		let batch;
-		if (mongoose.isValidObjectId(batchNumber)) {
-			batch = await Batch.findOne({
-				$or: [{ _id: batchNumber }, { batchNumber }],
-				createdBy: userId,
-			}).populate('product');
-		} else {
-			batch = await Batch.findOne({ batchNumber, createdBy: userId }).populate('product');
-		}
+		const batch = await resolveItem(Batch, batchNumber, { createdBy: userId }, 'product');
 
 		if (!batch) {
 			return res.status(404).json({ message: 'Batch not found' });
@@ -467,7 +453,7 @@ export const verifyScan = async (req: Request, res: Response) => {
 export const recallBatch = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
-		const { batchNumber } = req.params;
+		const batchNumber = req.params.batchNumber as string;
 
 		let batch: IBatch | null;
 		if (mongoose.isValidObjectId(batchNumber)) {
@@ -531,7 +517,7 @@ export const recallBatch = async (req: Request, res: Response) => {
 export const getBatchPDF = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
-		const { batchNumber } = req.params;
+		const batchNumber = req.params.batchNumber as string;
 
 		let batch;
 		if (mongoose.isValidObjectId(batchNumber)) {
@@ -573,7 +559,7 @@ export const getBatchPDF = async (req: Request, res: Response) => {
 export const getBatchScanDetails = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
-		const { batchNumber } = req.params;
+		const batchNumber = req.params.batchNumber as string;
 
 		// Verify batch ownership
 		let batch: IBatch | null;

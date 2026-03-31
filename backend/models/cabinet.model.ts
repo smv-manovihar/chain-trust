@@ -12,33 +12,37 @@ export interface INotificationOverride {
 }
 
 export interface ICabinetItem extends Document {
+	// 1. Identity & Linking
 	userId: Types.ObjectId;
 	name: string;
 	brand: string;
-	productId?: string;
-	batchNumber?: string;
-	medicineCode?: string;
+	isUserAdded: boolean;
+	batchId?: Types.ObjectId;     // Direct ref to verified Batch in DB
+	prescriptionIds: Types.ObjectId[]; // Links to central Prescription pool
+
+	// 2. Tracking (Business IDs)
+	productId?: string;           // SKU (For manual items, derived from name)
+	batchNumber?: string;         // Lot # (For verified items)
+	salt?: string;                // QR Salt (GUID:unitIndex:unitHash)
+	medicineCode?: string;        // Barcode/UPC
+
+	// 3. Medical Content
 	composition?: string;
 	expiryDate?: Date;
-	images?: string[];
-	salt?: string;
-	isUserAdded: boolean;
-
-	// Management fields
 	description?: string;
-	notes?: string;
+	images?: string[];
+
+	// 4. Dose & Usage
 	dosage?: string;
 	frequency?: string;
 	currentQuantity?: number;
 	totalQuantity?: number;
 	unit?: string;
+	notes?: string;
+
+	// 5. Notifications & Reminders
 	reminderTimes?: IReminderTime[];
 	notificationOverrides?: INotificationOverride;
-	prescriptions: {
-		url: string;
-		label: string;
-		uploadedAt: Date;
-	}[];
 
 	createdAt: Date;
 	updatedAt: Date;
@@ -46,26 +50,35 @@ export interface ICabinetItem extends Document {
 
 const cabinetItemSchema = new Schema<ICabinetItem>(
 	{
+		// 1. Identity & Linking
 		userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
 		name: { type: String, required: true },
 		brand: { type: String, required: true },
+		isUserAdded: { type: Boolean, default: false },
+		batchId: { type: Schema.Types.ObjectId, ref: 'Batch' },
+		prescriptionIds: [{ type: Schema.Types.ObjectId, ref: 'Prescription' }],
+
+		// 2. Tracking (Business IDs)
 		productId: { type: String },
 		batchNumber: { type: String },
+		salt: { type: String },
 		medicineCode: { type: String },
+
+		// 3. Medical Content
 		composition: { type: String, trim: true },
 		expiryDate: { type: Date },
-		images: { type: [String], default: [] },
-		salt: { type: String },
-		isUserAdded: { type: Boolean, default: false },
-
-		// Management fields
 		description: { type: String, trim: true },
-		notes: { type: String, trim: true },
+		images: { type: [String], default: [] },
+
+		// 4. Dose & Usage
 		dosage: { type: String, trim: true },
 		frequency: { type: String, trim: true },
 		currentQuantity: { type: Number, default: 30 },
 		totalQuantity: { type: Number, default: 30 },
 		unit: { type: String, default: 'pills' },
+		notes: { type: String, trim: true },
+
+		// 5. Notifications & Reminders
 		reminderTimes: [
 			{
 				time: { type: Date, required: true },
@@ -90,13 +103,6 @@ const cabinetItemSchema = new Schema<ICabinetItem>(
 				email: { type: Boolean },
 			},
 		},
-		prescriptions: [
-			{
-				url: { type: String, required: true },
-				label: { type: String, required: true },
-				uploadedAt: { type: Date, default: Date.now },
-			},
-		],
 	},
 	{
 		timestamps: true,
@@ -105,7 +111,11 @@ const cabinetItemSchema = new Schema<ICabinetItem>(
 );
 
 // Indexes
-cabinetItemSchema.index({ userId: 1, name: 1, isUserAdded: 1 });
-cabinetItemSchema.index({ userId: 1, productId: 1, isUserAdded: 1 });
+// Optimized for: (1) Uniqueness per user for manual items using name-derived productId
+// (2) Uniqueness per user for verified items using SKU (productId)
+cabinetItemSchema.index({ userId: 1, productId: 1, isUserAdded: 1 }, { unique: true });
+cabinetItemSchema.index({ salt: 1 });
 
-export default model<ICabinetItem>('CabinetItem', cabinetItemSchema);
+const CabinetItem = model<ICabinetItem>('CabinetItem', cabinetItemSchema);
+
+export default CabinetItem;

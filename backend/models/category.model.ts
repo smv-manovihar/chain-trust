@@ -34,4 +34,6 @@ const categorySchema = new Schema<ICategory>(
 // Same manufacturer can't have duplicate category names
 categorySchema.index({ name: 1, createdBy: 1 }, { unique: true });
 
-export default mongoose.model<ICategory>('Category', categorySchema);
+const Category = mongoose.model<ICategory>('Category', categorySchema);
+
+export default Category;

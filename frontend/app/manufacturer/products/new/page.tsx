@@ -197,9 +197,6 @@ export default function NewProductWizard() {
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Add New Product</h1>
-          <p className="text-sm text-muted-foreground mt-1 truncate">
-            {walletAddress.substring(0, 6)}...{walletAddress.substring(38)} • Connected
-          </p>
         </div>
         <div className="text-right hidden sm:block">
           <p className="text-xs text-muted-foreground">Step</p>

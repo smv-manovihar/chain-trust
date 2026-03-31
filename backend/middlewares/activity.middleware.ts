@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import User from '../models/user.model.js';
-import RefreshToken from '../models/refreshToken.model.js';
+import RefreshToken from '../models/refresh-token.model.js';
 import {
 	shouldExtendRefreshWindow,
 	generateAccessAndRefreshTokens,

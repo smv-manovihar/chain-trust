@@ -150,10 +150,11 @@ export function CategoryManagementDialog({
           <Button
             variant="outline"
             size="sm"
-            className="gap-2 rounded-full h-12 px-6"
+            className="flex-1 sm:flex-none gap-2 rounded-xl h-10 px-4 sm:px-6"
           >
             <Settings2 className="h-4 w-4" />
-            Manage Categories
+            <span className="hidden sm:inline">Manage Categories</span>
+            <span className="sm:hidden">Categories</span>
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col p-0 overflow-hidden">

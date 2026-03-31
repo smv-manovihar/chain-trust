@@ -104,10 +104,32 @@ export interface BatchData {
     productName: string;
     brand: string;
     batchNumber: string;
-    batchSalt: string;
+    batchSalt: string;       // Original hex string
     manufactureDate: number; // Unix timestamp
     expiryDate: number;      // Unix timestamp (0 if none)
     quantity: number;
+}
+
+/**
+ * Ensures a string is formatted as a 32-byte hex for the contract.
+ */
+const formatBytes32 = (hex: string): string => {
+    if (!web3) return hex;
+    const cleanHex = hex.startsWith('0x') ? hex : `0x${hex}`;
+    return web3.utils.padRight(cleanHex, 64);
+};
+
+/**
+ * Decentralized Unit Integrity: Derive the unit hash locally.
+ * Formula: SHA-256(batchSalt + "-" + unitIndex)
+ */
+export async function deriveUnitHash(batchSalt: string, unitIndex: number): Promise<string> {
+    const rawData = `${batchSalt}-${unitIndex}`;
+    const encoder = new TextEncoder();
+    const data = encoder.encode(rawData);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 // Register Batch via Smart Contract
@@ -120,7 +142,7 @@ export const registerBatchOnChain = async (batchData: BatchData, deployerAccount
         batchData.productName,
         batchData.brand,
         batchData.batchNumber,
-        batchData.batchSalt,
+        formatBytes32(batchData.batchSalt),
         batchData.manufactureDate,
         batchData.expiryDate,
         batchData.quantity
@@ -141,8 +163,8 @@ export async function verifyOnBlockchain(batchSalt: string, signal?: AbortSignal
     if (signal?.aborted) throw new Error('AbortError');
 
       try {
-        // Query the new smart contract method using the batchSalt
-        const batch: any = await contract.methods.getBatch(batchSalt).call();
+        // Query using bytes32 salt
+        const batch: any = await contract.methods.getBatch(formatBytes32(batchSalt)).call();
 
         if (signal?.aborted) throw new Error('AbortError');
 
@@ -204,7 +226,7 @@ export async function recallProductOnChain(batchSalt: string, account: string): 
     throw new Error('Web3 Contract instance not found');
   }
 
-  return await contract.methods.recallBatch(batchSalt).send({
+  return await contract.methods.recallBatch(formatBytes32(batchSalt)).send({
     from: account,
     gas: "500000"
   });

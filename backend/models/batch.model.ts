@@ -119,4 +119,6 @@ const batchSchema = new Schema<IBatch>(
 // Compound unique index: same manufacturer shouldn't create duplicate batch numbers
 batchSchema.index({ batchNumber: 1, createdBy: 1 }, { unique: true });
 
-export default mongoose.model<IBatch>('Batch', batchSchema);
+const Batch = mongoose.model<IBatch>('Batch', batchSchema);
+
+export default Batch;

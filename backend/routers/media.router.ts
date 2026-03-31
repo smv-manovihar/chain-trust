@@ -106,7 +106,9 @@ router.get('/customer-uploads/*key', protect, async (req, res) => {
 		// if we ensure upload prefix is always user-specific. 
 		// For now, let's check CabinetItem to be robust.
 		const CabinetItem = (await import('../models/cabinet.model.js')).default;
-		const hasAccess = await CabinetItem.findOne({
+		const Prescription = (await import('../models/prescription.model.js')).default;
+		
+		const hasAccessInCabinet = await CabinetItem.findOne({
 			userId,
 			$or: [
 				{ images: { $regex: fullKey } },
@@ -114,7 +116,12 @@ router.get('/customer-uploads/*key', protect, async (req, res) => {
 			]
 		});
 
-		if (!hasAccess) {
+		const hasAccessInPool = await Prescription.findOne({
+			userId,
+			url: { $regex: fullKey }
+		});
+
+		if (!hasAccessInCabinet && !hasAccessInPool) {
 			return res.status(403).json({ message: 'Access denied to this file' });
 		}
 

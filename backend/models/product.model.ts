@@ -93,4 +93,6 @@ const productSchema = new Schema<IProduct>(
 // Same manufacturer can't have duplicate product IDs
 productSchema.index({ productId: 1, createdBy: 1 }, { unique: true });
 
-export default mongoose.model<IProduct>('Product', productSchema);
+const Product = mongoose.model<IProduct>('Product', productSchema);
+
+export default Product;

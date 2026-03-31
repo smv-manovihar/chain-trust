@@ -244,9 +244,9 @@ export default function BatchesPage() {
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Batches</h1>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <Badge variant="secondary" className="font-normal border-primary/20 bg-primary/10 text-primary">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Batches</h1>
+          <div className="flex flex-wrap items-center gap-2 mt-1 sm:mt-2">
+            <Badge variant="secondary" className="font-normal border-primary/20 bg-primary/10 text-primary h-5 text-[10px]">
               <Boxes className="w-3 h-3 mr-1.5 inline-block" />
               {batches.filter((b) => !b.isRecalled).length} Active
             </Badge>
@@ -274,11 +274,11 @@ export default function BatchesPage() {
           </Button>
           <Button
             asChild
-            className="flex-1 sm:flex-none gap-2"
+            className="flex-1 sm:flex-none gap-2 rounded-xl h-10 px-4"
           >
             <Link href="/manufacturer/batches/new">
               <Plus className="h-4 w-4" />
-              Create Batch
+              <span className="sm:inline">Create Batch</span>
             </Link>
           </Button>
         </div>

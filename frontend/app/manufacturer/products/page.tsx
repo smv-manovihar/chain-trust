@@ -126,19 +126,19 @@ export default function ProductsPage() {
   return (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-700 pb-20">
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 px-1">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
+        <div className="w-full sm:w-auto">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-left">
             Products
           </h1>
-          <div className="flex items-center gap-3 mt-3">
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 h-5">
               <Package className="w-3 h-3 text-primary" />
               <span className="text-[10px] font-bold tracking-tight text-primary">
                 {products.length} Assets
               </span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20">
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 h-5">
               <LayoutGrid className="w-3 h-3 text-blue-600" />
               <span className="text-[10px] font-bold tracking-tight text-blue-600">
                 {products.length > 0
@@ -149,48 +149,52 @@ export default function ProductsPage() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             size="icon"
             onClick={fetchProducts}
-            className="rounded-full h-12 w-12 border-primary/20 hover:bg-primary/5 transition-all shadow-sm"
+            className="h-10 w-10 border-primary/20 hover:bg-primary/5 transition-all shadow-sm shrink-0 rounded-xl"
           >
             <RefreshCw
-              className={cn("h-5 w-5 text-primary", loading && "animate-spin")}
+              className={cn("h-4 w-4 text-primary", loading && "animate-spin")}
             />
           </Button>
-          <CategoryManagementDialog onCategoriesChange={fetchProducts} />
-          <Button
-            asChild
-            className="flex-1 sm:flex-none h-12 px-6 rounded-full gap-2 shadow-xl shadow-primary/20 font-bold"
-          >
-            <Link href="/manufacturer/products/new">
-              <Plus className="h-4 w-4" />
-              Add Product
-            </Link>
-          </Button>
+          <div className="flex-1 sm:flex-none flex items-center gap-2">
+            <CategoryManagementDialog onCategoriesChange={fetchProducts} />
+            <Button
+              asChild
+              className="flex-1 sm:flex-none h-10 px-4 sm:px-6 rounded-xl gap-2 font-bold shadow-lg shadow-primary/20"
+            >
+              <Link href="/manufacturer/products/new">
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Add Product</span>
+                <span className="sm:hidden">Add</span>
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="flex gap-4 px-1 sticky top-4 z-30">
+      <div className="flex flex-col sm:flex-row gap-3 px-1 sticky top-4 z-30">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by name or ID..."
-            className="pl-11 h-11 text-sm bg-background/80 backdrop-blur-3xl border-border/40 rounded-full focus-visible:ring-primary/20 shadow-sm"
+            className="pl-11 h-11 text-sm bg-background/80 backdrop-blur-3xl border-border/40 rounded-xl focus-visible:ring-primary/20 shadow-sm"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-
-        <CategoryFilter
-          selectedCategories={selectedCategories}
-          onCategoryChange={setSelectedCategories}
-          canManage={true}
-          onCategoriesChange={fetchProducts}
-          className="rounded-full h-11 px-6 border-border/40 bg-background/80 backdrop-blur-3xl shadow-sm"
-        />
+        <div className="flex items-center gap-2 sm:w-auto">
+          <CategoryFilter
+            selectedCategories={selectedCategories}
+            onCategoryChange={setSelectedCategories}
+            canManage={true}
+            onCategoriesChange={fetchProducts}
+            className="flex-1 sm:flex-none rounded-xl h-11 px-6 border-border/40 bg-background/80 backdrop-blur-3xl shadow-sm"
+          />
+        </div>
       </div>
 
       {/* Inventory Grid */}

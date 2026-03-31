@@ -56,4 +56,6 @@ const alertSchema = new Schema<IAlert>(
 alertSchema.index({ createdBy: 1, isRead: 1 });
 alertSchema.index({ type: 1 });
 
-export const Alert = mongoose.model<IAlert>('Alert', alertSchema);
+const Alert = mongoose.model<IAlert>('Alert', alertSchema);
+
+export default Alert;

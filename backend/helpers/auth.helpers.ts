@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { Request, Response } from 'express';
 import User from '../models/user.model.js';
-import RefreshToken, { IRefreshToken } from '../models/refreshToken.model.js';
+import RefreshToken, { IRefreshToken } from '../models/refresh-token.model.js';
 import {
 	JWT_SECRET,
 	JWT_ACCESS_EXPIRATION,

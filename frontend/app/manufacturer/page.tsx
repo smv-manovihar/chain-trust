@@ -140,27 +140,6 @@ export default function ManufacturerDashboard() {
             Here's what's happening across your company today.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            className="rounded-full border-primary/20 hover:bg-primary/5 px-6"
-            asChild
-          >
-            <Link href="/manufacturer/analytics">
-              <Bell className="mr-2 h-4 w-4" />
-              View Alerts
-            </Link>
-          </Button>
-          <Button
-            className="rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 px-6 font-bold"
-            asChild
-          >
-            <Link href="/manufacturer/batches/new">
-              <Plus className="mr-2 h-4 w-4" />
-              New Batch
-            </Link>
-          </Button>
-        </div>
       </div>
 
       {/* Bento KPI Grid */}

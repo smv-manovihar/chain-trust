@@ -9,8 +9,8 @@ contract ChainTrust {
     
     // Custom Errors for gas efficiency
     error NotAuthorized(address caller);
-    error BatchAlreadyExists(string batchSalt);
-    error BatchNotFound(string batchSalt);
+    error BatchAlreadyExists(bytes32 batchSalt);
+    error BatchNotFound(bytes32 batchSalt);
     error InvalidInput(string parameter);
     error UnauthorizedManufacturer(address manufacturer);
 
@@ -19,7 +19,7 @@ contract ChainTrust {
         string productName;     // Core metadata for offline verification
         string brand;           // Core metadata for offline verification
         string batchNumber;     // Manufacturer's batch identifier
-        string batchSalt;       // Root salt for unit-level verification
+        bytes32 batchSalt;      // Root salt (converted to bytes32 for gas)
         uint256 manufactureDate;
         uint256 expiryDate;
         uint32 quantity;        // Total units in this batch
@@ -35,10 +35,10 @@ contract ChainTrust {
     mapping(address => bool) public isManufacturer;
 
     // batchSalt -> Batch data
-    mapping(string => Batch) public batches;
+    mapping(bytes32 => Batch) public batches;
 
-    event BatchRegistered(string indexed batchSalt, string productId, string batchNumber, address manufacturer);
-    event BatchRecalled(string indexed batchSalt, address manufacturer);
+    event BatchRegistered(bytes32 indexed batchSalt, string productId, string batchNumber, address manufacturer);
+    event BatchRecalled(bytes32 indexed batchSalt, address manufacturer);
     event RoleGranted(address indexed account, string role);
     event RoleRevoked(address indexed account, string role);
 
@@ -73,20 +73,20 @@ contract ChainTrust {
 
     /**
      * @dev Register a new production batch on-chain.
-     * Stores essential metadata to allow verification even if the database is offline.
+     * Includes physical identifiers for backend-independent matching.
      */
     function registerBatch(
-        string memory _productId,
-        string memory _productName,
-        string memory _brand,
-        string memory _batchNumber,
-        string memory _batchSalt,
+        string calldata _productId,
+        string calldata _productName,
+        string calldata _brand,
+        string calldata _batchNumber,
+        bytes32 _batchSalt,
         uint256 _manufactureDate,
         uint256 _expiryDate,
         uint32 _quantity
     ) external onlyManufacturer {
         if (batches[_batchSalt].exists) revert BatchAlreadyExists(_batchSalt);
-        if (bytes(_batchSalt).length == 0) revert InvalidInput("batchSalt");
+        if (_batchSalt == 0) revert InvalidInput("batchSalt");
         if (bytes(_productId).length == 0) revert InvalidInput("productId");
         
         batches[_batchSalt] = Batch({
@@ -111,7 +111,7 @@ contract ChainTrust {
      * @dev Flag a batch as recalled.
      * Only the original manufacturer or the contract owner can recall.
      */
-    function recallBatch(string calldata _batchSalt) external {
+    function recallBatch(bytes32 _batchSalt) external {
         if (!batches[_batchSalt].exists) revert BatchNotFound(_batchSalt);
         
         // Authorization check
@@ -126,7 +126,7 @@ contract ChainTrust {
     /**
      * @dev Get full batch data for verification.
      */
-    function getBatch(string calldata _batchSalt) external view returns (Batch memory) {
+    function getBatch(bytes32 _batchSalt) external view returns (Batch memory) {
         if (!batches[_batchSalt].exists) revert BatchNotFound(_batchSalt);
         return batches[_batchSalt];
     }

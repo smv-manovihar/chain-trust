@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { verifyScan } from "@/api/batch.api";
 import { addToCabinet } from "@/api/customer.api";
-import { verifyOnBlockchain } from "@/api/web3-client";
+import { verifyOnBlockchain, deriveUnitHash } from "@/api/web3-client";
 import { getVisitorId } from "@/lib/visitor";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { cn } from "@/lib/utils";
@@ -302,18 +302,29 @@ function VerifyContent() {
     setError("");
 
     try {
-      const batchSalt = saltToVerify.includes(":")
-        ? saltToVerify.split(":")[0]
-        : saltToVerify;
-      const unitIndexStr = saltToVerify.includes(":")
-        ? saltToVerify.split(":")[1]
-        : "0";
+      // 1. Extract 3-part salt format: batchSalt : unitIndex : unitHash
+      const parts = saltToVerify.split(':');
+      const batchSalt = parts[0];
+      const unitIndexStr = parts[1] || '0';
+      const providedUnitHash = parts[2];
       const unitIndex = parseInt(unitIndexStr, 10);
 
+      // 2. Cryptographic Integrity Check (100% Client-side)
+      // This prevents someone from simply taking a valid batch ID and changing the unit index manually.
+      if (providedUnitHash) {
+          const expectedHash = await deriveUnitHash(batchSalt, unitIndex);
+          if (providedUnitHash !== expectedHash) {
+              console.warn(`[Security] QR Integrity check failed for batch ${batchSalt} unit ${unitIndex}`);
+              throw new Error("Tampered QR Code: Cryptographic integrity check failed.");
+          }
+      }
+
+      // 3. Blockchain Verification (Source of Truth)
       const blockchainResult = await verifyOnBlockchain(
         batchSalt,
         controller.signal,
       );
+      
       if (!blockchainResult.isValid || !blockchainResult.record) {
         throw new Error(
           blockchainResult.warnings?.[0] ||
@@ -353,6 +364,7 @@ function VerifyContent() {
           controller.signal,
         );
         if (result.isValid && result.product) {
+          // Enriched content from DB
           finalProduct = { ...finalProduct, ...result.product };
           finalStats = {
             count: result.scanCount || 1,
@@ -366,6 +378,9 @@ function VerifyContent() {
       } catch (err: any) {
         if (err.name === "AbortError") throw err;
         console.warn("DB Metadata unavailable, using blockchain data.");
+        toast.info("Database offline. Showing verified blockchain records only.", {
+            description: "Some rich media like product images may not be available."
+        });
       }
 
       setProduct(finalProduct);

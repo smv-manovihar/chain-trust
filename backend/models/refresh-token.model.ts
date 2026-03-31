@@ -57,4 +57,6 @@ refreshTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 refreshTokenSchema.index({ userId: 1, 'deviceInfo.deviceId': 1 });
 refreshTokenSchema.index({ isActive: 1 });
 
-export default model<IRefreshToken>('RefreshToken', refreshTokenSchema);
+const RefreshToken = model<IRefreshToken>('RefreshToken', refreshTokenSchema);
+
+export default RefreshToken;

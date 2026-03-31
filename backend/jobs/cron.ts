@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import CabinetItem from '../models/cabinet.model.js';
-import { Notification } from '../models/notification.model.js';
+import Notification from '../models/notification.model.js';
 import User from '../models/user.model.js';
 import { sendExpiryAlert, sendDoseReminder } from '../utils/email.utils.js';
 

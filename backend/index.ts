@@ -15,6 +15,7 @@ import batchRouter from './routers/batch.router.js';
 import categoryRouter from './routers/category.router.js';
 import notificationRouter from './routers/notification.router.js';
 import analyticsRouter from './routers/analytics.router.js';
+import cabinetRouter from './routers/cabinet.router.js';
 import { startCronJobs } from './jobs/cron.js';
 import { initS3 } from './services/s3.service.js';
 
@@ -82,6 +83,7 @@ app.use('/api/users', userRouter);
 app.use('/api/categories', categoryRouter);
 app.use('/api/notifications', notificationRouter);
 app.use('/api/analytics', analyticsRouter);
+app.use('/api/cabinet', cabinetRouter);
 
 // 404 handler
 app.use((_req, res) => {

@@ -216,8 +216,8 @@ export default function AnalyticsPage() {
   return (
     <div className="flex flex-col min-h-full gap-8 pb-12 overflow-y-auto pr-1 custom-scrollbar">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 sticky top-0 z-20 bg-background/95 backdrop-blur-sm py-2">
-        <h1 className="text-2xl sm:text-4xl font-black tracking-tighter text-foreground leading-none">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 sticky top-0 z-20 bg-background/95 backdrop-blur-sm py-4 border-b border-transparent data-[scrolled=true]:border-border/40 transition-all px-1">
+        <h1 className="text-2xl sm:text-3xl font-black tracking-tighter text-foreground leading-none">
           Analytics
         </h1>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">

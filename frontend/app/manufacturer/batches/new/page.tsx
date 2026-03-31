@@ -286,10 +286,6 @@ export default function CreateBatchWizard() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             Create New Batch
           </h1>
-          <p className="text-sm text-muted-foreground mt-1 truncate">
-            {walletAddress.substring(0, 6)}...{walletAddress.substring(38)} •
-            Connected
-          </p>
         </div>
         <div className="text-right hidden sm:block">
           <p className="text-xs text-muted-foreground">Step</p>

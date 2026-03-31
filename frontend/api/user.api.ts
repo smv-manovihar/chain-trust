@@ -11,7 +11,7 @@ export interface UserProfileUpdate {
 }
 
 export const updateProfile = async (data: UserProfileUpdate, signal?: AbortSignal) => {
-  const response = await client.put("/users/profile", data, { signal });
+  const response = await client.put("/users/update", data, { signal });
   return response.data;
 };
 

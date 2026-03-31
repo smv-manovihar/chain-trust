@@ -6,4 +6,3 @@ export * from './product.api';
 export * from './customer.api';
 export * from './category.api';
 export * from './user.api';
-export * from './alert.api';

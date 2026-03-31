@@ -207,20 +207,20 @@ function ScanAnalysisContent() {
   return (
     <div className="space-y-10 animate-in fade-in duration-700 pb-16">
       {/* Header */}
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
         <Link
           href="/manufacturer/analytics"
-          className="flex items-center gap-2 text-[11px] tracking-tight text-muted-foreground hover:text-primary transition-colors group"
+          className="flex items-center gap-2 text-[10px] sm:text-[11px] font-bold tracking-tight text-muted-foreground hover:text-primary transition-colors group px-1"
         >
           <ArrowLeft className="h-3 w-3 group-hover:-translate-x-1 transition-transform" />
           Back to Analytics
         </Link>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
           <div>
-            <h1 className="text-3xl sm:text-4xl tracking-tighter leading-none">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tighter leading-none">
               Scan Analysis
             </h1>
-            <p className="text-muted-foreground text-sm font-medium mt-2">
+            <p className="text-muted-foreground text-xs sm:text-sm font-medium mt-1.5 sm:mt-2">
               Unit-level tracking and geographic distribution analysis.
             </p>
           </div>

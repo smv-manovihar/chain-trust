@@ -22,6 +22,7 @@ import {
   Plus,
   CheckCircle2,
   Image as ImageIcon,
+  Eye,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +40,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { PrescriptionSelector } from "@/components/cabinet/prescription-selector";
+import { DocumentViewerDialog } from "@/components/common/document-viewer";
 
 export default function MedicineDetailPage() {
   const { id } = useParams() as { id: string };
@@ -60,10 +63,10 @@ export default function MedicineDetailPage() {
     totalQuantity: 0,
     reminderTimes: [] as string[],
     prescriptions: [] as { url: string; label: string; uploadedAt: string }[],
+    prescriptionIds: [] as string[],
   });
-  const [isUploading, setIsUploading] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; label: string } | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const fetchAbortRef = useRef<AbortController | null>(null);
@@ -92,7 +95,8 @@ export default function MedicineDetailPage() {
           currentQuantity: item.currentQuantity || 0,
           totalQuantity: item.totalQuantity || 0,
           reminderTimes: item.reminderTimes || [],
-          prescriptions: item.prescriptions || [],
+          prescriptions: (item.prescriptions || []) as { url: string; label: string; uploadedAt: string }[],
+          prescriptionIds: item.prescriptionIds || [],
         });
       } catch (err: any) {
         if (err.name === 'AbortError') return;
@@ -175,27 +179,12 @@ export default function MedicineDetailPage() {
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    setIsUploading(true);
-    try {
-      const urls = await uploadImages(Array.from(files));
-      const newPrescriptions = urls.map((url, i) => ({
-        url,
-        label: files[i].name.split('.')[0], 
-        uploadedAt: new Date().toISOString()
-      }));
-
-      const updatedPrescriptions = [...formData.prescriptions, ...newPrescriptions];
-      await handleSave({ prescriptions: updatedPrescriptions });
-    } catch (error) {
-      toast.error("Failed to upload document.");
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+  const handlePrescriptionChange = async (newIds: string[]) => {
+    setFormData(prev => ({ ...prev, prescriptionIds: newIds }));
+    // We don't save immediately here to match the "Sync Schedule" pattern of the page,
+    // or should we? The page seems to have a "Sync Schedule" button for most things.
+    // However, image uploads save immediately. 
+    // Let's stick to the "Sync Schedule" pattern for consistency with the form fields.
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -216,9 +205,14 @@ export default function MedicineDetailPage() {
     }
   };
 
-  const removePrescription = async (url: string) => {
+  const removePrescription = (url: string) => {
     const updated = formData.prescriptions.filter(p => p.url !== url);
-    await handleSave({ prescriptions: updated });
+    const updatedIds = medicine?.prescriptionIds?.filter((id: string, idx: number) => medicine.prescriptions?.[idx]?.url !== url);
+    setFormData(prev => ({ 
+      ...prev, 
+      prescriptions: updated,
+      prescriptionIds: updatedIds || []
+    }));
   };
 
   const removeImage = async (url: string) => {
@@ -510,14 +504,6 @@ export default function MedicineDetailPage() {
 
             <input 
               type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept=".pdf,image/*"
-              onChange={handleFileUpload}
-              multiple
-            />
-            <input 
-              type="file" 
               ref={imageInputRef} 
               className="hidden" 
               accept="image/*"
@@ -527,24 +513,10 @@ export default function MedicineDetailPage() {
 
             {/* Prescriptions & Documents Section */}
             <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <div className="space-y-1">
-                  <h3 className="text-lg font-black flex items-center gap-3">
-                    <FileText className="h-6 w-6 text-primary" />
-                    Medical Documents
-                  </h3>
-                  <p className="text-xs text-muted-foreground font-medium">Store your prescriptions and clinical notes securely.</p>
-                </div>
-                <Button 
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  variant="outline"
-                  className="rounded-full px-6 border-primary/20 hover:bg-primary/5 gap-2 h-10 font-bold text-xs border-2"
-                >
-                  {isUploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-                  Add Document
-                </Button>
-              </div>
+              <PrescriptionSelector 
+                selectedIds={(formData as any).prescriptionIds || []}
+                onChange={handlePrescriptionChange}
+              />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {formData.prescriptions.map((p, idx) => (
@@ -559,10 +531,13 @@ export default function MedicineDetailPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover/doc:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" asChild className="h-8 w-8 rounded-full hover:bg-primary/10 text-primary">
-                        <a href={p.url} target="_blank" rel="noopener noreferrer">
-                           <Activity className="h-3.5 w-3.5" />
-                        </a>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 rounded-full hover:bg-primary/10 text-primary"
+                        onClick={() => setPreviewDoc({ url: p.url, label: p.label })}
+                      >
+                         <Eye className="h-3.5 w-3.5" />
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => removePrescription(p.url)} className="h-8 w-8 rounded-full hover:bg-red-50 text-red-500">
                         <Trash2 className="h-3.5 w-3.5" />
@@ -639,6 +614,12 @@ export default function MedicineDetailPage() {
               />
             </div>
           </Card>
+
+          <DocumentViewerDialog 
+            open={!!previewDoc} 
+            onOpenChange={(open) => !open && setPreviewDoc(null)} 
+            document={previewDoc} 
+          />
 
           <Card className="p-6 rounded-[2rem] border-emerald-500/10 bg-emerald-500/[0.02] flex items-start gap-4">
              <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-600">

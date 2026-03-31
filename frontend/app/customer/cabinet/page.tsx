@@ -19,6 +19,7 @@ import {
   Trash2,
   ExternalLink,
   ShieldAlert,
+  QrCode,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -154,13 +155,14 @@ export default function MyMedicinesPage() {
             <div className="flex items-center gap-2 sm:gap-3">
               <AddManualMedicineDialog onSuccess={fetchCabinet} />
               <Button
-                className="flex-1 sm:flex-none rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 font-bold h-10 sm:h-12 px-4 sm:px-6"
+                variant="outline"
+                className="flex-1 sm:flex-none rounded-full border-primary/20 hover:bg-primary/5 font-bold h-10 sm:h-12 px-4 sm:px-6"
                 asChild
               >
                 <Link href="/verify">
-                  <Plus className="mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Verify New Medicine</span>
-                  <span className="sm:hidden text-xs">Verify New</span>
+                  <QrCode className="mr-2 h-4 w-4 text-primary" />
+                  <span className="hidden sm:inline">Verify Medicine</span>
+                  <span className="sm:hidden text-xs">Verify</span>
                 </Link>
               </Button>
             </div>
@@ -207,6 +209,11 @@ export default function MyMedicinesPage() {
             <Calendar className="h-6 w-6 text-primary" />
             Medication List
           </h2>
+          <Button variant="ghost" size="sm" asChild className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground hover:text-primary transition-colors">
+            <Link href="/customer/prescriptions" className="flex items-center gap-2">
+               View All Prescriptions <ChevronRight className="h-3 w-3" />
+            </Link>
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 sm:gap-8">

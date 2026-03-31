@@ -131,10 +131,10 @@ export default function ManufacturerSettingsPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-8">
       <div className="px-1">
-        <h1 className="text-3xl sm:text-4xl font-black tracking-tighter leading-none text-foreground">
+        <h1 className="text-2xl sm:text-3xl font-black tracking-tighter leading-none text-foreground">
           My Account
         </h1>
-        <p className="text-muted-foreground text-sm font-medium mt-2 italic px-1">
+        <p className="text-muted-foreground text-xs sm:text-sm font-medium mt-1.5 sm:mt-2 italic px-1">
           Configure your corporate identity, security protocols, and blockchain
           connectivity.
         </p>

@@ -66,9 +66,6 @@ export const inviteEmployee = async (req: Request, res: Response): Promise<void>
 
 		await user.save();
 
-		// Update company employees list
-		company.employees.push(user._id);
-		await company.save();
 
 		// 5. Send Invite Email (NO PASSWORD)
 		const loginUrl = `${FRONTEND_URL}/login`;

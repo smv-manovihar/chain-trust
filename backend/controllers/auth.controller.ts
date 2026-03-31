@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { hash, compare } from 'bcrypt';
 import User, { IUser } from '../models/user.model.js';
 import Company from '../models/company.model.js';
-import RefreshToken from '../models/refreshToken.model.js';
+import RefreshToken from '../models/refresh-token.model.js';
 import CabinetItem from '../models/cabinet.model.js';
 import Product from '../models/product.model.js';
 import Batch from '../models/batch.model.js';
@@ -941,8 +941,6 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
 		if (city !== undefined) user.city = city;
 		if (postalCode !== undefined) user.postalCode = postalCode;
 		if (country !== undefined) user.country = country;
-		if (companyName !== undefined) user.companyName = companyName;
-		if (website !== undefined) user.website = website;
 
 		await user.save();
 

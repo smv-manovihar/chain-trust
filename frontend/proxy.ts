@@ -35,8 +35,9 @@ export async function proxy(request: NextRequest) {
   const refreshToken = request.cookies.get('refreshToken')?.value;
   const path = request.nextUrl.pathname;
 
-  // Paths that require manufacturer or employee role
+  // Paths that require role checks
   const isManufacturerRoute = path.startsWith('/manufacturer');
+  const isCustomerRoute = path.startsWith('/customer');
   const isPublicRoute = path === '/manufacturer/register' || path === '/manufacturer/login';
 
   let currentToken = accessToken;
@@ -117,6 +118,10 @@ export async function proxy(request: NextRequest) {
     if (isManufacturerRoute && decodedPayload.role !== 'manufacturer' && decodedPayload.role !== 'employee') {
       return NextResponse.redirect(new URL('/customer', request.url));
     }
+    // Protect customer routes
+    if (isCustomerRoute && decodedPayload.role !== 'customer') {
+      return NextResponse.redirect(new URL('/manufacturer', request.url));
+    }
   } catch (err) {
     // Should not happen as we checked validity above, but safety redirect
     if (isManufacturerRoute && !isPublicRoute) {
@@ -129,6 +134,7 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/manufacturer/:path*'
+    '/manufacturer/:path*',
+    '/customer/:path*'
   ]
 };

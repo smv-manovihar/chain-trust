@@ -50,4 +50,6 @@ const scanSchema = new Schema<IScan>(
 // Unique index to ensure one visitor only counts as one scan for a specific unit
 scanSchema.index({ batch: 1, unitIndex: 1, visitorId: 1 }, { unique: true });
 
-export default mongoose.model<IScan>('Scan', scanSchema);
+const Scan = mongoose.model<IScan>('Scan', scanSchema);
+
+export default Scan;
