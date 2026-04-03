@@ -12,6 +12,7 @@ import { getGeoLocation } from '../utils/geo.util.js';
 import Notification from '../models/notification.model.js';
 import CabinetItem from '../models/cabinet.model.js';
 import { resolveItem } from '../utils/identifier.util.js';
+import { getOnChainBatch } from '../services/blockchain.service.js';
 
 const BATCH_NUMBER_REGEX = /^[a-zA-Z0-9\-_.]+$/;
 
@@ -63,6 +64,53 @@ async function findBatchByUnitSalt(salt: string): Promise<{ batch: any; unitInde
 	}
 
 	return null;
+}
+
+/**
+ * Synchronizes the batch's state (isRecalled, blockchainHash) with the actual
+ * blockchain state. This is called during verification and detail views to 
+ * ensure the caching layer (MongoDB) matches the Source of Truth.
+ */
+async function syncBatchWithChain(batch: IBatch, newTxHash?: string) {
+	try {
+		// Log removed to reduce noise
+		
+		// 1. Fetch on-chain status
+		const onChainData = await getOnChainBatch(batch.batchSalt);
+		
+		if (!onChainData) {
+			console.warn(`[Blockchain Sync] Batch ${batch.batchSalt} not found on-chain.`);
+			return batch;
+		}
+
+		let hasChanged = false;
+
+		// 2. Sync isRecalled status
+		if (batch.isRecalled !== onChainData.isRecalled) {
+			console.log(`[Blockchain Sync] Updating isRecalled status: ${batch.isRecalled} -> ${onChainData.isRecalled}`);
+			batch.isRecalled = onChainData.isRecalled;
+			hasChanged = true;
+		}
+
+		// 3. Update blockchainHash if a new transaction occurred or if it's currently missing
+		// Note: Every Recall/Restore transaction generates a new hash.
+		if (newTxHash && batch.blockchainHash !== newTxHash) {
+			console.log(`[Blockchain Sync] Updating transaction hash: ${batch.blockchainHash} -> ${newTxHash}`);
+			batch.blockchainHash = newTxHash;
+			hasChanged = true;
+		}
+
+		// 4. Persistence
+		if (hasChanged) {
+			await batch.save();
+			console.log(`[Blockchain Sync] Batch ${batch.batchNumber} synchronized (status changed).`);
+		}
+
+		return batch;
+	} catch (error) {
+		console.error(`[Blockchain Sync] Critical failure for batch ${batch.batchSalt}:`, error);
+		return batch; // Fail-safe: return current state
+	}
 }
 
 // POST /api/batches — Create a new batch from a catalogue product
@@ -203,6 +251,10 @@ export const getBatch = async (req: Request, res: Response) => {
 		if (!batch) {
 			return res.status(404).json({ message: 'Batch not found' });
 		}
+
+		// Perform live blockchain synchronization
+		await syncBatchWithChain(batch as unknown as IBatch);
+
 		res.json({ batch });
 	} catch (error) {
 		console.error('Get batch error:', error);
@@ -262,12 +314,18 @@ export const getBatchQRData = async (req: Request, res: Response) => {
 export const verifyScan = async (req: Request, res: Response) => {
 	try {
 		const { salt, visitorId, lat, lng } = req.body;
+		const ip = requestIp.getClientIp(req) || req.socket.remoteAddress || 'unknown';
+
+		// 1. Initial Logging
+		console.log(`\x1b[36m[Verification]\x1b[0m Incoming Scan | Salt: ${salt?.substring(0, 8)}... | IP: ${ip} | Visitor: ${visitorId || 'legacy'}`);
+
 		if (!salt) {
 			return res.status(400).json({ message: 'Salt value is required' });
 		}
 
 		const result = await findBatchByUnitSalt(salt);
 		if (!result) {
+			console.log(`\x1b[31m[Verification]\x1b[0m 404 - Product/Salt Not Found | Salt: ${salt.substring(0, 8)}... | IP: ${requestIp.getClientIp(req)}`);
 			return res.status(404).json({
 				message: 'Product not found',
 				isValid: false,
@@ -278,8 +336,7 @@ export const verifyScan = async (req: Request, res: Response) => {
 		// Populate product to check access levels
 		await batch.populate('product');
 		const product = batch.product as any;
-		// Extract request metadata
-		const ip = requestIp.getClientIp(req) || req.socket.remoteAddress || 'unknown';
+
 		const userAgent = req.headers['user-agent'] || '';
 		const user = (req as any).user;
 		const userId = user ? user._id : undefined;
@@ -326,6 +383,10 @@ export const verifyScan = async (req: Request, res: Response) => {
 					}
 				}
 			}
+		} else if (ip === '::1' || ip === '127.0.0.1') {
+			city = 'Local Development';
+			country = 'Internal Network';
+			console.log(`[Geolocation] Local IP detected (${ip}) - Marking as Local Development`);
 		}
 
 		// Calculate Suspiciousness using the history of scans
@@ -333,6 +394,7 @@ export const verifyScan = async (req: Request, res: Response) => {
 
 		// If suspicious, create a Notification for the manufacturer
 		if (suspiciousResult.isSuspicious) {
+			console.log(`\x1b[33m[Verification]\x1b[0m Flagged Suspicious | Reason: ${suspiciousResult.reason} | Batch: ${batch.batchNumber} | Unit: #${unitIndex+1}`);
 			try {
 				await Notification.create({
 					user: batch.createdBy,
@@ -366,7 +428,7 @@ export const verifyScan = async (req: Request, res: Response) => {
 
 			if (!existingScan) {
 				// Record new unique scan
-				await Scan.create({
+				const newScan = await Scan.create({
 					batch: batch._id,
 					unitIndex,
 					visitorId: queryVisitorId,
@@ -376,12 +438,17 @@ export const verifyScan = async (req: Request, res: Response) => {
 					latitude,
 					longitude,
 					city,
-					country
+					country,
+					isSuspicious: suspiciousResult.isSuspicious,
+					suspiciousReason: suspiciousResult.reason || undefined,
 				});
+
 				// Increment cached count only for first-time unique scan
 				newCount += 1;
 				batch.scanCounts.set(String(unitIndex), newCount);
 				await batch.save();
+
+				console.log(`\x1b[32m[Verification]\x1b[0m New Unique Scan Saved | ID: ${newScan._id} | Location: ${city || 'Unknown'}, ${country || 'Unknown'} | Risk: ${newScan.isSuspicious ? 'HIGH' : 'Safe'}`);
 
 				// Check for scan milestones (100, 500, 1000, etc.)
 				const totalScans = Array.from(batch.scanCounts.values()).reduce((a: number, b: any) => a + Number(b), 0);
@@ -405,6 +472,8 @@ export const verifyScan = async (req: Request, res: Response) => {
 						console.error('Error creating milestone notification:', milestoneError);
 					}
 				}
+			} else {
+				console.log(`\x1b[2m[Verification]\x1b[0m Repeat Scan (Visitor: ${queryVisitorId.substring(0,8)}...) | Location: ${city || 'Unknown'}`);
 			}
 		} catch (scanError) {
 			console.error('Unique scan tracking error:', scanError);
@@ -423,6 +492,9 @@ export const verifyScan = async (req: Request, res: Response) => {
 			// internal_only: hide images from consumer verification view
 			filteredImages = [];
 		}
+
+		// Perform live blockchain synchronization before returning results to consumer
+		await syncBatchWithChain(batch as unknown as IBatch);
 
 		res.json({
 			isValid: !batch.isRecalled,
@@ -454,6 +526,7 @@ export const recallBatch = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
 		const batchNumber = req.params.batchNumber as string;
+		const { transactionHash } = req.body; // Capture the latest hash from blockchain
 
 		let batch: IBatch | null;
 		if (mongoose.isValidObjectId(batchNumber)) {
@@ -474,8 +547,8 @@ export const recallBatch = async (req: Request, res: Response) => {
 			return res.status(403).json({ message: 'Not authorized to recall this batch' });
 		}
 
-		batch.isRecalled = true;
-		await batch.save();
+		// Update backend state and link to the new transaction hash via forced sync
+		await syncBatchWithChain(batch as unknown as IBatch, transactionHash);
 
 		// Notify users who have this batch in their cabinet
 		try {
@@ -509,6 +582,71 @@ export const recallBatch = async (req: Request, res: Response) => {
 		res.json({ message: 'Batch recalled successfully', batch });
 	} catch (error) {
 		console.error('Recall batch error:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+};
+
+// POST /api/batches/:batchNumber/restore — Restore a recalled batch
+export const restoreBatch = async (req: Request, res: Response) => {
+	try {
+		const userId = (req as any).user?.id;
+		const batchNumber = req.params.batchNumber as string;
+		const { transactionHash } = req.body; // Capture the latest hash from blockchain
+
+		let batch: IBatch | null;
+		if (mongoose.isValidObjectId(batchNumber)) {
+			batch = await Batch.findOne({
+				$or: [{ _id: batchNumber }, { batchNumber }],
+				createdBy: userId,
+			});
+		} else {
+			batch = await Batch.findOne({ batchNumber, createdBy: userId });
+		}
+
+		if (!batch) {
+			return res.status(404).json({ message: 'Batch not found' });
+		}
+
+		// Only the creator can restore
+		if (batch.createdBy.toString() !== (req as any).user?.id) {
+			return res.status(403).json({ message: 'Not authorized to restore this batch' });
+		}
+
+		// Update backend state and link to the new transaction hash via forced sync
+		await syncBatchWithChain(batch as unknown as IBatch, transactionHash);
+
+		// Notify users who have this batch in their cabinet that it's restored
+		try {
+			const batchToRestore = batch;
+			const affectedCabinetItems = await CabinetItem.find({
+				batchNumber: batchToRestore.batchNumber,
+				isUserAdded: false
+			});
+
+			if (affectedCabinetItems.length > 0) {
+				const notifications = affectedCabinetItems.map(item => ({
+					user: item.userId,
+					type: 'batch_restored',
+					title: 'Medicine Safety Update',
+					message: `The product "${item.name}" (Batch: ${item.batchNumber}) has been restored. The manufacturer has resolved the previous safety concerns.`,
+					link: `/customer/cabinet/${item._id}`,
+					metadata: {
+						batchId: batchToRestore._id,
+						productId: batchToRestore.product,
+						cabinetItemId: item._id,
+						medicineName: item.name
+					}
+				}));
+
+				await Notification.insertMany(notifications);
+			}
+		} catch (notificationError) {
+			console.error('Error creating restoration notifications:', notificationError);
+		}
+
+		res.json({ message: 'Batch restored successfully', batch });
+	} catch (error) {
+		console.error('Restore batch error:', error);
 		res.status(500).json({ message: 'Internal server error' });
 	}
 };

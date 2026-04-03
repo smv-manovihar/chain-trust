@@ -6,6 +6,7 @@ import {
 	getBatchQRData,
 	verifyScan,
 	recallBatch,
+	restoreBatch,
 	getBatchPDF,
 	getBatchScanDetails,
 } from '../controllers/batch.controller.js';
@@ -25,5 +26,6 @@ router.get('/:batchNumber/qr-data', authenticateJWT, checkManufacturer, getBatch
 router.get('/:batchNumber/pdf', authenticateJWT, checkManufacturer, getBatchPDF);
 router.get('/:batchNumber/scan-details', authenticateJWT, checkManufacturer, getBatchScanDetails);
 router.post('/:batchNumber/recall', authenticateJWT, checkManufacturer, recallBatch);
+router.post('/:batchNumber/restore', authenticateJWT, checkManufacturer, restoreBatch);
 
 export default router;

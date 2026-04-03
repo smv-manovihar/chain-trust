@@ -60,17 +60,13 @@ export const generateBatchPDF = async (batch: any, settings: QRSettings): Promis
         const qrSalt = `${batch.batchSalt}:${i}:${unitHash}`;
         const verifyUrl = `${frontendUrl}/verify?salt=${qrSalt}`;
 
-        // 1. Generate QR Buffer (Dynamic Error Correction for professional scaling)
-        let ecl: 'L' | 'M' | 'Q' | 'H' = 'M';
-        if (settings.qrSize < 20) ecl = 'L';
-        else if (settings.qrSize < 45) ecl = 'M';
-        else if (settings.qrSize < 70) ecl = 'Q';
-        else ecl = 'H';
+        // 1. Generate QR Buffer (Balanced ECL for logo integration)
+        const ecl: 'L' | 'M' | 'Q' | 'H' = 'M';
 
         const qrBuffer = await QRCode.toBuffer(verifyUrl, {
             errorCorrectionLevel: ecl,
-            margin: 0,
-            width: 1024, // High quality buffer for sharp scaling
+            margin: 2, // Mandatory quiet zone for recognition
+            width: 1024,
             color: {
                 dark: '#000000',
                 light: '#FFFFFF'
@@ -95,7 +91,28 @@ export const generateBatchPDF = async (batch: any, settings: QRSettings): Promis
 
         // 4. Draw QR Code (Centered in the column)
         const qrX = currentX + (labelWidth - qrSize) / 2;
-        doc.image(qrBuffer, qrX, currentY + padding, { width: qrSize });
+        const qrY = currentY + padding;
+        doc.image(qrBuffer, qrX, qrY, { width: qrSize });
+
+        // 4b. Draw Center Logo (Integrated)
+        try {
+            const logoSize = qrSize * 0.18;
+            const logoX = qrX + (qrSize - logoSize) / 2;
+            const logoY = qrY + (qrSize - logoSize) / 2;
+            
+            doc.save();
+            // White background for logo contrast
+            doc.fillColor('#FFFFFF')
+               .rect(logoX - 1, logoY - 1, logoSize + 2, logoSize + 2)
+               .fill();
+            
+            // Semi-transparent logo
+            doc.opacity(0.65)
+               .image(LOGO_PATH, logoX, logoY, { width: logoSize });
+            doc.restore();
+        } catch (e) {
+            console.error('Failed to overlay logo on PDF QR', e);
+        }
 
         // 5. Draw Metadata
         doc.fillColor('#000000');
@@ -121,16 +138,11 @@ export const generateBatchPDF = async (batch: any, settings: QRSettings): Promis
             textY += 8;
         }
 
-        // Branding Logo (Centered and small)
-      try {
-        const logoSize = 10;
-        doc.image(LOGO_PATH, currentX + (labelWidth - logoSize) / 2, textY, { height: logoSize });
-      } catch (e) {
-        doc.fontSize(5).fillColor('#CCCCCC').text('CHAINTRUST', currentX + 2, textY, {
-          width: labelWidth - 4,
-          align: 'center'
+        // Branding Text (Fallback or identifier)
+        doc.fontSize(5).fillColor('#CCCCCC').text('CHAINTRUST VERIFIED', currentX + 2, textY, {
+            width: labelWidth - 4,
+            align: 'center'
         });
-      }
 
         // 6. Update coordinates for next unit
         colIndex++;

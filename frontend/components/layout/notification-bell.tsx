@@ -27,9 +27,11 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 
 export function NotificationBell() {
+  const pathname = usePathname();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -220,7 +222,11 @@ export function NotificationBell() {
             asChild
           >
             <Link
-              href="/manufacturer/analytics"
+              href={
+                pathname.startsWith("/manufacturer")
+                  ? "/manufacturer/notifications"
+                  : "/customer/notifications"
+              }
               onClick={() => setIsOpen(false)}
             >
               View All Notifications

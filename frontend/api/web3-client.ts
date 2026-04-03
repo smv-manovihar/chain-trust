@@ -1,5 +1,6 @@
 import Web3 from 'web3';
 import ChainTrustABI from './ChainTrust.json';
+import { hashSHA256 } from '@/lib/crypto-utils';
 
 declare global {
   interface Window {
@@ -57,10 +58,12 @@ export interface BlockchainRecord {
   transactionHash: string;
   blockNumber: number;
   images: string[];
+  expiryDate?: number;
 }
 
 export interface VerificationResult {
   isValid: boolean;
+  isRecalled: boolean;
   record: BlockchainRecord | null;
   verificationDate: number;
   trustScore: number;
@@ -91,12 +94,7 @@ export const requestExecutionAccounts = async () => {
 
 // Generate salt value based on product info
 export const generateSalt = async (productId: string, brandName: string): Promise<string> => {
-    const rawData = `${productId}-${brandName}`;
-    const encoder = new TextEncoder();
-    const data = encoder.encode(rawData);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashSHA256(`${productId}-${brandName}`);
 };
 
 export interface BatchData {
@@ -124,12 +122,7 @@ const formatBytes32 = (hex: string): string => {
  * Formula: SHA-256(batchSalt + "-" + unitIndex)
  */
 export async function deriveUnitHash(batchSalt: string, unitIndex: number): Promise<string> {
-    const rawData = `${batchSalt}-${unitIndex}`;
-    const encoder = new TextEncoder();
-    const data = encoder.encode(rawData);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashSHA256(`${batchSalt}-${unitIndex}`);
 }
 
 // Register Batch via Smart Contract
@@ -156,8 +149,9 @@ export const registerBatchOnChain = async (batchData: BatchData, deployerAccount
 export async function verifyOnBlockchain(batchSalt: string, signal?: AbortSignal): Promise<VerificationResult> {
   try {
     const contract = getContract();
-    if (!contract) {
-        throw new Error('Web3 Contract instance not found');
+    const activeWeb3 = web3;
+    if (!contract || !activeWeb3) {
+        throw new Error('Web3 connection not initialized');
     }
 
     if (signal?.aborted) throw new Error('AbortError');
@@ -173,8 +167,9 @@ export async function verifyOnBlockchain(batchSalt: string, signal?: AbortSignal
           throw new Error("Batch data is marked as invalid/deleted.");
         }
 
-      const trustScore = batch.isRecalled ? 0 : 100;
-      const warnings = batch.isRecalled ? ["THIS BATCH HAS BEEN RECALLED BY THE MANUFACTURER"] : [];
+      const isRecalled = !!batch.isRecalled;
+      const trustScore = isRecalled ? 0 : 100;
+      const warnings = isRecalled ? ["CRITICAL: THIS BATCH HAS BEEN RECALLED BY THE MANUFACTURER. DO NOT CONSUME."] : [];
 
       const record: BlockchainRecord = {
         blockchainId: batch.productId, 
@@ -182,14 +177,16 @@ export async function verifyOnBlockchain(batchSalt: string, signal?: AbortSignal
         productName: batch.productName,
         manufacturerName: batch.brand,
         timestamp: Number(batch.manufactureDate) * 1000,
-        status: 'verified',
+        status: isRecalled ? 'minted' : 'verified', // If recalled, status effectively dropped to basic minted state (or we could add a 'recalled' status)
         transactionHash: 'Verified On-Chain', 
-        blockNumber: 0,
-        images: [], 
+        blockNumber: Number(await activeWeb3.eth.getBlockNumber()), 
+        images: [],
+        expiryDate: Number(batch.expiryDate) > 0 ? Number(batch.expiryDate) * 1000 : undefined,
       }
 
       return {
-        isValid: !batch.isRecalled,
+        isValid: true,
+        isRecalled,
         record,
         verificationDate: Date.now(),
         trustScore,
@@ -197,22 +194,25 @@ export async function verifyOnBlockchain(batchSalt: string, signal?: AbortSignal
       };
 
     } catch (e: any) {
+        console.warn("Blockchain query failed or Batch not found:", e.message);
         return {
           isValid: false,
+          isRecalled: false,
           record: null,
           verificationDate: Date.now(),
           trustScore: 0,
-          warnings: ['Batch not found on the blockchain or is a counterfeit.'],
+          warnings: ['Product not found on the secure public ledger. This may be a counterfeit.'],
         }
     }
   } catch (error) {
-    console.error("Blockchain Verification Error:", error);
+    console.error("Blockchain Connection Error:", error);
     return {
       isValid: false,
+      isRecalled: false,
       record: null,
       verificationDate: Date.now(),
       trustScore: 0,
-      warnings: ['Failed to connect to the blockchain network to verify.'],
+      warnings: ['Unable to reach the secure verification network. Please check your connection.'],
     }
   }
 }
@@ -227,6 +227,21 @@ export async function recallProductOnChain(batchSalt: string, account: string): 
   }
 
   return await contract.methods.recallBatch(formatBytes32(batchSalt)).send({
+    from: account,
+    gas: "500000"
+  });
+}
+
+/**
+ * Restore a batch on the blockchain
+ */
+export async function restoreProductOnChain(batchSalt: string, account: string): Promise<any> {
+  const contract = getContract();
+  if (!contract) {
+    throw new Error('Web3 Contract instance not found');
+  }
+
+  return await contract.methods.restoreBatch(formatBytes32(batchSalt)).send({
     from: account,
     gas: "500000"
   });

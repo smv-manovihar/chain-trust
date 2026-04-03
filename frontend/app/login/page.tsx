@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { AuthLayout } from "@/components/layout/auth-layout";
 import { FcGoogle } from "react-icons/fc";
 import { AlertCircle, Loader2 } from "lucide-react";
-import EmailVerificationModal from "@/components/email-verification/email-verification-dialog";
 import { useAuth } from "@/contexts/auth-context";
 import {
   Form,
@@ -32,7 +31,6 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
 
@@ -53,10 +51,7 @@ function LoginForm() {
       router.push(redirectUrl);
     } catch (err: any) {
       if (err.message && err.message.toLowerCase().includes("verify")) {
-        setError("Your email is not verified.");
-        // Optionally show a button to open modal
-        // For now just setting error, but user might want to verify.
-        // Let's add a button in the error message area if it's verification error
+        setError("Your email is not verified. Please check your inbox.");
       } else {
         setError(err.message || "Invalid credentials. Please try again.");
       }
@@ -75,17 +70,6 @@ function LoginForm() {
                 <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <p className="text-sm">{error}</p>
               </div>
-              {error.includes("verify") && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowVerificationModal(true)}
-                  className="w-full mt-1 border-destructive/20 hover:bg-destructive/10 hover:text-destructive"
-                >
-                  Verify Email
-                </Button>
-              )}
             </div>
           )}
 
@@ -139,17 +123,6 @@ function LoginForm() {
           </Button>
         </form>
       </Form>
-
-      <EmailVerificationModal
-        email={form.getValues("email")}
-        isOpen={showVerificationModal}
-        onOpenChange={setShowVerificationModal}
-        onSuccess={() => {
-          setShowVerificationModal(false);
-          // Retry login or just close
-          form.handleSubmit(onSubmit)();
-        }}
-      />
     </>
   );
 }

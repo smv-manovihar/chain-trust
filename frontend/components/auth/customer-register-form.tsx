@@ -19,7 +19,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import EmailVerificationModal from "@/components/email-verification/email-verification-dialog";
 
 const customerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -42,7 +41,6 @@ export function CustomerRegisterForm() {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [serverError, setServerError] = useState("");
   const router = useRouter();
   const { register } = useAuth();

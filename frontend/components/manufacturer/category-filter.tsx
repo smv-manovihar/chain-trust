@@ -84,23 +84,27 @@ export function CategoryFilter({
         <Button
           variant="outline"
           className={cn(
-            "h-10 px-4 rounded-md gap-2 border-border/40 bg-background/80 backdrop-blur-md shadow-sm transition-all",
-            selectedCategories.length > 0 && "border-primary text-primary bg-primary/5",
+            "h-10 px-3 md:px-4 rounded-md gap-2 border-border/40 bg-background/80 backdrop-blur-md shadow-sm transition-all",
+            selectedCategories.length > 0 && "border-primary/50 text-primary bg-primary/5 hover:bg-primary/10",
             className
           )}
         >
-          <Filter className="h-4 w-4" />
-          <span className="hidden sm:inline">
+          <div className="relative">
+            <Filter className="h-4 w-4" />
+            {selectedCategories.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[8px] text-primary-foreground font-bold border-2 border-background animate-in zoom-in duration-300">
+                {selectedCategories.length}
+              </span>
+            )}
+          </div>
+          <span className="hidden sm:inline-block">
             {selectedCategories.length === 0
               ? placeholder
-              : `${selectedCategories.length} selected`}
+              : selectedCategories.length === 1 
+                ? selectedCategories[0]
+                : `${selectedCategories.length} Selected`}
           </span>
-          {selectedCategories.length > 0 && (
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground font-bold">
-              {selectedCategories.length}
-            </span>
-          )}
-          <ChevronsUpDown className="h-3 w-3 opacity-50" />
+          <ChevronsUpDown className="h-3 w-3 opacity-30 ml-auto hidden sm:block" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[240px] p-1.5 rounded-md shadow-xl border-border/50" align={align}>

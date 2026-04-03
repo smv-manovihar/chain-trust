@@ -124,7 +124,7 @@ export default function ProductsPage() {
   // };
 
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-700 pb-20">
+    <div className="space-y-10 pb-20">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
         <div className="w-full sm:w-auto">
@@ -154,7 +154,7 @@ export default function ProductsPage() {
             variant="outline"
             size="icon"
             onClick={fetchProducts}
-            className="h-10 w-10 border-primary/20 hover:bg-primary/5 transition-all shadow-sm shrink-0 rounded-xl"
+            className="h-10 w-10 border-primary/20 hover:bg-primary/5 transition-all shadow-sm shrink-0 rounded-full"
           >
             <RefreshCw
               className={cn("h-4 w-4 text-primary", loading && "animate-spin")}
@@ -164,7 +164,7 @@ export default function ProductsPage() {
             <CategoryManagementDialog onCategoriesChange={fetchProducts} />
             <Button
               asChild
-              className="flex-1 sm:flex-none h-10 px-4 sm:px-6 rounded-xl gap-2 font-bold shadow-lg shadow-primary/20"
+              className="flex-1 sm:flex-none h-10 px-4 sm:px-6 rounded-full gap-2 font-bold shadow-lg shadow-primary/20"
             >
               <Link href="/manufacturer/products/new">
                 <Plus className="h-4 w-4" />
@@ -176,25 +176,23 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 px-1 sticky top-4 z-30">
+      <div className="flex items-center gap-3 px-1 sticky top-4 z-30">
         <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by name or ID..."
-            className="pl-11 h-11 text-sm bg-background/80 backdrop-blur-3xl border-border/40 rounded-xl focus-visible:ring-primary/20 shadow-sm"
+            className="pl-12 h-11 text-sm bg-background/80 backdrop-blur-3xl border-border/40 rounded-full focus-visible:ring-primary/20 shadow-sm"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
         </div>
-        <div className="flex items-center gap-2 sm:w-auto">
-          <CategoryFilter
-            selectedCategories={selectedCategories}
-            onCategoryChange={setSelectedCategories}
-            canManage={true}
-            onCategoriesChange={fetchProducts}
-            className="flex-1 sm:flex-none rounded-xl h-11 px-6 border-border/40 bg-background/80 backdrop-blur-3xl shadow-sm"
-          />
-        </div>
+        <CategoryFilter
+          selectedCategories={selectedCategories}
+          onCategoryChange={setSelectedCategories}
+          canManage={true}
+          onCategoriesChange={fetchProducts}
+          className="rounded-full h-11 px-4 sm:px-6 border-border/40 bg-background/80 backdrop-blur-3xl shadow-sm"
+        />
       </div>
 
       {/* Inventory Grid */}

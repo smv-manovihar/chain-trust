@@ -7,9 +7,9 @@
   {
     "inputs": [
       {
-        "internalType": "string",
+        "internalType": "bytes32",
         "name": "batchSalt",
-        "type": "string"
+        "type": "bytes32"
       }
     ],
     "name": "BatchAlreadyExists",
@@ -18,9 +18,9 @@
   {
     "inputs": [
       {
-        "internalType": "string",
+        "internalType": "bytes32",
         "name": "batchSalt",
-        "type": "string"
+        "type": "bytes32"
       }
     ],
     "name": "BatchNotFound",
@@ -64,9 +64,9 @@
     "inputs": [
       {
         "indexed": true,
-        "internalType": "string",
+        "internalType": "bytes32",
         "name": "batchSalt",
-        "type": "string"
+        "type": "bytes32"
       },
       {
         "indexed": false,
@@ -83,9 +83,9 @@
     "inputs": [
       {
         "indexed": true,
-        "internalType": "string",
+        "internalType": "bytes32",
         "name": "batchSalt",
-        "type": "string"
+        "type": "bytes32"
       },
       {
         "indexed": false,
@@ -163,9 +163,9 @@
   {
     "inputs": [
       {
-        "internalType": "string",
+        "internalType": "bytes32",
         "name": "",
-        "type": "string"
+        "type": "bytes32"
       }
     ],
     "name": "batches",
@@ -191,9 +191,9 @@
         "type": "string"
       },
       {
-        "internalType": "string",
+        "internalType": "bytes32",
         "name": "batchSalt",
-        "type": "string"
+        "type": "bytes32"
       },
       {
         "internalType": "uint256",
@@ -232,9 +232,9 @@
   {
     "inputs": [
       {
-        "internalType": "string",
+        "internalType": "bytes32",
         "name": "_batchSalt",
-        "type": "string"
+        "type": "bytes32"
       }
     ],
     "name": "getBatch",
@@ -262,9 +262,9 @@
             "type": "string"
           },
           {
-            "internalType": "string",
+            "internalType": "bytes32",
             "name": "batchSalt",
-            "type": "string"
+            "type": "bytes32"
           },
           {
             "internalType": "uint256",
@@ -340,9 +340,9 @@
   {
     "inputs": [
       {
-        "internalType": "string",
+        "internalType": "bytes32",
         "name": "_batchSalt",
-        "type": "string"
+        "type": "bytes32"
       }
     ],
     "name": "recallBatch",
@@ -373,9 +373,9 @@
         "type": "string"
       },
       {
-        "internalType": "string",
+        "internalType": "bytes32",
         "name": "_batchSalt",
-        "type": "string"
+        "type": "bytes32"
       },
       {
         "internalType": "uint256",
@@ -394,6 +394,19 @@
       }
     ],
     "name": "registerBatch",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "_batchSalt",
+        "type": "bytes32"
+      }
+    ],
+    "name": "restoreBatch",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

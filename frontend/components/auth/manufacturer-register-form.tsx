@@ -18,7 +18,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import EmailVerificationModal from "@/components/email-verification/email-verification-dialog";
 import Link from "next/link";
 
 const manufacturerSchema = z.object({
@@ -45,7 +44,6 @@ export function ManufacturerRegisterForm() {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [serverError, setServerError] = useState("");
   const router = useRouter();
   const { register } = useAuth();

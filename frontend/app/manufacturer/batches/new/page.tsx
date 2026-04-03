@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { useDebounce } from "@/hooks/use-debounce";
+import { hashSHA256 } from "@/lib/crypto-utils";
 
 interface CatalogueProduct {
   _id: string;
@@ -109,15 +110,8 @@ export default function CreateBatchWizard() {
 
     try {
       if (!selectedProduct) throw new Error("No product template selected.");
-      const encoder = new TextEncoder();
       const saltInput = `${selectedProduct.productId}-${batchData.batchNumber}-${Date.now()}-${crypto.getRandomValues(new Uint8Array(8)).join("")}`;
-      const hashBuffer = await crypto.subtle.digest(
-        "SHA-256",
-        encoder.encode(saltInput),
-      );
-      const batchSalt = Array.from(new Uint8Array(hashBuffer))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
+      const batchSalt = hashSHA256(saltInput);
 
       setRegisterProgress(40);
       if (!walletAddress) throw new Error("Wallet disconnect detected.");
@@ -202,7 +196,7 @@ export default function CreateBatchWizard() {
 
   if (!walletAddress) {
     return (
-      <div className="max-w-md mx-auto mt-20 animate-in fade-in zoom-in-95 duration-500">
+      <div className="max-w-md mx-auto mt-20">
         <Card className="p-8 text-center space-y-6">
           <div className="mx-auto h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center relative">
             <Wallet className="h-10 w-10 text-primary" />
@@ -221,7 +215,7 @@ export default function CreateBatchWizard() {
             <Button
               onClick={connectWallet}
               disabled={isConnecting}
-              className="w-full gap-2"
+              className="w-full gap-2 rounded-full h-11"
             >
               {isConnecting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -230,7 +224,7 @@ export default function CreateBatchWizard() {
               )}
               Connect Wallet
             </Button>
-            <Button variant="outline" asChild className="w-full">
+            <Button variant="outline" asChild className="w-full rounded-full h-11">
               <Link href="/manufacturer/batches">Cancel</Link>
             </Button>
           </div>
@@ -241,7 +235,7 @@ export default function CreateBatchWizard() {
 
   if (successId) {
     return (
-      <div className="max-w-md mx-auto mt-20 text-center space-y-6 animate-in fade-in zoom-in-95 duration-500">
+      <div className="max-w-md mx-auto mt-20 text-center space-y-6">
         <Card className="p-8 space-y-6 flex flex-col items-center">
           <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center text-green-500">
             <Check className="h-10 w-10" />
@@ -254,12 +248,12 @@ export default function CreateBatchWizard() {
             </p>
           </div>
           <div className="flex flex-col w-full gap-3 pt-4 border-t border-border/40">
-            <Button asChild className="w-full gap-2">
+            <Button asChild className="w-full gap-2 rounded-full h-11">
               <Link href={`/manufacturer/batches/${successId}`}>
                 <QrCode className="h-4 w-4" /> Print Evidence Sheet
               </Link>
             </Button>
-            <Button variant="outline" asChild className="w-full">
+            <Button variant="outline" asChild className="w-full rounded-full h-11">
               <Link href="/manufacturer/batches">Done</Link>
             </Button>
           </div>
@@ -269,7 +263,7 @@ export default function CreateBatchWizard() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto w-full space-y-6 pb-20 animate-in fade-in flex-1 min-h-0">
+    <div className="max-w-3xl mx-auto w-full space-y-6 pb-20 flex-1 min-h-0">
       {/* Header & Steps */}
       <div className="flex items-center gap-4 px-1">
         <Button
@@ -339,13 +333,13 @@ export default function CreateBatchWizard() {
                         placeholder="Search products..."
                         value={productSearch}
                         onChange={(e) => setProductSearch(e.target.value)}
-                        className="pl-9"
+                        className="pl-10 h-11 rounded-full"
                       />
                     </div>
                     <CategoryFilter
                       selectedCategories={selectedCategories}
                       onCategoryChange={setSelectedCategories}
-                      className="gap-2 px-3 shrink-0"
+                      className="gap-2 px-3 shrink-0 rounded-full h-11"
                       align="end"
                     />
                   </div>
@@ -369,7 +363,7 @@ export default function CreateBatchWizard() {
                               initiate a production batch for it.
                             </p>
                           </div>
-                          <Button asChild variant="outline" size="sm" className="gap-2">
+                          <Button asChild variant="outline" size="sm" className="gap-2 rounded-full">
                             <Link href="/manufacturer/products/new">
                               <Plus className="h-4 w-4" /> Add Product
                             </Link>
@@ -452,6 +446,7 @@ export default function CreateBatchWizard() {
                             batchNumber: e.target.value,
                           }))
                         }
+                        className="rounded-full h-11"
                         autoFocus
                       />
                     </div>
@@ -467,6 +462,7 @@ export default function CreateBatchWizard() {
                             quantity: e.target.value,
                           }))
                         }
+                        className="rounded-full h-11"
                       />
                     </div>
 
@@ -478,7 +474,7 @@ export default function CreateBatchWizard() {
                           <Button
                             variant="outline"
                             className={cn(
-                              "w-full justify-start text-left font-normal",
+                              "w-full justify-start text-left font-normal h-11 rounded-full",
                               !batchData.manufactureDate &&
                                 "text-muted-foreground",
                             )}
@@ -520,7 +516,7 @@ export default function CreateBatchWizard() {
                           <Button
                             variant="outline"
                             className={cn(
-                              "w-full justify-start text-left font-normal",
+                              "w-full justify-start text-left font-normal h-11 rounded-full",
                               !batchData.expiryDate && "text-muted-foreground",
                             )}
                           >
@@ -637,7 +633,7 @@ export default function CreateBatchWizard() {
           {/* Navigation Bar */}
           <div className="flex justify-between items-center pt-8 mt-8 border-t border-border/40">
             {step > 1 ? (
-              <Button variant="outline" onClick={prevStep} disabled={loading}>
+              <Button variant="outline" onClick={prevStep} disabled={loading} className="rounded-full h-10 px-6">
                 Back
               </Button>
             ) : (
@@ -645,14 +641,14 @@ export default function CreateBatchWizard() {
             )}
 
             {step < 3 ? (
-              <Button onClick={nextStep} className="gap-2">
+              <Button onClick={nextStep} className="gap-2 rounded-full h-10 px-8">
                 Next <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
               <Button
                 onClick={handleCreate}
                 disabled={loading}
-                className="gap-2"
+                className="gap-2 rounded-full h-10 px-8"
               >
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />

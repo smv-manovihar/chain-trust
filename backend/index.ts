@@ -43,7 +43,7 @@ app.use(
 );
 
 // Body parsing
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '10mb', strict: false }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
@@ -91,9 +91,17 @@ app.use((_req, res) => {
 });
 
 // Error handler
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+	// Handle body-parser SyntaxErrors (e.g. malformed JSON)
+	if (err instanceof SyntaxError && (err as any).status === 400 && 'body' in err) {
+		return res.status(400).json({ message: 'Invalid JSON payload. Please check your request body.' });
+	}
+
 	console.error('Unhandled error:', err);
-	res.status(500).json({ message: 'Internal server error' });
+	res.status(err.status || 500).json({ 
+		message: err.message || 'Internal server error',
+		...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+	});
 });
 
 // Start server

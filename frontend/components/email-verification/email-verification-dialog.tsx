@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import {
   InputOTP,
@@ -17,7 +17,13 @@ import {
 } from "@/components/ui/input-otp";
 import { verifyEmailWithOTP, resendVerificationEmail } from "@/api";
 import { useAuth } from "@/contexts/auth-context";
-import { Mail, RefreshCw, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Mail, RefreshCw, CheckCircle, XCircle, Loader2, Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
 interface EmailVerificationModalProps {
@@ -104,19 +110,30 @@ export default function EmailVerificationModal({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader className="flex flex-col items-center text-center">
+    <ResponsiveDialog open={isOpen} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="sm:max-w-md">
+        <ResponsiveDialogHeader className="flex flex-col items-center text-center">
           <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
             <Mail className="w-6 h-6 text-primary" />
           </div>
-          <DialogTitle className="text-xl">Verify Your Email</DialogTitle>
-          <DialogDescription>
-            We sent a 6-digit verification code to
-            <br />
-            <span className="font-medium text-foreground">{email}</span>
-          </DialogDescription>
-        </DialogHeader>
+          <div className="flex items-center gap-2">
+            <ResponsiveDialogTitle className="text-xl">Verify Email</ResponsiveDialogTitle>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full">
+                    <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="p-2 text-xs text-center">
+                  We sent a 6-digit verification code to
+                  <br />
+                  <span className="font-medium">{email}</span>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </ResponsiveDialogHeader>
 
         <div className="flex flex-col items-center space-y-4 py-4">
           <InputOTP
@@ -181,7 +198,7 @@ export default function EmailVerificationModal({
             )}
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

@@ -126,7 +126,7 @@ export default function ManufacturerDashboard() {
   }
 
   return (
-    <div className="space-y-8 lg:space-y-10 animate-in fade-in duration-500 pb-12">
+    <div className="space-y-8 lg:space-y-10 pb-12">
       {/* Header / Welcome Banner */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
@@ -251,7 +251,7 @@ export default function ManufacturerDashboard() {
               asChild
             >
               <Link href="/manufacturer/analytics">
-                View All <ArrowRight className="ml-1 h-3 w-3" />
+                View all <ArrowRight className="ml-1 h-3 w-3" />
               </Link>
             </Button>
           </div>

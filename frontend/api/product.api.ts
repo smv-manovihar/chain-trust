@@ -13,7 +13,6 @@ export interface ProductDto {
 	customerVisibleImages?: number[];
 	qrSettings?: {
 		qrSize: number;
-		columns: number;
 		showProductName: boolean;
 		showUnitIndex: boolean;
 		showBatchNumber: boolean;

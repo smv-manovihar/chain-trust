@@ -11,6 +11,8 @@ export interface IScan extends Document {
 	longitude?: number;
 	city?: string;
 	country?: string;
+	isSuspicious: boolean;
+	suspiciousReason?: string;
 	createdAt: Date;
 }
 
@@ -40,6 +42,8 @@ const scanSchema = new Schema<IScan>(
 		longitude: { type: Number },
 		city: { type: String, trim: true },
 		country: { type: String, trim: true },
+		isSuspicious: { type: Boolean, default: false },
+		suspiciousReason: { type: String, trim: true },
 	},
 	{
 		timestamps: { createdAt: true, updatedAt: false },

@@ -2,22 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Copy,
-  QrCode,
   Search,
   RefreshCw,
-  Package,
-  Plus,
-  MoreVertical,
-  ExternalLink,
-  AlertTriangle,
-  FileSpreadsheet,
-  TrendingUp,
   Boxes,
+  Plus,
+  FileSpreadsheet,
   Loader2,
-  Filter,
-  Check,
-  ChevronsUpDown,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,16 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { CategoryFilter } from "@/components/manufacturer/category-filter";
-import { listBatches, recallBatch } from "@/api/batch.api";
-import { recallProductOnChain } from "@/api/web3-client";
-import { useWeb3 } from "@/contexts/web3-context";
+import { listBatches } from "@/api/batch.api";
 import { format } from "date-fns";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -62,46 +45,7 @@ interface Batch {
   batchSalt: string;
 }
 
-const BatchActions = ({
-  batch,
-  onRecall,
-  onCopyHash,
-}: {
-  batch: Batch;
-  onRecall: (b: Batch) => void;
-  onCopyHash: (h: string) => void;
-}) => (
-  <DropdownMenuContent
-    align="end"
-    className="w-48 p-1.5"
-  >
-    <DropdownMenuItem asChild className="cursor-pointer py-2 px-3">
-      <Link
-        href={`/manufacturer/batches/${encodeURIComponent(batch.batchNumber)}`}
-        className="flex items-center text-sm"
-      >
-        <QrCode className="mr-2 h-4 w-4 text-primary" />
-        View QR Sheets
-      </Link>
-    </DropdownMenuItem>
-    <DropdownMenuItem
-      className="cursor-pointer py-2 px-3 text-sm"
-      onClick={() => onCopyHash(batch.blockchainHash)}
-    >
-      <ExternalLink className="mr-2 h-4 w-4 text-muted-foreground" />
-      Copy Tx Hash
-    </DropdownMenuItem>
-    {!batch.isRecalled && (
-      <DropdownMenuItem
-        className="cursor-pointer py-2 px-3 text-destructive focus:bg-destructive/10 text-sm"
-        onClick={() => onRecall(batch)}
-      >
-        <AlertTriangle className="mr-2 h-4 w-4" />
-        Recall Batch
-      </DropdownMenuItem>
-    )}
-  </DropdownMenuContent>
-);
+
 
 export default function BatchesPage() {
   const searchParams = useSearchParams();
@@ -120,7 +64,6 @@ export default function BatchesPage() {
 
   const debouncedSearch = useDebounce(searchTerm, 500);
   const debouncedCategories = useDebounce(selectedCategories, 500);
-  const { address: walletAddress, connect: connectWallet } = useWeb3();
 
   // Sync state to URL
   useEffect(() => {
@@ -177,10 +120,7 @@ export default function BatchesPage() {
     return () => fetchAbortRef.current?.abort();
   }, [fetchBatches]);
 
-  const handleCopyHash = (hash: string) => {
-    navigator.clipboard.writeText(hash);
-    toast.success("Transaction hash copied!");
-  };
+
 
   const handleExportCSV = () => {
     if (batches.length === 0) {
@@ -212,35 +152,12 @@ export default function BatchesPage() {
     toast.success("CSV Export starting...");
   };
 
-  const handleRecall = async (batch: Batch) => {
-    if (
-      !confirm(
-        `Are you sure you want to recall batch ${batch.batchNumber}? This action is irreversible on the blockchain.`
-      )
-    )
-      return;
 
-    if (!walletAddress) {
-      toast.error("Wallet not connected. Connect your wallet first.");
-      return;
-    }
-
-    try {
-      toast.loading("Recalling batch on chain...");
-      await recallProductOnChain(batch.batchSalt, walletAddress);
-      await recallBatch(batch.batchNumber);
-
-      fetchBatches();
-      toast.success("Batch successfully recalled.");
-    } catch (err: any) {
-      toast.error(err.message || "Recall failed.");
-    }
-  };
 
   const filteredBatches = batches;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-10">
+    <div className="space-y-6 pb-10">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
         <div>
@@ -267,14 +184,14 @@ export default function BatchesPage() {
           <Button
             variant="outline"
             onClick={handleExportCSV}
-            className="gap-2 hidden md:flex rounded-xl"
+            className="gap-2 hidden md:flex rounded-full"
           >
             <FileSpreadsheet className="h-4 w-4" />
             Export CSV
           </Button>
           <Button
             asChild
-            className="flex-1 sm:flex-none gap-2 rounded-xl h-10 px-4"
+            className="flex-1 sm:flex-none gap-2 rounded-full h-10 px-4"
           >
             <Link href="/manufacturer/batches/new">
               <Plus className="h-4 w-4" />
@@ -287,13 +204,13 @@ export default function BatchesPage() {
 
       <div className="flex gap-4 px-1 sticky top-4 z-30">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search batches or products..."
-            className="pl-9 bg-background/80 backdrop-blur-md"
+            className="pl-10 bg-background/80 backdrop-blur-md rounded-full"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
         </div>
 
         <CategoryFilter
@@ -322,7 +239,7 @@ export default function BatchesPage() {
                     <TableHead>Quantity (Units)</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Total Scans</TableHead>
-                    <TableHead className="w-[80px]"></TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -355,22 +272,8 @@ export default function BatchesPage() {
                       <TableCell className="text-right font-medium">
                         {batch.totalScans.toLocaleString()}
                       </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                            >
-                              <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <BatchActions
-                            batch={batch}
-                            onRecall={handleRecall}
-                            onCopyHash={handleCopyHash}
-                          />
-                        </DropdownMenu>
+                      <TableCell className="text-right">
+                        <ChevronRight className="h-5 w-5 text-muted-foreground opacity-50 ml-auto" />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -407,7 +310,7 @@ export default function BatchesPage() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="bg-muted/40 p-3 rounded-lg">
                         <p className="text-xs text-muted-foreground mb-1">Quantity</p>
                         <p className="text-sm font-medium">{batch.quantity.toLocaleString()}</p>
@@ -416,30 +319,6 @@ export default function BatchesPage() {
                         <p className="text-xs text-muted-foreground mb-1">Total Scans</p>
                         <p className="text-sm font-medium">{batch.totalScans.toLocaleString()}</p>
                       </div>
-                    </div>
-
-                    <div
-                      className="flex gap-2"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Button asChild className="w-full" variant="secondary">
-                        <Link href={`/manufacturer/batches/${encodeURIComponent(batch.batchNumber)}`}>
-                          <QrCode className="h-4 w-4 mr-2" />
-                          View QR
-                        </Link>
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="icon" className="shrink-0">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <BatchActions
-                          batch={batch}
-                          onRecall={handleRecall}
-                          onCopyHash={handleCopyHash}
-                        />
-                      </DropdownMenu>
                     </div>
                   </CardContent>
                 </Card>

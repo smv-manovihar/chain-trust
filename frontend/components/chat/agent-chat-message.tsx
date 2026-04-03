@@ -378,9 +378,9 @@ const AgentChatMessageBase = ({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      variant="ghost"
+                      variant="destructive"
                       size="icon"
-                      className="h-7 w-7 sm:h-8 sm:w-8 text-foreground/70 hover:text-destructive transition-all duration-300"
+                      className="h-7 w-7 sm:h-8 sm:w-8"
                       disabled={isGenerating}
                       onClick={() => setShowDeleteDialog(true)}
                     >

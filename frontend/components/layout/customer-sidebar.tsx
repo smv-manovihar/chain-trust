@@ -8,6 +8,7 @@ import {
   Pill,
   Bot,
   FileText,
+  Bell,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -33,11 +34,6 @@ export const navGroups = [
         icon: Pill,
       },
       {
-        label: "Verify Product",
-        href: "/verify",
-        icon: QrCode,
-      },
-      {
         label: "Prescriptions",
         href: "/customer/prescriptions",
         icon: FileText,
@@ -47,13 +43,23 @@ export const navGroups = [
         href: "/customer/agent",
         icon: Bot,
       },
+      {
+        label: "Verify Product",
+        href: "/verify",
+        icon: QrCode,
+      },
     ],
   },
   {
-    label: "Settings",
+    label: "Account",
     items: [
       {
-        label: "Profile",
+        label: "Notifications",
+        href: "/customer/notifications",
+        icon: Bell,
+      },
+      {
+        label: "Settings",
         href: "/customer/settings",
         icon: Settings,
       },

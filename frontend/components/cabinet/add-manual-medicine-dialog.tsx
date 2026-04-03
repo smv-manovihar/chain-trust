@@ -5,14 +5,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +35,7 @@ import {
   X,
   Calendar as CalendarIcon,
   Fingerprint,
+  Check,
 } from "lucide-react";
 // Ensure these API paths match your project
 import { addToCabinet } from "@/api/customer.api";
@@ -50,6 +51,13 @@ import {
 import { format } from "date-fns";
 import { PrescriptionSelector } from "./prescription-selector";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const manualMedicineSchema = z.object({
   name: z.string().min(2, "Medicine name is required"),
@@ -79,6 +87,8 @@ export function AddManualMedicineDialog({
   const [selectedPrescriptionIds, setSelectedPrescriptionIds] = useState<
     string[]
   >([]);
+  const [isPrescriptionDialogOpen, setIsPrescriptionDialogOpen] =
+    useState(false);
 
   const form = useForm<ManualMedicineValues>({
     resolver: zodResolver(manualMedicineSchema),
@@ -153,26 +163,46 @@ export function AddManualMedicineDialog({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
+    <ResponsiveDialog open={isOpen} onOpenChange={setIsOpen}>
+      <ResponsiveDialogTrigger asChild>
         <Button className="flex-1 sm:flex-none rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 font-bold h-12 px-4 sm:px-6 gap-2">
           <Plus className="h-5 w-5 sm:h-4 sm:w-4" />
           <span>Add Medicine</span>
         </Button>
-      </DialogTrigger>
-      {/* Mobile Optimizations on DialogContent: 
-        1. h-[100dvh] instead of h-full prevents iOS Safari bottom bar clipping 
-        2. rounded-none on mobile, rounded-[2.5rem] on desktop
-        3. max-w-none on mobile for true edge-to-edge
-      */}
-      <DialogContent className="w-full max-w-none sm:max-w-xl h-[100dvh] sm:h-[85vh] flex flex-col bg-background/95 sm:bg-background/80 backdrop-blur-3xl border-0 sm:border border-zinc-800 rounded-none sm:rounded-[2.5rem] p-0 overflow-hidden shadow-2xl">
+      </ResponsiveDialogTrigger>
+      <ResponsiveDialogContent className="w-full max-w-none sm:max-w-xl h-auto sm:h-[85vh] flex flex-col bg-background/95 sm:bg-background/80 backdrop-blur-3xl border-0 sm:border border-zinc-800 rounded-none sm:rounded-[2.5rem] p-0 overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
 
-        <DialogHeader className="p-5 sm:p-8 pb-3 relative z-10 shrink-0 border-b border-primary/5 sm:border-none mt-2 sm:mt-0">
-          <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight">
-            Add medicine
-          </DialogTitle>
-        </DialogHeader>
+        <ResponsiveDialogHeader className="p-5 sm:p-8 pb-3 relative z-auto shrink-0 border-b border-primary/5 sm:border-none mt-2 sm:mt-0">
+          <div className="flex items-center gap-3">
+            <ResponsiveDialogTitle className="text-xl sm:text-2xl font-bold tracking-tight">
+              Add medicine
+            </ResponsiveDialogTitle>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 rounded-full hover:bg-primary/10 hover:text-primary transition-all"
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="right"
+                  className="max-w-[calc(100vw-48px)] p-3 rounded-2xl bg-popover/90 backdrop-blur-md border-primary/10 shadow-xl"
+                >
+                  <p className="text-xs leading-relaxed font-medium">
+                    Add a medicine manually to your cabinet if you don't have a
+                    verified QR code. You can still link it to your
+                    prescriptions for tracking.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </ResponsiveDialogHeader>
 
         <Form {...form}>
           <form
@@ -201,7 +231,7 @@ export function AddManualMedicineDialog({
                               <Pill className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40 group-focus-within:opacity-100 transition-opacity" />
                               <Input
                                 placeholder="e.g. Paracetamol, Augmentin..."
-                                className="pl-11 h-12 w-full rounded-2xl border-primary/10 bg-muted/30 focus-visible:ring-primary/20 font-semibold transition-all text-base"
+                                className="pl-12 h-12 w-full rounded-full border-primary/10 bg-muted/30 focus-visible:ring-primary/20 font-semibold transition-all text-base"
                                 {...field}
                               />
                             </div>
@@ -224,7 +254,7 @@ export function AddManualMedicineDialog({
                               <Package className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40 group-focus-within:opacity-100 transition-opacity" />
                               <Input
                                 placeholder="e.g. GSK, Pfizer..."
-                                className="pl-11 h-12 w-full rounded-2xl border-primary/10 bg-muted/30 focus-visible:ring-primary/20 font-semibold text-base"
+                                className="pl-12 h-12 w-full rounded-full border-primary/10 bg-muted/30 focus-visible:ring-primary/20 font-semibold text-base"
                                 {...field}
                               />
                             </div>
@@ -247,7 +277,7 @@ export function AddManualMedicineDialog({
                               <FlaskConical className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40 group-focus-within:opacity-100 transition-opacity" />
                               <Input
                                 placeholder="e.g. Paracetamol 500mg"
-                                className="pl-11 h-12 w-full rounded-2xl border-primary/10 bg-muted/30 focus-visible:ring-primary/20 font-semibold text-base"
+                                className="pl-12 h-12 w-full rounded-full border-primary/10 bg-muted/30 focus-visible:ring-primary/20 font-semibold text-base"
                                 {...field}
                               />
                             </div>
@@ -273,14 +303,14 @@ export function AddManualMedicineDialog({
                       render={({ field }) => (
                         <FormItem className="w-full max-w-full overflow-hidden">
                           <FormLabel className="text-xs font-semibold text-muted-foreground/70 ml-1">
-                            Batch or code
+                            Batch of medicines
                           </FormLabel>
                           <FormControl>
                             <div className="relative group w-full">
                               <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40 group-focus-within:opacity-100 transition-opacity" />
                               <Input
                                 placeholder="Code on pack"
-                                className="pl-11 h-12 w-full rounded-2xl border-primary/10 bg-muted/30 focus-visible:ring-primary/20 font-mono text-sm font-bold"
+                                className="pl-12 h-12 w-full rounded-full border-primary/10 bg-muted/30 focus-visible:ring-primary/20 font-mono text-sm font-bold"
                                 {...field}
                               />
                             </div>
@@ -305,7 +335,7 @@ export function AddManualMedicineDialog({
                                   <Button
                                     variant={"outline"}
                                     className={cn(
-                                      "w-full pl-4 text-left font-bold h-12 rounded-2xl bg-muted/30 border-primary/10 hover:bg-muted/40 transition-all text-base",
+                                      "w-full pl-4 text-left font-bold h-12 rounded-full bg-muted/30 border-primary/10 hover:bg-muted/40 transition-all text-base",
                                       !field.value && "text-muted-foreground",
                                     )}
                                   >
@@ -400,21 +430,53 @@ export function AddManualMedicineDialog({
                     </div>
                   </div>
 
-                  <div className="bg-muted/20 p-4 sm:p-5 rounded-[1.5rem] sm:rounded-[2rem] border border-primary/5 shadow-sm space-y-4">
+                  <div className="bg-muted/20 p-4 sm:p-5 rounded-[2rem] border border-primary/5 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-bold text-muted-foreground/80 ml-1">
+                        Prescriptions
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsPrescriptionDialogOpen(true)}
+                        className="h-8 rounded-full border-dashed border-primary/30 hover:border-primary/50 text-[10px] font-bold px-3 transition-all"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Attach
+                      </Button>
+                    </div>
+
                     <PrescriptionSelector
+                      open={isPrescriptionDialogOpen}
+                      onOpenChange={setIsPrescriptionDialogOpen}
                       selectedIds={selectedPrescriptionIds}
                       onChange={setSelectedPrescriptionIds}
                     />
+
+                    {selectedPrescriptionIds.length > 0 && (
+                      <div className="flex flex-wrap gap-2 p-3 rounded-2xl bg-background border border-primary/10">
+                        {selectedPrescriptionIds.map((id) => (
+                          <div
+                            key={id}
+                            className="px-3 py-1 bg-primary/5 border border-primary/20 rounded-full text-[10px] font-bold text-primary flex items-center gap-1.5"
+                          >
+                            <Check className="h-3 w-3" />
+                            <span>ID: {id.slice(-6).toUpperCase()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </ScrollArea>
 
             {/* Added pb-8 on mobile to ensure it sits safely above the iOS home indicator */}
-            <DialogFooter className="p-4 pb-8 sm:p-6 sm:pt-4 shrink-0 border-t border-primary/5 bg-background/80 backdrop-blur-md">
+            <ResponsiveDialogFooter className="p-4 pb-8 sm:p-6 sm:pt-4 shrink-0 border-t border-primary/5 bg-background/80 backdrop-blur-md">
               <Button
                 type="submit"
-                className="w-full h-14 rounded-2xl shadow-xl shadow-primary/20 font-bold text-base sm:text-lg gap-3 transition-transform hover:scale-[1.02] active:scale-95"
+                className="w-full h-14 rounded-full shadow-xl shadow-primary/20 font-bold text-base sm:text-lg gap-3 transition-transform hover:scale-[1.02] active:scale-95"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -429,10 +491,10 @@ export function AddManualMedicineDialog({
                   </>
                 )}
               </Button>
-            </DialogFooter>
+            </ResponsiveDialogFooter>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

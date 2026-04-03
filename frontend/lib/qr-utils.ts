@@ -1,7 +1,7 @@
 /**
  * QR Code Generation Utilities
- * For ChainTrust pharmaceutical verification system
  */
+import { hashSHA256 } from './crypto-utils';
 
 /**
  * Derive a unit-level salt from a batch salt and unit index.
@@ -9,11 +9,7 @@
  * Uses Web Crypto API for client-side hashing.
  */
 export async function deriveUnitSalt(batchSalt: string, unitIndex: number): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(`${batchSalt}-${unitIndex}`);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashSHA256(`${batchSalt}-${unitIndex}`);
 }
 
 /**

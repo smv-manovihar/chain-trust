@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from "react";
 import {
   format,
-  differenceInDays,
   subDays,
   startOfDay,
   endOfDay,
@@ -40,18 +39,15 @@ import {
 } from "@/components/ui/tooltip";
 import {
   Activity,
-  Download,
   Package,
   ShieldCheck,
   Calendar as CalendarIcon,
-  MapPin,
-  Boxes,
   Globe,
   AlertTriangle,
   ArrowRight,
   Loader2,
-  MousePointerClick,
   ExternalLink,
+  Boxes,
 } from "lucide-react";
 import { listProducts } from "@/api/product.api";
 import { listBatches } from "@/api/batch.api";
@@ -78,9 +74,11 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 export default function AnalyticsPage() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
 
   // Replaced static 30 with Shadcn DateRange state
@@ -166,11 +164,6 @@ export default function AnalyticsPage() {
         const geoSegments = geoRes.distribution || [];
         const threatIntel = threatsRes.threats || [];
 
-        const totalScans = batches.reduce(
-          (acc: number, b: any) => acc + (Number(b.totalScans) || 0),
-          0,
-        );
-
         setStats({
           products: products.length,
           batches: batches.length,
@@ -192,7 +185,7 @@ export default function AnalyticsPage() {
       } catch (error: any) {
         if (error.name === "AbortError") return;
         console.error("Failed to fetch analytics:", error);
-        toast.error("Could not load intelligence data.");
+        toast.error("Could not load analytics data.");
       } finally {
         if (fetchAbortRef.current === controller) {
           setIsLoading(false);
@@ -252,7 +245,7 @@ export default function AnalyticsPage() {
               </DrawerTrigger>
               <DrawerContent>
                 <DrawerHeader className="text-left">
-                  <DrawerTitle>Select Date Range</DrawerTitle>
+                  <DrawerTitle>Select date range</DrawerTitle>
                   <DrawerDescription>
                     Analyze data within a specific timeframe.
                   </DrawerDescription>
@@ -318,7 +311,7 @@ export default function AnalyticsPage() {
               className="w-full sm:w-auto gap-2 shadow-sm font-semibold group h-11 sm:h-10 rounded-full"
             >
               <Activity className="h-4 w-4" />
-              Scan Details
+              Scan details
               <ArrowRight className="h-4 w-4 opacity-70 group-hover:translate-x-1 transition-transform sm:inline hidden" />
             </Button>
           </Link>
@@ -332,21 +325,21 @@ export default function AnalyticsPage() {
           <CardHeader className="flex flex-col items-stretch border-b p-0 sm:flex-row">
             <div className="flex flex-1 flex-col justify-center gap-1 px-6 py-4">
               <CardTitle className="text-lg font-black tracking-tight leading-none">
-                Scan Volume
+                Scan volume
               </CardTitle>
               <CardDescription>
-                Detailed scan activity and scan trends
+                Detailed verification activity and scan trends
               </CardDescription>
             </div>
             <div className="flex flex-wrap border-t sm:border-t-0 sm:border-l">
               {[
-                { id: "all", label: "Total Scans", total: entityTotals.all },
+                { id: "all", label: "Total scans", total: entityTotals.all },
                 {
                   id: "product",
-                  label: "By Products",
+                  label: "By products",
                   total: entityTotals.all,
                 },
-                { id: "batch", label: "By Batches", total: entityTotals.all },
+                { id: "batch", label: "By batches", total: entityTotals.all },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -354,10 +347,10 @@ export default function AnalyticsPage() {
                   className="flex flex-1 min-w-[100px] flex-col justify-center gap-1 px-4 py-3 sm:px-6 sm:py-4 text-left data-[active=true]:bg-muted/50 transition-colors border-r last:border-r-0"
                   onClick={() => setActiveTab(tab.id)}
                 >
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold leading-none">
+                  <span className="text-[10px] tracking-wider text-muted-foreground font-bold leading-none">
                     {tab.label}
                   </span>
-                  <span className="text-lg leading-none font-black sm:text-2xl">
+                  <span className="text-lg leading-none font-black sm:text-2xl mt-1">
                     {tab.total >= 1000
                       ? `${(tab.total / 1000).toFixed(1)}k`
                       : tab.total}
@@ -438,71 +431,59 @@ export default function AnalyticsPage() {
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2 bg-muted/20 rounded-lg border border-dashed">
                 <Activity className="h-8 w-8 opacity-50" />
-                <p className="text-sm font-medium">No activity in period</p>
+                <p className="text-sm font-medium">No activity detected</p>
               </div>
             )}
           </div>
         </Card>
 
-        {/* Executive Summary */}
+        {/* Executive Summary - Uppercase Labels Allowed here */}
         <Card className="lg:col-span-1 rounded-xl shadow-sm flex flex-col min-h-[320px] overflow-hidden">
           <CardHeader className="border-b">
             <CardTitle className="text-xl font-black tracking-tight">
-              Executive Summary
+              Executive summary
             </CardTitle>
-            <CardDescription>Fleet-wide performance overview</CardDescription>
+            <CardDescription>Product and batch performance</CardDescription>
           </CardHeader>
           <div className="p-6 flex-1 flex flex-col justify-between">
             <div className="space-y-6">
               <div className="flex items-center justify-between group">
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Products
-                  </p>
-                  <p className="text-2xl font-black tracking-tight">
-                    {stats.products}
-                  </p>
+                  <p className="text-xs font-bold text-muted-foreground uppercase opacity-60">PRODUCTS</p>
+                  <p className="text-2xl font-black tracking-tight">{stats.products}</p>
                 </div>
-                <div className="p-2.5 bg-blue-500/10 rounded-lg">
+                <div className="p-2.5 bg-blue-500/10 rounded-xl">
                   <Package className="h-5 w-5 text-blue-500" />
                 </div>
               </div>
 
               <div className="flex items-center justify-between group">
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Active Batches
-                  </p>
-                  <p className="text-2xl font-black tracking-tight">
-                    {stats.batches}
-                  </p>
+                  <p className="text-xs font-bold text-muted-foreground uppercase opacity-60">ACTIVE BATCHES</p>
+                  <p className="text-2xl font-black tracking-tight">{stats.batches}</p>
                 </div>
-                <div className="p-2.5 bg-primary/10 rounded-lg">
+                <div className="p-2.5 bg-primary/10 rounded-xl">
                   <Boxes className="h-5 w-5 text-primary" />
                 </div>
               </div>
 
               <div className="flex items-center justify-between group">
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Total Scans
-                  </p>
+                  <p className="text-xs font-bold text-muted-foreground uppercase opacity-60">TOTAL SCANS</p>
                   <p className="text-2xl font-black tracking-tight">
                     {stats.totalScans >= 1000
                       ? `${(stats.totalScans / 1000).toFixed(1)}k`
                       : stats.totalScans}
                   </p>
                 </div>
-                <div className="p-2.5 bg-emerald-500/10 rounded-lg">
+                <div className="p-2.5 bg-emerald-500/10 rounded-xl">
                   <ShieldCheck className="h-5 w-5 text-emerald-500" />
                 </div>
               </div>
 
               <div className="flex items-center justify-between group">
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Incidents
-                  </p>
+                  <p className="text-xs font-bold text-muted-foreground uppercase opacity-60">INCIDENTS</p>
                   <p
                     className={cn(
                       "text-2xl font-black tracking-tight",
@@ -514,7 +495,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div
                   className={cn(
-                    "p-2.5 rounded-lg",
+                    "p-2.5 rounded-xl",
                     stats.securityIncidents > 0 ? "bg-red-500/10" : "bg-muted",
                   )}
                 >
@@ -539,10 +520,10 @@ export default function AnalyticsPage() {
         <Card className="lg:col-span-2 rounded-xl shadow-sm flex flex-col min-h-[300px] overflow-hidden">
           <CardHeader className="border-b">
             <CardTitle className="text-xl font-black tracking-tight">
-              Regional Scans
+              Regional scans
             </CardTitle>
             <CardDescription>
-              Geographic distribution of product verifications
+              Geographic distribution of verifications
             </CardDescription>
           </CardHeader>
           <div className="p-6 flex-1 w-full min-h-[300px]">
@@ -605,19 +586,11 @@ export default function AnalyticsPage() {
         </Card>
 
         {/* Batch Ranking Table */}
-        <Card className="lg:col-span-1 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-[300px]">
+        <Card className="lg:col-span-1 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-[400px]">
           <CardHeader className="border-b gap-0.5">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xl font-black tracking-tight">
-                Batch Performance
-              </CardTitle>
-              <Badge
-                variant="outline"
-                className="font-bold uppercase tracking-widest text-[9px] px-1.5 h-4 border-primary/20 text-primary bg-primary/5"
-              >
-                Top Rank
-              </Badge>
-            </div>
+            <CardTitle className="text-xl font-black tracking-tight">
+              Batch performance
+            </CardTitle>
             <CardDescription className="text-xs">
               Engagement volume by production run
             </CardDescription>
@@ -626,10 +599,10 @@ export default function AnalyticsPage() {
             <table className="w-full text-left">
               <thead className="sticky top-0 bg-card z-10 border-b">
                 <tr>
-                  <th className="px-4 sm:px-6 py-3 text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
+                  <th className="px-4 sm:px-6 py-3 text-[10px] font-bold text-muted-foreground">
                     Batch ID
                   </th>
-                  <th className="px-4 sm:px-6 py-3 text-[10px] uppercase font-bold text-muted-foreground tracking-widest text-right">
+                  <th className="px-4 sm:px-6 py-3 text-[10px] font-bold text-muted-foreground text-right">
                     Scan Index
                   </th>
                 </tr>
@@ -638,29 +611,27 @@ export default function AnalyticsPage() {
                 {topBatches.map((batch, i) => (
                   <tr
                     key={i}
-                    className="hover:bg-muted/50 transition-colors group cursor-pointer"
+                    onClick={() => router.push(`/manufacturer/analytics/scans?batchNumber=${batch.batchNumber}`)}
+                    className="hover:bg-primary/[0.03] transition-all group cursor-pointer"
                   >
-                    <td className="px-4 sm:px-6 py-3 sm:py-4">
-                      <Link
-                        href={`/manufacturer/analytics/scans?batchNumber=${batch.batchNumber}`}
-                        className="flex flex-col gap-0.5"
-                      >
+                    <td className="px-4 sm:px-6 py-4">
+                      <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-1.5 font-black tracking-tight text-sm sm:text-base group-hover:text-primary transition-colors">
                           {batch.batchNumber}
                           <ArrowRight className="h-3 w-3 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all sm:inline hidden" />
                         </div>
-                        <p className="text-[9px] sm:text-[10px] text-muted-foreground font-medium uppercase tracking-tight truncate max-w-[80px] sm:max-w-none">
+                        <p className="text-[9px] sm:text-[10px] text-muted-foreground font-medium truncate max-w-[80px] sm:max-w-none">
                           {batch.productName}
                         </p>
-                      </Link>
+                      </div>
                     </td>
-                    <td className="px-4 sm:px-6 py-3 sm:py-4 text-right">
+                    <td className="px-4 sm:px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2 sm:gap-4">
                         <div className="flex flex-col items-end gap-0.5">
                           <span className="text-sm sm:text-base font-black tracking-tighter tabular-nums">
                             {batch.totalScans}
                           </span>
-                          <div className="h-1 w-12 sm:w-20 bg-muted rounded-full overflow-hidden hidden xs:block">
+                          <div className="h-1.5 w-12 sm:w-20 bg-muted/50 rounded-full overflow-hidden hidden xs:block">
                             <div
                               className="h-full bg-primary"
                               style={{
@@ -672,21 +643,26 @@ export default function AnalyticsPage() {
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Link href={`/manufacturer/batches/${batch._id}`}>
+                              <Link 
+                                href={`/manufacturer/batches/${batch.batchNumber}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                }}
+                              >
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground hover:text-primary transition-colors shrink-0"
+                                  className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors shrink-0"
                                 >
-                                  <ExternalLink className="h-3 sm:h-3.5 w-3 sm:w-3.5" />
+                                  <ExternalLink className="h-3.5 w-3.5" />
                                 </Button>
                               </Link>
                             </TooltipTrigger>
-                            <TooltipContent
-                              side="left"
-                              className="text-xs font-bold bg-primary text-primary-foreground border-none"
+                           <TooltipContent
+                              side="top"
+                              className="text-[10px] font-bold bg-primary text-primary-foreground border-none px-3 py-1.5"
                             >
-                              View Profile
+                              Open profile
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -697,10 +673,10 @@ export default function AnalyticsPage() {
               </tbody>
             </table>
           </div>
-          <div className="px-6 py-4 border-t">
+          <div className="px-6 py-4 border-t bg-muted/5">
             <Link href="/manufacturer/analytics/scans">
-              <Button variant="ghost" className="w-full text-sm hover:bg-muted">
-                View Detailed Scans <ArrowRight className="ml-2 h-4 w-4" />
+              <Button variant="ghost" className="w-full text-xs font-bold hover:bg-muted rounded-xl h-10">
+                View detailed scans <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
           </div>

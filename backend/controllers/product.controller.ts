@@ -9,7 +9,7 @@ const PRODUCT_ID_REGEX = /^[a-zA-Z0-9\-_.]+$/;
 // POST /api/products — Create a new catalogue product
 export const createProduct = async (req: Request, res: Response) => {
 	try {
-		const { name, productId, categories, brand, price, description, images } = req.body;
+		const { name, productId, categories, brand, price, description, composition, images, unit } = req.body;
 
 		if (!name || !productId || !categories || !Array.isArray(categories) || categories.length === 0 || !brand) {
 			return res.status(400).json({ message: 'Name, Product ID, Categories (array), and Brand are required.' });
@@ -33,7 +33,9 @@ export const createProduct = async (req: Request, res: Response) => {
 			categories,
 			brand,
 			price: price || 0,
+			composition,
 			description,
+			unit: unit || 'pills',
 			images: images || [],
 			createdBy: userId,
 		});
@@ -160,7 +162,7 @@ export const updateProduct = async (req: Request, res: Response) => {
 			return res.status(404).json({ message: 'Product not found' });
 		}
 
-		const { name, productId, categories, brand, price, description, images, qrSettings } = req.body;
+		const { name, productId, categories, brand, price, description, composition, images, qrSettings, unit } = req.body;
 
 		const oldProductId = product.productId;
 		let productIdChanged = false;
@@ -176,7 +178,9 @@ export const updateProduct = async (req: Request, res: Response) => {
 		if (categories) product.categories = categories;
 		if (brand) product.brand = brand;
 		if (price !== undefined) product.price = price;
+		if (composition !== undefined) product.composition = composition;
 		if (description !== undefined) product.description = description;
+		if (unit !== undefined) product.unit = unit;
 		if (qrSettings) product.qrSettings = { ...product.qrSettings, ...qrSettings };
 		
 		// IMAGE CLEANUP: Identify removed images

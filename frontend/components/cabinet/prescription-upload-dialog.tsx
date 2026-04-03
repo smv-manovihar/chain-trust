@@ -2,13 +2,13 @@
 
 import React, { useState } from "react";
 import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription,
-  DialogFooter
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle
+} from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -18,8 +18,15 @@ import {
   CheckCircle2, 
   X,
   Stethoscope,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Info
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { uploadImages } from "@/api/upload.api";
 import { uploadPrescription } from "@/api/customer.api";
 import { toast } from "sonner";
@@ -105,19 +112,32 @@ export function PrescriptionUploadDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full sm:max-w-md h-full sm:h-auto bg-background/95 backdrop-blur-md border-zinc-800 sm:rounded-[2rem] p-0 overflow-hidden flex flex-col">
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="w-full sm:max-w-md h-auto sm:h-auto bg-background/95 backdrop-blur-md border-zinc-800 sm:rounded-[2rem] p-0 overflow-hidden flex flex-col">
         <ScrollArea className="flex-1 w-full">
           <div className="px-6 py-8 space-y-6 overflow-x-hidden w-full">
             <div className="mx-auto w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center mb-2">
               <FileText className="h-6 w-6 text-blue-500" />
             </div>
-            <DialogHeader className="p-0">
-              <DialogTitle className="text-center text-xl font-bold">New prescription</DialogTitle>
-              <DialogDescription className="text-center text-xs sm:text-sm">
-                Upload your prescription document (PDF or image) for quick selection later.
-              </DialogDescription>
-            </DialogHeader>
+            <ResponsiveDialogHeader className="p-0">
+              <div className="flex items-center justify-center gap-2">
+                <ResponsiveDialogTitle className="text-center text-xl font-bold tracking-tight">New prescription</ResponsiveDialogTitle>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-primary/10 hover:text-primary transition-all">
+                        <Info className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[250px] p-3 rounded-2xl bg-popover/90 backdrop-blur-md border-primary/10 shadow-xl">
+                      <p className="text-xs leading-relaxed font-medium">
+                        Upload your prescription document (PDF or image) for quick selection later. This allows you to link it to your medications for automated dose tracking.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </ResponsiveDialogHeader>
 
             <div className="space-y-5 pt-4">
               <div className="space-y-2">
@@ -199,7 +219,7 @@ export function PrescriptionUploadDialog({
           </div>
         </ScrollArea>
 
-        <DialogFooter className="p-6 border-t border-white/5 bg-muted/5 shrink-0">
+        <ResponsiveDialogFooter className="p-6 border-t border-white/5 bg-muted/5 shrink-0">
           <Button 
             className="w-full h-12 rounded-xl gap-2 font-bold text-base" 
             onClick={handleUpload} 
@@ -217,8 +237,8 @@ export function PrescriptionUploadDialog({
               </>
             )}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

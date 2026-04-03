@@ -6,6 +6,7 @@ import {
   Settings,
   BarChart3,
   Boxes,
+  Bell,
   PanelLeft,
   Bot,
   QrCode,
@@ -62,8 +63,13 @@ export const navGroups = [
     ],
   },
   {
-    label: "Configuration",
+    label: "Account",
     items: [
+      {
+        label: "Notifications",
+        href: "/manufacturer/notifications",
+        icon: Bell,
+      },
       {
         label: "Settings",
         href: "/manufacturer/settings",

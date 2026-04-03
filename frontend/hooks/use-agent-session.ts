@@ -63,7 +63,7 @@ export const useAgentSession = ({
     try {
       if (!sessionRef.current) setIsLoading(true);
 
-      const sessions = await agentApi.listSessions(controller.signal);
+      const sessions = await agentApi.listSessions(undefined, undefined, undefined, controller.signal);
       const currentSession = sessions.find(s => s.id === sessionId);
       
       if (!currentSession) {

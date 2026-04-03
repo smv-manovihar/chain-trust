@@ -23,6 +23,13 @@ import {
   ArrowRight,
   PlusCircle,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { createProduct } from "@/api/product.api";
 import { uploadImages } from "@/api/upload.api";
 import { toast } from "sonner";
@@ -66,6 +73,7 @@ export default function NewProductWizard() {
     price: "",
     description: "",
     composition: "",
+    unit: "pills",
     images: [] as File[],
     imageAccessLevel: "public" as "public" | "verified_only" | "internal_only",
     customerVisibleImages: [] as number[],
@@ -136,7 +144,7 @@ export default function NewProductWizard() {
   };
 
   const nextStep = () => {
-    if (step === 1 && (!form.name || !form.productId || form.categories.length === 0 || !form.brand || !form.composition)) {
+    if (step === 1 && (!form.name || !form.productId || form.categories.length === 0 || !form.brand || !form.composition || !form.unit)) {
       toast.error("Please fill in all basic details.");
       return;
     }
@@ -147,7 +155,7 @@ export default function NewProductWizard() {
 
   if (!walletAddress) {
     return (
-      <div className="max-w-md mx-auto mt-20 animate-in fade-in zoom-in-95 duration-500 flex-1 min-h-0">
+      <div className="max-w-md mx-auto mt-20 flex-1 min-h-0">
         <Card className="p-8 text-center space-y-6">
           <div className="mx-auto h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center relative">
             <Wallet className="h-10 w-10 text-primary" />
@@ -163,7 +171,7 @@ export default function NewProductWizard() {
             <Button
               onClick={connectWallet}
               disabled={isConnecting}
-              className="w-full gap-2"
+              className="w-full gap-2 rounded-full h-11"
             >
               {isConnecting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -172,7 +180,7 @@ export default function NewProductWizard() {
               )}
               Connect Wallet
             </Button>
-            <Button variant="outline" asChild className="w-full">
+            <Button variant="outline" asChild className="w-full rounded-full h-11">
               <Link href="/manufacturer/products">Cancel</Link>
             </Button>
           </div>
@@ -182,7 +190,7 @@ export default function NewProductWizard() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto w-full space-y-6 pb-20 animate-in fade-in flex-1 min-h-0">
+    <div className="max-w-3xl mx-auto w-full space-y-6 pb-20 flex-1 min-h-0">
       {/* Header & Progress */}
       <div className="flex items-center gap-4 px-1">
         <Button
@@ -241,11 +249,12 @@ export default function NewProductWizard() {
                   </div>
                   <div className="grid sm:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label>Product Name</Label>
+                      <Label>Product name</Label>
                       <Input
                         placeholder="e.g. Amoxicillin 500mg"
                         value={form.name}
                         onChange={(e) => updateForm({ name: e.target.value })}
+                        className="rounded-full h-11"
                         autoFocus
                       />
                     </div>
@@ -255,14 +264,16 @@ export default function NewProductWizard() {
                         placeholder="e.g. NDC-12345"
                         value={form.productId}
                         onChange={(e) => updateForm({ productId: e.target.value })}
+                        className="rounded-full h-11"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Composition / Active Ingredients</Label>
+                      <Label>Composition / active ingredients</Label>
                       <Input
                         placeholder="e.g. Paracetamol 500mg"
                         value={form.composition}
                         onChange={(e) => updateForm({ composition: e.target.value })}
+                        className="rounded-full h-11"
                       />
                     </div>
                     <div className="space-y-2 flex flex-col justify-end">
@@ -272,17 +283,38 @@ export default function NewProductWizard() {
                         onCategoryChange={(cats) => updateForm({ categories: cats })}
                         canManage={true}
                         placeholder="Select categories..."
-                        className="w-full justify-between h-auto min-h-[40px] px-3 py-2 rounded-md"
+                        className="w-full justify-between h-auto min-h-[44px] px-4 py-2 rounded-full border-border/40"
                         align="start"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Brand / Manufacturer</Label>
+                      <Label>Brand / manufacturer</Label>
                       <Input
                         placeholder="e.g. PharmaCorp"
-                        value={form.brand}
+                         value={form.brand}
                         onChange={(e) => updateForm({ brand: e.target.value })}
+                        className="rounded-full h-11"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Standard unit (Dose type)</Label>
+                      <Select
+                        value={form.unit}
+                        onValueChange={(val) => updateForm({ unit: val })}
+                      >
+                        <SelectTrigger className="w-full h-11 rounded-full px-4">
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="tablets">Tablets</SelectItem>
+                          <SelectItem value="capsules">Capsules</SelectItem>
+                          <SelectItem value="pills">Pills</SelectItem>
+                          <SelectItem value="mg">mg</SelectItem>
+                          <SelectItem value="ml">ml</SelectItem>
+                          <SelectItem value="doses">Doses</SelectItem>
+                          <SelectItem value="units">Units</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>
@@ -296,12 +328,13 @@ export default function NewProductWizard() {
                   </div>
                   <div className="space-y-6">
                     <div className="space-y-2 sm:w-1/2">
-                      <Label>Price (USDT Equivalent)</Label>
+                      <Label>Price (USDT equivalent)</Label>
                       <Input
                         type="number"
                         placeholder="0.00"
                         value={form.price}
                         onChange={(e) => updateForm({ price: e.target.value })}
+                        className="rounded-full h-11"
                         autoFocus
                       />
                     </div>
@@ -311,7 +344,7 @@ export default function NewProductWizard() {
                         placeholder="Enter formulation details, dosage instructions..."
                         value={form.description}
                         onChange={(e) => updateForm({ description: e.target.value })}
-                        className="min-h-[160px] resize-none"
+                        className="min-h-[160px] resize-none rounded-[1.5rem] p-4 shadow-inner"
                       />
                     </div>
                   </div>
@@ -393,17 +426,17 @@ export default function NewProductWizard() {
                   <div className="space-y-4 pt-4 border-t border-border/40">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div>
-                        <Label className="text-sm font-bold">Image Access Level</Label>
+                        <Label className="text-sm font-bold">Image access level</Label>
                         <p className="text-xs text-muted-foreground mt-0.5">Control who can view these product images</p>
                       </div>
-                      <div className="flex bg-muted/50 p-1 rounded-lg border border-border/50 w-full sm:w-auto">
+                      <div className="flex bg-muted/50 p-1.5 rounded-full border border-border/50 w-full sm:w-auto">
                         {(['public', 'verified_only', 'internal_only'] as const).map((level) => (
                           <button
                             key={level}
                             type="button"
                             onClick={() => updateForm({ imageAccessLevel: level })}
                             className={cn(
-                              "px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all flex-1 sm:flex-none",
+                              "px-4 py-2 text-[10px] font-bold rounded-full transition-all flex-1 sm:flex-none",
                               form.imageAccessLevel === level
                                 ? "bg-background text-primary shadow-sm border border-border/50"
                                 : "text-muted-foreground hover:text-foreground"
@@ -433,6 +466,7 @@ export default function NewProductWizard() {
               <Button
                 variant="outline"
                 onClick={prevStep}
+                className="rounded-full h-10 px-8"
               >
                 Back
               </Button>
@@ -441,14 +475,14 @@ export default function NewProductWizard() {
             )}
 
             {step < 3 ? (
-              <Button onClick={nextStep} className="gap-2">
+              <Button onClick={nextStep} className="gap-2 rounded-full h-10 px-8">
                 Next <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
               <Button
                 onClick={handleSave}
                 disabled={saving}
-                className="gap-2"
+                className="gap-2 rounded-full h-10 px-8"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {saving ? "Saving..." : "Create Product"}

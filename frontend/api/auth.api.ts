@@ -66,7 +66,7 @@ export async function getCurrentUser(signal?: AbortSignal): Promise<{ user: User
 }
 
 export async function logout(signal?: AbortSignal): Promise<void> {
-  await client.post('/auth/logout', null, { signal });
+  await client.post('/auth/logout', {}, { signal });
 }
 
 export async function deleteAccount(signal?: AbortSignal): Promise<void> {

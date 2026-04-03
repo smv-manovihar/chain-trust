@@ -8,6 +8,7 @@ export interface IProduct extends Document {
 	price: number;
 	composition: string;
 	description?: string;
+	unit: string;
 	images: string[]; // S3/MinIO URLs
 	imageAccessLevel?: 'public' | 'verified_only' | 'internal_only';
 	customerVisibleImages?: number[]; // Indices of images visible to customers
@@ -52,6 +53,10 @@ const productSchema = new Schema<IProduct>(
 		description: {
 			type: String,
 			trim: true,
+		},
+		unit: {
+			type: String,
+			default: 'pills',
 		},
 		images: {
 			type: [String],

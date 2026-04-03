@@ -211,14 +211,14 @@ export default function CustomerDashboard() {
                     className="h-1 mb-4"
                   />
                   <div className="flex justify-between items-center bg-background/50 p-2 rounded-xl">
-                    <span className="text-[10px] font-black text-primary uppercase">
+                    <span className="text-[10px] font-black text-primary">
                       {med.currentQuantity} Left
                     </span>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleTakeDose(med._id, med.name)}
-                      className="h-8 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all border-primary/20"
+                      className="h-8 px-4 rounded-xl text-[10px] font-black hover:bg-primary hover:text-white transition-all border-primary/20"
                     >
                       Taken
                     </Button>
@@ -228,7 +228,7 @@ export default function CustomerDashboard() {
             ) : (
               <Card className="flex-1 min-h-[300px] lg:min-h-0 flex flex-col items-center justify-center text-center opacity-40 border-2 border-dashed rounded-[2.5rem] bg-muted/5 h-full">
                 <Pill className="h-8 w-8 mx-auto mb-3 opacity-20" />
-                <p className="text-[10px] font-black uppercase tracking-widest">
+                <p className="text-[10px] font-bold text-muted-foreground">
                   Your list is empty
                 </p>
               </Card>
@@ -348,7 +348,7 @@ export default function CustomerDashboard() {
                       {alert.link && (
                         <Link
                           href={alert.link}
-                          className="text-[10px] font-black uppercase text-primary hover:underline flex items-center gap-1"
+                          className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
                         >
                           View Details <ArrowRight className="h-3 w-3" />
                         </Link>
@@ -362,8 +362,8 @@ export default function CustomerDashboard() {
                     className="h-10 w-10 mb-3 text-primary"
                     strokeWidth={1.5}
                   />
-                  <p className="text-xs font-black uppercase tracking-tight">
-                    Supply Health Verified
+                  <p className="text-xs font-bold text-muted-foreground/60">
+                    Your supply is secure
                   </p>
                 </div>
               )}

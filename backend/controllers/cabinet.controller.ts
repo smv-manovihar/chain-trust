@@ -79,14 +79,26 @@ export const getPersonalCabinet = async (req: Request, res: Response): Promise<v
 		const userId = (req as any).user.id;
 		const page = parseInt(req.query.page as string) || 1;
 		const limit = parseInt(req.query.limit as string) || 10;
-		const search = req.query.search as string;
+		const searchTerm = req.query.search as string;
+		const status = req.query.status as string;
 
 		const query: any = { userId };
-		if (search) {
+		if (searchTerm) {
 			query.$or = [
-				{ name: { $regex: search, $options: 'i' } },
-				{ brand: { $regex: search, $options: 'i' } }
+				{ name: { $regex: searchTerm, $options: 'i' } },
+				{ brand: { $regex: searchTerm, $options: 'i' } },
+				{ composition: { $regex: searchTerm, $options: 'i' } },
+				{ doctorName: { $regex: searchTerm, $options: 'i' } },
+				{ notes: { $regex: searchTerm, $options: 'i' } },
+				{ productId: { $regex: searchTerm, $options: 'i' } },
 			];
+		}
+		if (status === 'all') {
+			// No filter on status
+		} else if (status) {
+			query.status = status;
+		} else {
+			query.status = 'active'; // Default to active items
 		}
 
 		const total = await CabinetItem.countDocuments(query);
@@ -207,6 +219,7 @@ export const addToCabinet = async (req: Request, res: Response): Promise<void> =
 			currentQuantity: productData.currentQuantity,
 			totalQuantity: productData.totalQuantity,
 			unit: productData.unit,
+			doctorName: productData.doctorName,
 			notes: productData.notes,
 			reminderTimes: productData.reminderTimes || [],
 			prescriptionIds: productData.prescriptionIds || [],
@@ -367,7 +380,7 @@ export const getUserPrescriptions = async (req: Request, res: Response): Promise
 				const linkedMedications = await CabinetItem.find({
 					userId,
 					prescriptionIds: p._id
-				}).select('name brand productId batchNumber isUserAdded');
+				}).select('name brand productId batchNumber isUserAdded images');
 
 				return {
 					...p.toObject(),

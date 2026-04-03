@@ -181,7 +181,7 @@ export default function ManufacturerSettingsPage() {
 
         <TabsContent
           value="general"
-          className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300"
+          className="space-y-6"
         >
           <Card className="border border-border overflow-hidden rounded-[2rem] shadow-sm">
             <CardHeader className="bg-muted/30 pb-8">
@@ -294,7 +294,7 @@ export default function ManufacturerSettingsPage() {
 
         <TabsContent
           value="security"
-          className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-400"
+          className="space-y-6"
         >
           <GoogleConnection redirectPath="/manufacturer/settings" />
           <PasswordSettings />
@@ -317,7 +317,7 @@ export default function ManufacturerSettingsPage() {
 
         <TabsContent
           value="notifications"
-          className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500"
+          className="space-y-6"
         >
           <Card className="border border-border rounded-[2rem] overflow-hidden">
             <CardHeader className="bg-muted/10">
@@ -383,14 +383,14 @@ export default function ManufacturerSettingsPage() {
 
         <TabsContent
           value="web3"
-          className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-600"
+          className="space-y-6"
         >
           <WalletSettings />
         </TabsContent>
 
         <TabsContent
           value="advanced"
-          className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-700"
+          className="space-y-6"
         >
           <DangerZoneSettings role="manufacturer" />
         </TabsContent>

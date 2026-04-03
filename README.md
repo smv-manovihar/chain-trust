@@ -27,6 +27,26 @@ ChainTrust/
 
 ---
 
+## 🎨 Design System & Mobile Experience
+
+ChainTrust follows a **Mobile-First** design philosophy. The UI is built using a custom design system that prioritizes speed, clarity, and accessibility.
+
+### Key Principles
+- **Responsive Dialogs**: All complex forms use a `ResponsiveDialog` pattern—rendering as a bottom-sheet **Drawer** on mobile and a centered **Dialog** on desktop.
+- **Glassmorphism**: High-density interfaces with `backdrop-blur` and subtle borders for a premium feel.
+- **No-Scroll Layouts**: Dashboard views are designed to fit within the viewport (`h-screen`) to prevent disorienting global page scrolls.
+
+### Essential Components
+| Component | Purpose | Location |
+| :--- | :--- | :--- |
+| `ResponsiveDialog` | Adaptive form container | `components/ui/responsive-dialog.tsx` |
+| `StatCard` | KPI and metric display | `components/ui/stat-card.tsx` |
+| `AgentChat` | AI assistant interface | `components/chat/agent-chat.tsx` |
+| `BrandLogo` | Consistent branding | `components/layout/brand-logo.tsx` |
+
+
+---
+
 ## ✅ Prerequisites
 
 Make sure you have the following installed:
@@ -148,7 +168,7 @@ pnpm dev
 
 The frontend will be running at **http://localhost:3000**.
 
-### 9. Start the AI Service (Optional)
+### 7. Start the AI Service (Optional)
 
 ```bash
 cd ai-service
@@ -156,7 +176,18 @@ uv sync
 uv run main.py
 ```
 
-The AI service will be running at **http://localhost:8000**.
+---
+
+## 🐳 Docker Deployment
+
+The project includes a multi-container Docker setup for production-ready local environments.
+
+```bash
+# Start all services (Backend, Frontend, AI Service, Minio, MongoDB)
+docker-compose up -d
+```
+
+The application will be available at `http://localhost:3000`.
 
 ---
 

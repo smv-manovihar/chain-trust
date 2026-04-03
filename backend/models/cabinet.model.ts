@@ -38,11 +38,15 @@ export interface ICabinetItem extends Document {
 	currentQuantity?: number;
 	totalQuantity?: number;
 	unit?: string;
+	doctorName?: string;
 	notes?: string;
 
 	// 5. Notifications & Reminders
 	reminderTimes?: IReminderTime[];
 	notificationOverrides?: INotificationOverride;
+
+	// 6. Lifecycle Status
+	status: 'active' | 'inactive';
 
 	createdAt: Date;
 	updatedAt: Date;
@@ -76,6 +80,7 @@ const cabinetItemSchema = new Schema<ICabinetItem>(
 		currentQuantity: { type: Number, default: 30 },
 		totalQuantity: { type: Number, default: 30 },
 		unit: { type: String, default: 'pills' },
+		doctorName: { type: String, trim: true },
 		notes: { type: String, trim: true },
 
 		// 5. Notifications & Reminders
@@ -102,6 +107,11 @@ const cabinetItemSchema = new Schema<ICabinetItem>(
 				inApp: { type: Boolean },
 				email: { type: Boolean },
 			},
+		},
+		status: {
+			type: String,
+			enum: ['active', 'inactive'],
+			default: 'active',
 		},
 	},
 	{

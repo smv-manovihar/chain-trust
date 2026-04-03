@@ -123,23 +123,19 @@ export function UploadScanner({
         onClick={() => !loading && fileInputRef.current?.click()}
         animate={{
           scale: dragActive ? 0.98 : 1,
-          borderColor: dragActive
-            ? "hsl(var(--primary))"
-            : error
-              ? "hsl(var(--destructive) / 0.4)"
-              : preview
-                ? "hsl(142 71% 45% / 0.5)"
-                : "hsl(var(--primary) / 0.2)",
         }}
-        transition={{ duration: 0.15 }}
         className={cn(
-          "relative w-full h-64 sm:h-80 rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center gap-4 cursor-pointer overflow-hidden transition-all duration-200 shadow-sm group",
+          "relative w-full h-64 sm:h-80 rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center gap-4 cursor-pointer overflow-hidden transition-all duration-300 shadow-sm group",
           loading
             ? "pointer-events-none"
             : "hover:bg-muted/30 hover:border-primary/40",
-          dragActive ? "bg-primary/5" : "bg-card/50",
-          error && "bg-destructive/5",
-          preview && "bg-green-500/5",
+          dragActive 
+            ? "bg-primary/5 border-primary" 
+            : error
+              ? "bg-destructive/5 border-destructive/40"
+              : preview
+                ? "bg-green-500/5 border-green-500/50"
+                : "bg-card/50 border-primary/20",
         )}
       >
         {preview ? (

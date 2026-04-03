@@ -20,6 +20,7 @@ export interface CabinetItem {
   currentQuantity?: number;
   totalQuantity?: number;
   unit?: string;
+  doctorName?: string;
   notes?: string;
   reminderTimes?: string[];
   prescriptionIds?: string[];
@@ -28,6 +29,7 @@ export interface CabinetItem {
     label: string;
     uploadedAt: string;
   }[];
+  status?: "active" | "inactive";
 }
 
 export const addToCabinet = async (data: Partial<CabinetItem>, signal?: AbortSignal) => {
@@ -35,9 +37,9 @@ export const addToCabinet = async (data: Partial<CabinetItem>, signal?: AbortSig
   return response.data;
 };
 
-export const getCabinet = async (search?: string, signal?: AbortSignal) => {
+export const getCabinet = async (search?: string, status?: string, signal?: AbortSignal) => {
   const response = await client.get('/cabinet/list', { 
-    params: { search },
+    params: { search, status },
     signal 
   });
   // Handle both { cabinet: [] } and directly returning []
@@ -70,7 +72,7 @@ export const getRecentScans = async (signal?: AbortSignal) => {
 };
 
 export const markDoseTaken = async (id: string, signal?: AbortSignal) => {
-  const response = await client.post(`/cabinet/mark-taken/${id}`, null, { signal });
+  const response = await client.post(`/cabinet/mark-taken/${id}`, {}, { signal });
   return response.data;
 };
 

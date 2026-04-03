@@ -78,7 +78,15 @@ export function VideoScanner({
       try {
         await scannerRef.current.start(
           camId,
-          { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 4 / 3 },
+          { 
+            fps: 30, 
+            qrbox: { width: 280, height: 280 }, 
+            aspectRatio: 4 / 3,
+            videoConstraints: {
+                focusMode: 'continuous',
+                exposureMode: 'continuous'
+            } as any
+          },
           (decoded) => {
             stopScanner().then(() => onScanSuccess(decoded));
           },
@@ -105,7 +113,16 @@ export function VideoScanner({
       try {
         await scannerRef.current.start(
           { facingMode: facing },
-          { fps: 15, qrbox: { width: 260, height: 260 }, aspectRatio: 9 / 16 },
+          { 
+            fps: 30, 
+            qrbox: { width: 260, height: 260 }, 
+            aspectRatio: 9 / 16,
+            videoConstraints: {
+                facingMode: facing,
+                focusMode: 'continuous',
+                exposureMode: 'continuous'
+            } as any
+          },
           (decoded) => {
             stopScanner().then(() => onScanSuccess(decoded));
           },

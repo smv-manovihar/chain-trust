@@ -124,6 +124,21 @@ contract ChainTrust {
     }
 
     /**
+     * @dev Restore a recalled batch.
+     * Reverses the recall flag on-chain.
+     */
+    function restoreBatch(bytes32 _batchSalt) external {
+        if (!batches[_batchSalt].exists) revert BatchNotFound(_batchSalt);
+        
+        // Authorization check
+        if (batches[_batchSalt].manufacturer != msg.sender && msg.sender != owner) {
+             revert NotAuthorized(msg.sender);
+        }
+
+        batches[_batchSalt].isRecalled = false;
+    }
+
+    /**
      * @dev Get full batch data for verification.
      */
     function getBatch(bytes32 _batchSalt) external view returns (Batch memory) {

@@ -39,8 +39,13 @@ export const verifyScan = async (salt: string, visitorId: string, lat?: number, 
 	return response.data;
 };
 
-export const recallBatch = async (batchNumber: string, signal?: AbortSignal) => {
-	const response = await client.post(`/batches/${batchNumber}/recall`, null, { signal });
+export const recallBatch = async (batchNumber: string, transactionHash?: string, signal?: AbortSignal) => {
+	const response = await client.post(`/batches/${batchNumber}/recall`, { transactionHash }, { signal });
+	return response.data;
+};
+
+export const restoreBatch = async (batchNumber: string, transactionHash?: string, signal?: AbortSignal) => {
+	const response = await client.post(`/batches/${batchNumber}/restore`, { transactionHash }, { signal });
 	return response.data;
 };
 
@@ -59,4 +64,3 @@ export const getBatchScanDetails = async (batchNumber: string, signal?: AbortSig
 	});
 	return response.data;
 };
-
