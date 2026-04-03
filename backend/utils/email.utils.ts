@@ -3,7 +3,7 @@ import transporter from '../config/nodemailer.config.js';
 import { FRONTEND_URL, EMAIL_FROM } from '../config/config.js';
 
 export const generateOTP = (): string => {
-	return Math.floor(100000 + Math.random() * 900000).toString();
+	return crypto.randomInt(100000, 999999).toString();
 };
 
 export const generateVerificationToken = (): string => {

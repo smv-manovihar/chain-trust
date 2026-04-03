@@ -1,27 +1,42 @@
-# Route: /customer/settings (Account Preferences)
+# Customer Settings — Operational Manual
+**Route:** `/customer/settings`
 
-The Customer Settings page is the primary point for managing the user's personal identity, security posture, and global notification preferences.
+The Settings page is where a customer manages their identity, security preferences, and account integrations. It emphasizes data privacy and streamlined authentication.
 
-## Layout Overview (Mobile-Optimized)
-- **Fluid Tab Navigation**: Uses the `useScroll` hook to ensure the navigation bar stays responsive. 
-- **Tab Structure**:
-  - **General**: Personal identity (Name, Address, Phone). Note: Email is read-only.
-  - **Security**: Manage authentication layers, password updates, and Google OAuth linking status.
-  - **Notifications**: Granular toggles for "Supply Safety Alerts," "Health Adherence Insights," and platform updates.
-  - **Account Control (Danger Zone)**: High-security actions including global logout and irreversible account deletion.
+---
 
-## Key Management Features
-### 1. Profile Synchronization
-- **Identity Fields**: Supports name, physical address for local pharmacy tracking, and phone number for SMS alerts.
-- **Save Action**: Updates the profile via `updateProfile` with instantaneous "Toast" feedback.
+## 🎨 Visual Details & Layout
+- **Unified Profile Header**: A prominently designed, rounded-2xl banner displaying the user's avatar and role.
+- **Settings Category Cards**: Grouped into modular, glassmorphic cards: "Personal Details", "Security Hub", and "External Integrations".
 
-### 2. Google OAuth Integration
-- **Direct Connection**: Displays a "Connect to Google" or "Unlink" button based on the `isGoogleConnected` server-side flag. This ensures account recovery parity.
+---
 
-### 3. Safety Alerts Configuration
-- **Supply Recalls (Critical)**: When enabled, the background security agents will prioritize push notifications for any match in the user's Cabinet.
+## 🔗 URL & Navigation (Link Generation)
+The agent can generate links to specific settings or actions:
 
-## AI Guidance & Context
-- **Privacy First**: The AI should never reveal raw password data. If a user asks to change their password, the AI should guide them to the **Security** tab.
-- **Account Deletion**: If a user asks to "Delete my account," the AI MUST warn them that this action is irreversible and triggers a cascading delete of their entire "My Medicines" history. Provide a direct link to the **Account Control** tab.
-- **Profile Updates**: If a user provides a new phone number or address in chat, the AI can offer to call the `updateProfile` tool to sync it automatically.
+| Destination | Route | Description |
+| :--- | :--- | :--- |
+| **Settings Profile** | `/customer/settings` | Main settings overview. |
+| **Google Connect** | `/customer/settings?action=google_connect` | Triggers the Google connection flow. |
+
+**AI Rule:** Use the settings route to guide the user towards account security and profile management.
+
+---
+
+## 🛠️ Tool Integration & AI Guidance
+
+| User Intent | Tool Strategy | Notes |
+| :--- | :--- | :--- |
+| "What's my profile info?" | `get_user_profile` | Check name, email, and Google status. |
+| "Is my Google account linked?" | `get_user_profile` | Check `isGoogleConnected` flag. |
+
+---
+
+## 🚨 Error & Empty States
+- **Incomplete Profile Warning**: If a phone number or email is missing, a "Complete Your Profile" amber banner may appear. AI should proactively mention this.
+
+---
+
+## 🧠 Operational Best Practices
+- **Privacy Focus**: Provide a link to the [Settings](/customer/settings) page for any profile mutation requests.
+- **Authentication Source**: Use the `provider` field from `get_user_profile` to know the authentication context.

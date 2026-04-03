@@ -20,26 +20,29 @@ export const getTimelineAnalytics = async (req: Request, res: Response) => {
 		if (from && (from as string).length === 10) startDate.setUTCHours(0, 0, 0, 0);
 		if (to && (to as string).length === 10) endDate.setUTCHours(23, 59, 59, 999);
 
-		const batchMatch: any = { createdBy: userId };
-		if (batchNumber) batchMatch.batchNumber = batchNumber as string;
-		if (productId) {
-			if (mongoose.Types.ObjectId.isValid(productId as string)) {
-				batchMatch.product = new mongoose.Types.ObjectId(productId as string);
-			} else {
-				batchMatch.productId = productId as string;
-			}
-		}
-
-		const batchIds = (await Batch.find(batchMatch).select('_id')).map(b => b._id);
-
-		if (batchIds.length === 0) {
-			return res.json({ history: [], metadata: { totals: { all: 0 } } });
-		}
-
-		const matchStage = {
-			batch: { $in: batchIds },
+		const matchStage: any = {
+			manufacturer: mongoose.Types.ObjectId.createFromHexString(userId),
 			createdAt: { $gte: startDate, $lte: endDate }
 		};
+
+		if (batchNumber) {
+			// If searching for a specific batch, we still need its ID
+			const batch = await Batch.findOne({ batchNumber, createdBy: userId }).select('_id');
+			if (!batch) return res.json({ history: [], metadata: { totals: { all: 0 } } });
+			matchStage.batch = batch._id;
+		} else if (productId) {
+			// If searching for a product, find all its batches once
+			const batchIds = (await Batch.find({ 
+				createdBy: userId, 
+				$or: [
+					{ productId: productId as string },
+					{ product: mongoose.Types.ObjectId.isValid(productId as string) ? new mongoose.Types.ObjectId(productId as string) : undefined }
+				].filter(c => !!c.product || !!c.productId)
+			}).select('_id')).map(b => b._id);
+			
+			if (batchIds.length === 0) return res.json({ history: [], metadata: { totals: { all: 0 } } });
+			matchStage.batch = { $in: batchIds };
+		}
 
 		let groupStage: any = {
 			_id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
@@ -118,7 +121,7 @@ export const getTimelineAnalytics = async (req: Request, res: Response) => {
 export const getGeographicAnalytics = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
-		const { from, to, productId, batchNumber } = req.query;
+		const { from, to, productId, batchNumber, groupBy = 'total' } = req.query;
 
 		let startDate = from ? new Date(from as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 		let endDate = to ? new Date(to as string) : new Date();
@@ -126,43 +129,93 @@ export const getGeographicAnalytics = async (req: Request, res: Response) => {
 		if (from && (from as string).length === 10) startDate.setUTCHours(0, 0, 0, 0);
 		if (to && (to as string).length === 10) endDate.setUTCHours(23, 59, 59, 999);
 
-		const batchMatch: any = { createdBy: userId };
-		if (batchNumber) batchMatch.batchNumber = batchNumber as string;
-		if (productId) {
-			if (mongoose.Types.ObjectId.isValid(productId as string)) {
-				batchMatch.product = new mongoose.Types.ObjectId(productId as string);
-			} else {
-				batchMatch.productId = productId as string;
+		const matchStage: any = { 
+			manufacturer: mongoose.Types.ObjectId.createFromHexString(userId),
+			createdAt: { $gte: startDate, $lte: endDate }
+		};
+
+		if (batchNumber || productId) {
+			const batchMatch: any = { createdBy: userId };
+			if (batchNumber) batchMatch.batchNumber = batchNumber as string;
+			if (productId) {
+				if (mongoose.Types.ObjectId.isValid(productId as string)) {
+					batchMatch.product = new mongoose.Types.ObjectId(productId as string);
+				} else {
+					batchMatch.productId = productId as string;
+				}
 			}
+			const batchIds = (await Batch.find(batchMatch).select('_id')).map(b => b._id);
+			if (batchIds.length === 0) return res.json({ distribution: [] });
+			matchStage.batch = { $in: batchIds };
 		}
 
-		const batchIds = (await Batch.find(batchMatch).select('_id')).map(b => b._id);
+		const pipeline: any[] = [{ $match: matchStage }];
 
-		if (batchIds.length === 0) return res.json({ distribution: [] });
+		if (groupBy === 'product' || groupBy === 'batch') {
+			pipeline.push({
+				$lookup: {
+					from: 'batches',
+					localField: 'batch',
+					foreignField: '_id',
+					as: 'batchInfo'
+				}
+			});
+			pipeline.push({ $unwind: '$batchInfo' });
 
-		const distribution = await Scan.aggregate([
-			{ 
-				$match: { 
-					batch: { $in: batchIds },
-					createdAt: { $gte: startDate, $lte: endDate }
-				} 
-			},
-			{
+			const groupKey = groupBy === 'product' ? '$batchInfo.productName' : '$batchInfo.batchNumber';
+			
+			pipeline.push({
+				$group: {
+					_id: { 
+						country: "$country", 
+						city: "$city",
+						entity: groupKey
+					},
+					count: { $sum: 1 }
+				}
+			});
+		} else {
+			pipeline.push({
 				$group: {
 					_id: { country: "$country", city: "$city" },
 					count: { $sum: 1 }
 				}
-			},
-			{ $sort: { count: -1 } },
-			{ $limit: 20 }
-		]);
+			});
+		}
+
+		pipeline.push({ $sort: { count: -1 } });
+		
+		const results = await Scan.aggregate(pipeline);
+
+		// Format / Pivot results if grouped
+		if (groupBy === 'product' || groupBy === 'batch') {
+			const distributionMap: Record<string, any> = {};
+			
+			results.forEach(item => {
+				const cityKey = `${item._id.city}, ${item._id.country}`;
+				if (!distributionMap[cityKey]) {
+					distributionMap[cityKey] = {
+						city: item._id.city || 'Unknown',
+						country: item._id.country || 'Unknown',
+						count: 0
+					};
+				}
+				const entity = item._id.entity || 'Unknown';
+				distributionMap[cityKey][entity] = (distributionMap[cityKey][entity] || 0) + item.count;
+				distributionMap[cityKey].count += item.count;
+			});
+
+			return res.json({ 
+				distribution: Object.values(distributionMap).sort((a, b) => b.count - a.count).slice(0, 20)
+			});
+		}
 
 		res.json({ 
-			distribution: distribution.map(d => ({
+			distribution: results.map(d => ({
 				country: d._id.country || 'Unknown',
 				city: d._id.city || 'Unknown',
 				count: d.count
-			}))
+			})).slice(0, 20)
 		});
 	} catch (error) {
 		console.error('Geo analytics error:', error);
@@ -192,32 +245,37 @@ export const getScanDetails = async (req: Request, res: Response) => {
 		if (from && (from as string).length === 10 && startDate) startDate.setUTCHours(0, 0, 0, 0);
 		if (to && (to as string).length === 10 && endDate) endDate.setUTCHours(23, 59, 59, 999);
 
-		// 1. Find relevant batch IDs
-		const batchMatch: any = { createdBy: userId };
-		if (batchNumber) batchMatch.batchNumber = batchNumber as string;
-		if (productId) {
-			if (mongoose.Types.ObjectId.isValid(productId as string)) {
-				batchMatch.product = new mongoose.Types.ObjectId(productId as string);
-			} else {
-				batchMatch.productId = productId as string;
-			}
-		}
+		// 1. Build Scan Match Query directly using manufacturer
+		const scanMatch: any = { 
+			manufacturer: mongoose.Types.ObjectId.createFromHexString(userId) 
+		};
 
-		const batches = await Batch.find(batchMatch).select('_id productName batchNumber');
-		const batchIds = batches.map(b => b._id);
-
-		if (batchIds.length === 0) {
-			return res.json({ scans: [], total: 0, page: Number(page), limit: Number(limit) });
-		}
-
-		// 2. Build Scan Match Query
-		const scanMatch: any = { batch: { $in: batchIds } };
 		if (startDate || endDate) {
 			scanMatch.createdAt = {};
 			if (startDate) scanMatch.createdAt.$gte = startDate;
 			if (endDate) scanMatch.createdAt.$lte = endDate;
 		}
+		
 		if (country) scanMatch.country = country;
+
+		// 2. Add Specific Filters if provided
+		if (batchNumber || productId) {
+			const batchMatch: any = { createdBy: userId };
+			if (batchNumber) batchMatch.batchNumber = batchNumber as string;
+			if (productId) {
+				if (mongoose.Types.ObjectId.isValid(productId as string)) {
+					batchMatch.product = new mongoose.Types.ObjectId(productId as string);
+				} else {
+					batchMatch.productId = productId as string;
+				}
+			}
+			const batches = await Batch.find(batchMatch).select('_id');
+			const batchIds = batches.map(b => b._id);
+			if (batchIds.length === 0) {
+				return res.json({ scans: [], total: 0, page: Number(page), limit: Number(limit) });
+			}
+			scanMatch.batch = { $in: batchIds };
+		}
 		
 		// If suspiciousOnly, we might need to join or have a flag. 
 		// For now, let's keep it simple or implement the suspicious flag if added.
@@ -248,13 +306,9 @@ export const getScanDetails = async (req: Request, res: Response) => {
 export const getThreatAnalytics = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
-		const batches = await Batch.find({ createdBy: userId }).select('_id');
-		const batchIds = batches.map(b => b._id);
-
-		if (batchIds.length === 0) return res.json({ threats: [] });
 
 		const threats = await Scan.aggregate([
-			{ $match: { batch: { $in: batchIds } } },
+			{ $match: { manufacturer: mongoose.Types.ObjectId.createFromHexString(userId) } },
 			{
 				$group: {
 					_id: { batch: "$batch", unit: "$unitIndex" },

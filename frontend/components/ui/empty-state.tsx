@@ -67,14 +67,14 @@ export function EmptyState({
           (action.href ? (
             <Button
               asChild
-              className="rounded-full h-12 px-8 shadow-xl shadow-primary/20 font-bold"
+              className="rounded-full h-12 px-8 shadow-xl shadow-primary/20 font-bold transition-all active:scale-95"
             >
               <Link href={action.href}>{action.label}</Link>
             </Button>
           ) : (
             <Button
               onClick={action.onClick}
-              className="rounded-full h-12 px-8 shadow-xl shadow-primary/20 font-bold"
+              className="rounded-full h-12 px-8 shadow-xl shadow-primary/20 font-bold transition-all active:scale-95"
             >
               {action.label}
             </Button>
@@ -85,7 +85,7 @@ export function EmptyState({
             <Button
               variant="outline"
               asChild
-              className="rounded-full h-12 px-8 font-bold"
+              className="rounded-full h-12 px-8 font-bold transition-all active:scale-95"
             >
               <Link href={secondaryAction.href}>{secondaryAction.label}</Link>
             </Button>
@@ -93,7 +93,7 @@ export function EmptyState({
             <Button
               variant="outline"
               onClick={secondaryAction.onClick}
-              className="rounded-full h-12 px-8 font-bold"
+              className="rounded-full h-12 px-8 font-bold transition-all active:scale-95"
             >
               {secondaryAction.label}
             </Button>

@@ -44,9 +44,13 @@ class ToolStore:
 
         return doc
 
-    async def get_product_by_id(self, product_id: str) -> Optional[Dict[str, Any]]:
-        """Fetch a single product by its productId (SKU/Barcode)."""
-        product = await self.db["products"].find_one({"productId": product_id})
+    async def get_product_by_id(self, product_id: str, user_id: str = None) -> Optional[Dict[str, Any]]:
+        """Fetch a single manufacturer product by its SKU, optionally enforcing ownership."""
+        query = {"productId": product_id}
+        if user_id:
+            query["createdBy"] = PyObjectId(user_id)
+            
+        product = await self.db["products"].find_one(query)
         return self._serialize_doc(product, keep_id=False)
 
     async def list_products(
@@ -201,14 +205,18 @@ class ToolStore:
         batches = await cursor.to_list(length=20)
         return [self._serialize_doc(b, keep_id=False) for b in batches]
 
-    async def get_batch_details(self, batch_number: str) -> Optional[Dict[str, Any]]:
-        """Fetch detailed batch info and linked product info."""
-        batch = await self.db["batches"].find_one({"batchNumber": batch_number})
+    async def get_batch_details(self, batch_number: str, user_id: str = None) -> Optional[Dict[str, Any]]:
+        """Fetch detailed manufacturer batch info and linked product info with ownership verification."""
+        query = {"batchNumber": batch_number}
+        if user_id:
+            query["createdBy"] = PyObjectId(user_id)
+            
+        batch = await self.db["batches"].find_one(query)
         if not batch:
             return None
 
-        # Fetch linked product info by productId
-        product_info = await self.get_product_by_id(batch["productId"])
+        # Fetch linked product info by productId and owner
+        product_info = await self.get_product_by_id(batch["productId"], user_id=user_id)
 
         # Fetch recent alerts
         alerts_cursor = (
@@ -342,6 +350,15 @@ class ToolStore:
         if "password" in profile:
             del profile["password"]
 
+        # Enrich with company metadata if available
+        if "companyId" in profile and profile["companyId"]:
+            company = await self.db["companies"].find_one(
+                {"_id": PyObjectId(profile["companyId"])}
+            )
+            if company:
+                profile["companyName"] = company.get("name", "N/A")
+                profile["companyDomain"] = company.get("domain", "N/A")
+
         # Add helper flags for the agent
         profile["isGoogleConnected"] = profile.get("provider") == "google"
 
@@ -352,22 +369,224 @@ class ToolStore:
         user_id: str,
         name: str,
         brand: str,
+        composition: str = None,
+        medicine_code: str = None,
         batch_number: str = None,
         expiry_date: str = None,
+        prescription_ids: List[str] = None,
+        **kwargs
     ) -> bool:
-        """Manually add a medicine to the user's cabinet."""
+        """Manually add a medicine to the user's cabinet, aligning with frontend form fields."""
+        
+        # Parse expiry date if provided
+        parsed_expiry = None
+        if expiry_date:
+            try:
+                # Expecting YYYY-MM-DD or ISO string
+                if "T" in expiry_date:
+                    parsed_expiry = datetime.fromisoformat(expiry_date.replace("Z", "+00:00"))
+                else:
+                    parsed_expiry = datetime.strptime(expiry_date, "%Y-%m-%d")
+            except Exception:
+                pass
+
         item = {
             "userId": PyObjectId(user_id),
             "name": name,
             "brand": brand,
+            "composition": composition or "N/A",
+            "medicineCode": medicine_code or "N/A",
+            "productId": f"manual-{int(datetime.now().timestamp() * 1000)}",
             "batchNumber": batch_number or "N/A",
-            "expiryDate": expiry_date,
+            "expiryDate": parsed_expiry,
+            "prescriptionIds": [PyObjectId(pid) for pid in prescription_ids] if prescription_ids else [],
             "isUserAdded": True,
+            "status": "active",
             "createdAt": datetime.now(),
             "updatedAt": datetime.now(),
         }
+        
+        # Add any extra fields (dosage, frequency, notes, etc.)
+        for key, value in kwargs.items():
+            if value is not None:
+                item[key] = value
+
         result = await self.db["cabinet_items"].insert_one(item)
         return bool(result.inserted_id)
+
+    async def update_cabinet_item(self, item_id: str, user_id: str, updates: Dict[str, Any]) -> bool:
+        """Update an existing medicine in the user's cabinet."""
+        updates["updatedAt"] = datetime.now()
+        result = await self.db["cabinet_items"].update_one(
+            {"_id": PyObjectId(item_id), "userId": PyObjectId(user_id)},
+            {"$set": updates}
+        )
+        return result.modified_count > 0
+
+    async def remove_cabinet_item(self, item_id: str, user_id: str) -> bool:
+        """Remove a medicine from the user's cabinet."""
+        result = await self.db["cabinet_items"].delete_one(
+            {"_id": PyObjectId(item_id), "userId": PyObjectId(user_id)}
+        )
+        return result.deleted_count > 0
+
+    async def mark_dose_taken(self, item_id: str, user_id: str) -> bool:
+        """Decrement currentQuantity for a medicine."""
+        item = await self.db["cabinet_items"].find_one(
+            {"_id": PyObjectId(item_id), "userId": PyObjectId(user_id)}
+        )
+        if not item or item.get("currentQuantity", 0) <= 0:
+            return False
+        
+        result = await self.db["cabinet_items"].update_one(
+            {"_id": PyObjectId(item_id)},
+            {"$inc": {"currentQuantity": -1}, "$set": {"updatedAt": datetime.now()}}
+        )
+        return result.modified_count > 0
+
+    async def list_prescriptions(self, user_id: str, skip: int = 0, limit: int = 20) -> List[Dict[str, Any]]:
+        """List user's prescriptions."""
+        cursor = (
+            self.db["prescriptions"]
+            .find({"userId": PyObjectId(user_id)}, {"content": 0})
+            .sort("createdAt", -1)
+            .skip(skip)
+            .limit(limit)
+        )
+        prescriptions = await cursor.to_list(length=limit)
+        return [self._serialize_doc(p, keep_id=True) for p in prescriptions]
+
+    async def get_prescription(self, prescription_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get a single prescription to access its URL."""
+        p = await self.db["prescriptions"].find_one(
+            {"_id": PyObjectId(prescription_id), "userId": PyObjectId(user_id)}
+        )
+        return self._serialize_doc(p, keep_id=True)
+
+    async def get_scan_geography(
+        self,
+        user_id: str,
+        from_date: str = None,
+        to_date: str = None,
+        product_id: str = None,
+        batch_number: str = None
+    ) -> List[Dict[str, Any]]:
+        """Get geographic scan distribution for manufacturer with filtered depth."""
+        match_query = {"manufacturer": PyObjectId(user_id)}
+        
+        # Add date range filter
+        date_filter = {}
+        if from_date:
+            try:
+                date_filter["$gte"] = datetime.fromisoformat(from_date.replace("Z", "+00:00"))
+            except Exception:
+                pass
+        if to_date:
+            try:
+                date_filter["$lte"] = datetime.fromisoformat(to_date.replace("Z", "+00:00"))
+            except Exception:
+                pass
+        
+        if date_filter:
+            match_query["createdAt"] = date_filter
+
+        # Add entity filters
+        if product_id:
+            match_query["productId"] = product_id
+        if batch_number:
+            match_query["batchNumber"] = batch_number
+
+        pipeline = [
+            {"$match": match_query},
+            {
+                "$group": {
+                    "_id": {"country": "$country", "city": "$city"},
+                    "count": {"$sum": 1}
+                }
+            },
+            {"$sort": {"count": -1}},
+            {"$limit": 20}
+        ]
+        results = await self.db["scans"].aggregate(pipeline).to_list(length=20)
+        return [
+            {
+                "country": r["_id"].get("country", "Unknown"),
+                "city": r["_id"].get("city", "Unknown"),
+                "count": r["count"]
+            }
+            for r in results
+        ]
+
+    async def get_threat_data(
+        self,
+        user_id: str,
+        from_date: str = None,
+        to_date: str = None,
+        product_id: str = None,
+        batch_number: str = None
+    ) -> List[Dict[str, Any]]:
+        """Get suspicious scan patterns (multiple visitors per unit) with filtered depth."""
+        match_query = {"manufacturer": PyObjectId(user_id)}
+        
+        # Add date range filter
+        date_filter = {}
+        if from_date:
+            try:
+                date_filter["$gte"] = datetime.fromisoformat(from_date.replace("Z", "+00:00"))
+            except Exception:
+                pass
+        if to_date:
+            try:
+                date_filter["$lte"] = datetime.fromisoformat(to_date.replace("Z", "+00:00"))
+            except Exception:
+                pass
+        
+        if date_filter:
+            match_query["createdAt"] = date_filter
+
+        # Add entity filters
+        if product_id:
+            match_query["productId"] = product_id
+        if batch_number:
+            match_query["batchNumber"] = batch_number
+
+        pipeline = [
+            {"$match": match_query},
+            {
+                "$group": {
+                    "_id": {"batch": "$batch", "unit": "$unitIndex"},
+                    "uniqueVisitors": {"$addToSet": "$visitorId"},
+                    "totalScans": {"$sum": 1}
+                }
+            },
+            {
+                "$project": {
+                    "batchId": "$_id.batch",
+                    "unit": "$_id.unit",
+                    "visitorCount": {"$size": "$uniqueVisitors"},
+                    "totalScans": 1
+                }
+            },
+            {"$match": {"visitorCount": {"$gt": 3}}},
+            {"$sort": {"visitorCount": -1}},
+            {"$limit": 10}
+        ]
+        results = await self.db["scans"].aggregate(pipeline).to_list(length=10)
+        
+        # Enrich with batch numbers
+        batch_ids = [r["batchId"] for r in results if r.get("batchId")]
+        batches = await self.db["batches"].find({"_id": {"$in": batch_ids}}).to_list(length=len(batch_ids))
+        batch_map = {b["_id"]: b["batchNumber"] for b in batches}
+        
+        return [
+            {
+                "batchNumber": batch_map.get(r["batchId"], "Unknown"),
+                "unit": r["unit"],
+                "visitorCount": r["visitorCount"],
+                "totalScans": r["totalScans"]
+            }
+            for r in results
+        ]
 
     # --- View Data & Dashboard Aggregators (Shifted from ChatStore & Enhanced) ---
 
@@ -381,6 +600,9 @@ class ToolStore:
         try:
             if route in ["/customer", "/customer/cabinet"]:
                 return await self.get_customer_dashboard_data(user_id)
+
+            if route == "/customer/prescriptions":
+                return await self.get_customer_prescriptions_data(user_id)
 
             if route == "/manufacturer":
                 return await self.get_manufacturer_dashboard_data(user_id)
@@ -422,20 +644,14 @@ class ToolStore:
             {"user": u_id, "isRead": False}
         )
 
-        # Scans Today Logic
+        # Scans Today Logic (Optimized using denormalized manufacturer field)
         today_start = datetime.now(timezone.utc).replace(
             hour=0, minute=0, second=0, microsecond=0
         )
-        batches = await self.db.batches.find({"createdBy": u_id}, {"_id": 1}).to_list(
-            length=None
+        
+        scans_today = await self.db.scans.count_documents(
+            {"manufacturer": u_id, "createdAt": {"$gte": today_start}}
         )
-        batch_ids = [b["_id"] for b in batches]
-
-        scans_today = 0
-        if batch_ids:
-            scans_today = await self.db.scans.count_documents(
-                {"batch": {"$in": batch_ids}, "createdAt": {"$gte": today_start}}
-            )
 
         # Recent Notifications
         notifications_cursor = (
@@ -498,6 +714,30 @@ class ToolStore:
                 summary.append(f"- **{r['name']}** ({r['brand']}) - {type_label}")
         else:
             summary.append("- Your My Medicines list is currently empty.")
+
+        return "\n".join(summary)
+
+    async def get_customer_prescriptions_data(self, user_id: str) -> str:
+        """Aggregates overview data for the customer Prescriptions page."""
+        u_id = PyObjectId(user_id)
+        total_items = await self.db.prescriptions.count_documents({"userId": u_id})
+
+        recent_cursor = (
+            self.db.prescriptions.find({"userId": u_id}).sort("createdAt", -1).limit(3)
+        )
+        recent = await recent_cursor.to_list(length=3)
+
+        summary = [
+            "## Prescriptions Overview",
+            f"- **Total Prescriptions Uploaded:** {total_items}",
+            "\n### Recent Prescriptions",
+        ]
+
+        if recent:
+            for r in recent:
+                summary.append(f"- **{r.get('label', 'Untitled')}** (Dr. {r.get('doctorName', 'Unknown')})")
+        else:
+            summary.append("- You have not uploaded any prescriptions yet.")
 
         return "\n".join(summary)
 
@@ -591,8 +831,8 @@ class ToolStore:
         if not batch:
             return f"Synchronized with batch route, but identifier '{identifier}' was not found."
 
-        # Re-use the detailed fetch logic
-        details = await self.get_batch_details(batch["batchNumber"])
+        # Re-use the detailed fetch logic with owner verification
+        details = await self.get_batch_details(batch["batchNumber"], user_id=user_id)
         if not details:
             return f"Failed to retrieve details for batch {identifier}."
 

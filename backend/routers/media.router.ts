@@ -14,7 +14,7 @@ const router:Router = Router();
 const storage = multer.memoryStorage();
 const upload = multer({
 	storage,
-	limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB limit
+	limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB limit
 	fileFilter: (_req, file, cb) => {
 		const ext = path.extname(file.originalname).toLowerCase();
 		const allowed = ['.png', '.jpg', '.jpeg', '.webp', '.pdf'];
@@ -35,12 +35,12 @@ router.post('/', protect, checkUploadAuth, upload.array('images', 5), async (req
 
 		const user = (req as any).user;
 		const isCustomer = user.role === 'customer';
-		const prefix = isCustomer ? 'customer-uploads' : 'products';
+		// Prefix with userId for customers to enable high-performance ownership checks
+		const prefix = isCustomer ? `customer-uploads/${user.id}` : 'products';
 
 		const files = req.files as Express.Multer.File[];
 		const uploadPromises = files.map(async (file) => {
 			const ext = path.extname(file.originalname);
-			// Generate random filename to prevent collisions
 			const filename = `${crypto.randomBytes(16).toString('hex')}${ext}`;
 			const key = `${prefix}/${filename}`;
 
@@ -53,7 +53,7 @@ router.post('/', protect, checkUploadAuth, upload.array('images', 5), async (req
 
 			await s3Client.send(command);
 
-			// Return relative proxy URL instead of direct S3 link
+			// Return relative proxy URL
 			return `/api/media/${key}`;
 		});
 
@@ -70,7 +70,7 @@ router.post('/', protect, checkUploadAuth, upload.array('images', 5), async (req
 router.get('/products/*key', async (req, res) => {
 	try {
 		const keyList = req.params.key as unknown as string[];
-		const key = `products/${keyList.join('/')}`; // Express 5 glob captures as array
+		const key = `products/${keyList.join('/')}`;
 		
 		const command = new GetObjectCommand({
 			Bucket: S3_BUCKET,
@@ -94,36 +94,20 @@ router.get('/products/*key', async (req, res) => {
 	}
 });
 
-// 2. PROTECTED Customer Uploads
+// 2. PROTECTED Customer Uploads (High-Performance Prefix Check)
 router.get('/customer-uploads/*key', protect, async (req, res) => {
 	try {
 		const userId = (req as any).user.id;
 		const keyList = req.params.key as unknown as string[];
-		const fullKey = `customer-uploads/${keyList.join('/')}`;
-
-		// SECURITY: Ownership check
-		// Instead of a slow DB query for every image, we can enforce path-based access
-		// if we ensure upload prefix is always user-specific. 
-		// For now, let's check CabinetItem to be robust.
-		const CabinetItem = (await import('../models/cabinet.model.js')).default;
-		const Prescription = (await import('../models/prescription.model.js')).default;
 		
-		const hasAccessInCabinet = await CabinetItem.findOne({
-			userId,
-			$or: [
-				{ images: { $regex: fullKey } },
-				{ 'prescriptions.url': { $regex: fullKey } }
-			]
-		});
-
-		const hasAccessInPool = await Prescription.findOne({
-			userId,
-			url: { $regex: fullKey }
-		});
-
-		if (!hasAccessInCabinet && !hasAccessInPool) {
-			return res.status(403).json({ message: 'Access denied to this file' });
+		// The key must start with the userId for ownership verification
+		// Path format: /api/media/customer-uploads/[userId]/[filename]
+		if (keyList[0] !== userId) {
+			console.warn(`[Security] Media access denied: User ${userId} tried to access ${keyList[0]}'s file.`);
+			return res.status(403).json({ message: 'Access denied: You do not own this file' });
 		}
+
+		const fullKey = `customer-uploads/${keyList.join('/')}`;
 
 		const command = new GetObjectCommand({
 			Bucket: S3_BUCKET,

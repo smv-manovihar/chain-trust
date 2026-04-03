@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Pill, ShieldCheck, ChevronRight, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { resolveMediaUrl } from "@/lib/media-url";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -68,7 +69,7 @@ export function LinkedMedications({ medications }: LinkedMedicationsProps) {
             >
               {med.images && med.images.length > 0 ? (
                 <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-[0.85rem] overflow-hidden shrink-0 shadow-sm border border-primary/10 bg-white">
-                  <img src={med.images[0]} alt={med.name} className="h-full w-full object-cover" crossOrigin="anonymous" />
+                  <img src={resolveMediaUrl(med.images[0])} alt={med.name} className="h-full w-full object-cover" crossOrigin="anonymous" />
                 </div>
               ) : (
                 <div className={cn(

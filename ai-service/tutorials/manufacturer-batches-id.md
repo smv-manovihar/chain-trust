@@ -1,31 +1,44 @@
-# Route: /manufacturer/batches/[id] (Batch Detail & QR Management)
+# Batch Detail (QR Management) — Operational Manual
+**Route:** `/manufacturer/batches/[id]`
 
-A deep-dive investigative and operational view for a specific production batch, focusing on serialized unit-level tracking and physical label generation.
+The Batch Detail page is the technical deep-dive for a specific production run. It provides access to unit-level scan data, blockchain verification status, and the specialized "QR Grid" for printing labels.
 
-## Layout Overview (Operational Analytics)
-- **Batch Intelligence Dashboard**:
-  - **Traceability Summary**: High-level view of the associated Product, Batch ID, and total unit count.
-  - **On-chain Status**: Live verification of the blockchain ledger entry.
-- **Unit Grid & Scan Tracking**:
-  - **Unit Indexing**: Every unit is displayed as a unique cryptographic serialized card.
-  - **Real-time Scan Metrics**: Individual unit cards display a "Scans" badge. 
-  - **Security Flags**: If a unit's scan count exceeds the safety threshold (e.g., >5), the badge turns Red (`destructive`), signaling a potential security breach or duplicate.
+---
 
-## Key Management Features
-### 1. Label Design & Print Engine
-- **Global Print Actions**:
-  - **Prepare All**: Processes all serialized unit salts in memory for large batch generation.
-  - **Download Artifact**: Instant PDF report generation for the entire batch.
-  - **Print Layout**: Dedicated action that opens a browser-optimized print dialog (supports `grid-cols` customization).
-- **Design Layout (Side Panel)**: Accessible via the "Design" button. Allows manufacturers to customize:
-  - **QR Size & Padding**: Precision sliders (15mm to 80mm) for different packaging sizes.
-  - **Print Columns**: Adjust from 1 to 6 columns based on label sheet standards.
-  - **Serialized Data**: Toggles for showing "Product Name," "Batch ID," or "Unit Index" on the physical label.
+## 🎨 Visual Details & Layout
+- **Batch Identity Banner**: A high-fidelity card showing the batch number, product name, and creation date.
+- **Scan Distribution Chart**: Interactive chart showing total scans across the batch's unit indexes.
+- **QR Generation Grid**: A high-performance grid of QR codes for each unit in the batch.
+  - **Identified Print Mode**: A "Print QR Sheet" button that triggers a specialized @media print CSS view for physical label production.
+- **Unit Registry**: A searchable table of all serialized units, their individual salts, and current scan counts.
 
-### 2. Investigative Search
-- **Unit ID Lookup**: A dedicated search input to filter the unit grid and find specific serial numbers for audit purposes.
+---
 
-## AI Guidance & Context
-- **Security Audit**: If a manufacturer asks "Are there any problems with this batch?", the AI should check the "Unit Grid" for units with high scan counts (>5) and report them instantly.
-- **Printing Assistance**: If the user has issues with label alignment, guide them to the **Design Layout** panel to adjust the `Columns` and `Padding` for their specific sheet type.
-- **Traceability Logic**: Explain that unit salts are derived via `SHA-256(batchSalt + "-" + unitIndex)` to ensure cryptographic integrity.
+## 🔗 URL & Navigation (Link Generation)
+The agent can generate links to specific batches if the internal MongoDB `_id` is known from `list_batches`:
+
+| Destination | Route | Description |
+| :--- | :--- | :--- |
+| **Batch Details** | `/manufacturer/batches/[id]` | Full technical view of a specific run ID. |
+
+**AI Rule:** When a manufacturer asks for unit-level data or QR printing for a specific batch, provide the direct link to its [Detail Page](/manufacturer/batches/[id]).
+
+---
+
+## 🛠️ Tool Integration & AI Guidance
+
+| User Intent | Tool Strategy | Notes |
+| :--- | :--- | :--- |
+| "Show me details for this run." | `get_batch_details(batch_number)` | Use the batch number to get the full profile. |
+| "I need to print the labels." | `get_page_guide` | Explain the "Print QR Sheet" feature on the detail page. |
+
+---
+
+## 🚨 Error & Empty States
+- **Batch Not Found**: If an invalid ID is provided, the UI shows a "404" state. AI should suggest checking the [Batch List](/manufacturer/batches).
+
+---
+
+## 🧠 Operational Best Practices
+- **Print Guidance**: Mention that the QR Grid is designed for professional label printers and the UI removes chrome during `print` actions.
+- **Unit Scan Analysis**: If a batch has high total scans, guide the user to the "Unit Registry" on this page to identify which specific units are compromised.

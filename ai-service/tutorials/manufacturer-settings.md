@@ -1,28 +1,42 @@
-# Route: /manufacturer/settings (Corporate Preferences)
+# Manufacturer Settings — Operational Manual
+**Route:** `/manufacturer/settings`
 
-The Manufacturer Settings page is the primary point for managing the corporate identity, security protocols, and blockchain connectivity.
+The Settings page is where a manufacturer manages their corporate identity, executive security preferences, and API/Web3 integrations. It emphasizes data privacy and streamlined authentication.
 
-## Layout Overview (Corporate Control)
-- **Fluid Tab Navigation**: Uses the `useScroll` hook for responsiveness.
-- **Tab Structure**:
-  - **General**: Company identity (Corporate Name, Website, Primary Phone). Note: Email is read-only.
-  - **Security**: Manage authentication layers and corporate Google OAuth linking.
-  - **Notifications**: Granular toggles for "Production Alerts," "Scan Velocity Warnings," and "Security Intelligence Updates."
-  - **Web3**: Direct link to blockchain wallet management and cryptographic signing status.
-  - **Account Control (Danger Zone)**: High-security actions including corporate logout and full company deletion.
+---
 
-## Key Management Features
-### 1. Corporate Identity Synchronization
-- **Identity Fields**: Supports corporate name, official website for consumer validation, and phone number for critical alerts.
-- **Save Action**: Updates the profile via `updateProfile` with instantaneous "Toast" feedback.
+## 🎨 Visual Details & Layout
+- **Unified Profile Header**: A prominently designed, rounded-2xl banner displaying the company logo and executive role.
+- **Settings Category Cards**: Grouped into modular, glassmorphic cards: "Company Details", "Executive Security", and "API Integrations".
 
-### 2. Google OAuth Integration
-- **Direct Connection**: Displays a "Connect to Google" or "Unlink" button based on the `isGoogleConnected` server-side flag. This ensures account recovery parity for corporate admins.
+---
 
-### 3. Cascading Deletion (Danger Zone)
-- **Extreme Warning**: If the user is a company admin, deleting their account WIPS the entire company! This includes all employee records, product catalogues, and production batch data.
+## 🔗 URL & Navigation (Link Generation)
+The agent can generate links to specific settings or actions:
 
-## AI Guidance & Context
-- **Corporate Privacy**: The AI should never reveal raw password data. If a user asks to change their password, the AI should guide them to the **Security** tab.
-- **Company Deletion**: If a user asks to "Delete my company," the AI MUST warn them that this action is irreversible and triggers a cascading delete of all production and employee records. Provide a direct link to the **Account Control** tab.
-- **Profile Updates**: If a user provides a new corporate phone number or website in chat, the AI can offer to call the `updateProfile` tool to sync it automatically.
+| Destination | Route | Description |
+| :--- | :--- | :--- |
+| **Settings Profile** | `/manufacturer/settings` | Corporate settings overview. |
+| **Google Connect** | `/manufacturer/settings?action=google_connect` | Triggers the Google connection flow. |
+
+**AI Rule:** Use the settings route to guide the user towards account security and company profile management.
+
+---
+
+## 🛠️ Tool Integration & AI Guidance
+
+| User Intent | Tool Strategy | Notes |
+| :--- | :--- | :--- |
+| "What's our company info?" | `get_user_profile` | Check company name, email, and Google status. |
+| "Is our Google account linked?" | `get_user_profile` | Check `isGoogleConnected` flag. |
+
+---
+
+## 🚨 Error & Empty States
+- **Incomplete Profile Warning**: If a company email is missing, a "Complete Your Profile" amber banner may appear. AI should proactively mention this.
+
+---
+
+## 🧠 Operational Best Practices
+- **Privacy Focus**: Provide a link to the [Settings](/manufacturer/settings) page for any profile mutation requests.
+- **Authentication Source**: Use the `provider` field from `get_user_profile` to know the authentication context.

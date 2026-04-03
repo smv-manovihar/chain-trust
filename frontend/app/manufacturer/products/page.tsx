@@ -20,7 +20,9 @@ import {
   Boxes,
 } from "lucide-react";
 import { ProductCard } from "@/components/manufacturer/product-card";
+import { ProductListView } from "@/components/manufacturer/product-list-view";
 import type { Product } from "@/components/manufacturer/product-card";
+import { List, LayoutGrid as GridIcon } from "lucide-react";
 
 import { listProducts } from "@/api/product.api";
 import { toast } from "sonner";
@@ -44,6 +46,7 @@ export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState(
     searchParams.get("search") || "",
   );
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [categoriesCount, setCategoriesCount] = useState(0);
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
     searchParams.get("categories")?.split(",").filter(Boolean) || [],
@@ -160,6 +163,26 @@ export default function ProductsPage() {
               className={cn("h-4 w-4 text-primary", loading && "animate-spin")}
             />
           </Button>
+          
+          <div className="hidden sm:flex bg-muted/30 p-1 rounded-full border border-border/40">
+            <Button
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => setViewMode("grid")}
+              className={cn("h-8 w-8 rounded-full", viewMode === "grid" && "shadow-sm")}
+            >
+              <GridIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "list" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => setViewMode("list")}
+              className={cn("h-8 w-8 rounded-full", viewMode === "list" && "shadow-sm")}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+
           <div className="flex-1 sm:flex-none flex items-center gap-2">
             <CategoryManagementDialog onCategoriesChange={fetchProducts} />
             <Button
@@ -205,11 +228,25 @@ export default function ProductsPage() {
             </p>
           </div>
         ) : products.length > 0 ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {products.map((p) => (
-              <ProductCard key={p._id} product={p} />
-            ))}
-          </div>
+          /* On mobile, always show grid (Card mode) as requested */
+          viewMode === "grid" ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              {products.map((p) => (
+                <ProductCard key={p._id} product={p} />
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="hidden sm:block">
+                <ProductListView products={products} />
+              </div>
+              <div className="sm:hidden grid grid-cols-1 gap-8">
+                {products.map((p) => (
+                  <ProductCard key={p._id} product={p} />
+                ))}
+              </div>
+            </>
+          )
         ) : (
           <EmptyState
             icon={Package}

@@ -13,6 +13,7 @@ export interface GeographicParams {
 	to?: string;
 	batchNumber?: string;
 	productId?: string;
+	groupBy?: 'total' | 'product' | 'batch';
 }
 
 export interface ScanDetailParams {

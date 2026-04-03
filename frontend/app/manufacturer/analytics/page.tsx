@@ -23,6 +23,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
+import {
   Drawer,
   DrawerContent,
   DrawerDescription,
@@ -74,34 +80,69 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { cn, getEntityColor } from "@/lib/utils";
+import {
+  StatsSkeleton,
+  ChartSkeleton,
+  GeoSkeleton,
+} from "@/components/manufacturer/analytics-skeletons";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { parseISO } from "date-fns";
 
 export default function AnalyticsPage() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  // Replaced static 30 with Shadcn DateRange state
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isTimelineLoading, setIsTimelineLoading] = useState(false);
+  const [isGeoLoading, setIsGeoLoading] = useState(false);
+
+  // Initialize from URL
+  const urlTab = searchParams.get("tab") || "all";
+  const urlFrom = searchParams.get("from");
+  const urlTo = searchParams.get("to");
+
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 30),
-    to: new Date(),
+    from: urlFrom ? parseISO(urlFrom) : subDays(new Date(), 30),
+    to: urlTo ? parseISO(urlTo) : new Date(),
   });
 
   const [scanHistory, setScanHistory] = useState<any[]>([]);
   const [entityTotals, setEntityTotals] = useState<Record<string, number>>({
     all: 0,
   });
-  const [activeTab, setActiveTab] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<string>(urlTab);
+
+  // Sync state to URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", activeTab);
+    if (dateRange?.from) params.set("from", dateRange.from.toISOString());
+    else params.delete("from");
+    if (dateRange?.to) params.set("to", dateRange.to.toISOString());
+    else params.delete("to");
+
+    const queryString = params.toString();
+    if (queryString !== searchParams.toString()) {
+      router.replace(`${pathname}?${queryString}`, { scroll: false });
+    }
+  }, [activeTab, dateRange, pathname, router, searchParams]);
 
   const [topBatches, setTopBatches] = useState<any[]>([]);
   const [geoData, setGeoData] = useState<any[]>([]);
+  const [threats, setThreats] = useState<any[]>([]);
+  const [activeModal, setActiveModal] = useState<"geo" | "incidents" | null>(null);
+  const [geoActiveTab, setGeoActiveTab] = useState<"product" | "batch">("product");
+
   const [stats, setStats] = useState({
     products: 0,
     batches: 0,
     totalScans: 0,
     securityIncidents: 0,
   });
-  const fetchAbortRef = useRef<AbortController | null>(null);
+  const baseFetchAbortRef = useRef<AbortController | null>(null);
+  const operationalFetchAbortRef = useRef<AbortController | null>(null);
 
   const geoChartConfig = {
     count: {
@@ -122,58 +163,32 @@ export default function AnalyticsPage() {
 
   const isMobile = useIsMobile();
 
+  // Effect 1: Fetch Base Data (Products, Batches, Threats) - Once on mount
   useEffect(() => {
-    const fetchAnalytics = async () => {
-      if (fetchAbortRef.current) fetchAbortRef.current.abort();
+    const fetchBaseData = async () => {
+      if (baseFetchAbortRef.current) baseFetchAbortRef.current.abort();
       const controller = new AbortController();
-      fetchAbortRef.current = controller;
+      baseFetchAbortRef.current = controller;
 
-      const startDate = dateRange?.from || subDays(new Date(), 30);
-      const endDate = dateRange?.to || new Date();
-
-      setIsLoading(true);
       try {
-        const fromStr = startOfDay(startDate).toISOString();
-        const toStr = endOfDay(endDate).toISOString();
-
-        const [productsRes, batchesRes, timelineRes, geoRes, threatsRes] =
-          await Promise.all([
-            listProducts({}, controller.signal),
-            listBatches({}, controller.signal),
-            getTimelineAnalytics(
-              {
-                from: fromStr,
-                to: toStr,
-                groupBy: activeTab === "all" ? "total" : (activeTab as any),
-              },
-              controller.signal,
-            ),
-            getGeographicAnalytics(
-              { from: fromStr, to: toStr },
-              controller.signal,
-            ),
-            getThreatAnalytics(controller.signal),
-          ]);
+        const [productsRes, batchesRes, threatsRes] = await Promise.all([
+          listProducts({}, controller.signal),
+          listBatches({}, controller.signal),
+          getThreatAnalytics(controller.signal),
+        ]);
 
         if (controller.signal.aborted) return;
 
         const products = productsRes.products || [];
         const batches = batchesRes.batches || [];
-        const history = timelineRes.history || [];
-        const totals = timelineRes.metadata?.totals || { all: 0 };
-        const geoSegments = geoRes.distribution || [];
         const threatIntel = threatsRes.threats || [];
 
-        setStats({
+        setStats((prev) => ({
+          ...prev,
           products: products.length,
           batches: batches.length,
-          totalScans: totals.all,
           securityIncidents: threatIntel.length,
-        });
-
-        setScanHistory(history);
-        setEntityTotals(totals);
-        setGeoData(geoSegments);
+        }));
 
         const sortedBatches = [...batches]
           .sort(
@@ -184,32 +199,89 @@ export default function AnalyticsPage() {
         setTopBatches(sortedBatches);
       } catch (error: any) {
         if (error.name === "AbortError") return;
-        console.error("Failed to fetch analytics:", error);
-        toast.error("Could not load analytics data.");
+        console.error("Failed to fetch base analytics:", error);
       } finally {
-        if (fetchAbortRef.current === controller) {
-          setIsLoading(false);
+        if (baseFetchAbortRef.current === controller) {
+          setIsInitialLoading(false);
         }
       }
     };
 
-    fetchAnalytics();
-    return () => fetchAbortRef.current?.abort();
+    fetchBaseData();
+    return () => baseFetchAbortRef.current?.abort();
+  }, []);
+
+  // Effect 2: Fetch Operational Data (Timeline, Geography) - On Date/Tab change
+  useEffect(() => {
+    const fetchOperationalData = async () => {
+      if (operationalFetchAbortRef.current)
+        operationalFetchAbortRef.current.abort();
+      const controller = new AbortController();
+      operationalFetchAbortRef.current = controller;
+
+      const startDate = dateRange?.from || subDays(new Date(), 30);
+      const endDate = dateRange?.to || new Date();
+      const fromStr = startOfDay(startDate).toISOString();
+      const toStr = endOfDay(endDate).toISOString();
+
+      setIsTimelineLoading(true);
+      setIsGeoLoading(true);
+
+      try {
+        const [timelineRes, geoRes] = await Promise.all([
+          getTimelineAnalytics(
+            {
+              from: fromStr,
+              to: toStr,
+              groupBy: activeTab === "all" ? "total" : (activeTab as any),
+            },
+            controller.signal,
+          ),
+          getGeographicAnalytics(
+            { from: fromStr, to: toStr },
+            controller.signal,
+          ),
+        ]);
+
+        if (controller.signal.aborted) return;
+
+        const history = timelineRes.history || [];
+        const totals = timelineRes.metadata?.totals || { all: 0 };
+        const geoSegments = geoRes.distribution || [];
+
+        setScanHistory(history);
+        setEntityTotals(totals);
+        setGeoData(geoSegments);
+        setStats((prev) => ({ ...prev, totalScans: totals.all }));
+      } catch (error: any) {
+        if (error.name === "AbortError") return;
+        console.error("Failed to fetch operational analytics:", error);
+        toast.error("Could not update analytics filters.");
+      } finally {
+        if (operationalFetchAbortRef.current === controller) {
+          setIsTimelineLoading(false);
+          setIsGeoLoading(false);
+        }
+      }
+    };
+
+    fetchOperationalData();
+    return () => operationalFetchAbortRef.current?.abort();
   }, [dateRange, activeTab]);
 
-  if (isLoading && scanHistory.length === 0) {
+  if (isInitialLoading && topBatches.length === 0) {
     return (
       <div className="h-[60vh] flex flex-col items-center justify-center gap-4 text-muted-foreground font-medium">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p>Loading analytics...</p>
+        <p>Loading analytics workspace...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-full gap-8 pb-12 overflow-y-auto pr-1 custom-scrollbar">
+    <div className="flex flex-col min-h-full gap-8 pb-12 pr-1 custom-scrollbar">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 sticky top-0 z-20 bg-background/95 backdrop-blur-sm py-4 border-b border-transparent data-[scrolled=true]:border-border/40 transition-all px-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 py-4 transition-all px-1">
         <h1 className="text-2xl sm:text-3xl font-black tracking-tighter text-foreground leading-none">
           Analytics
         </h1>
@@ -222,7 +294,7 @@ export default function AnalyticsPage() {
                   id="date"
                   variant={"outline"}
                   className={cn(
-                    "w-full justify-start text-left font-normal h-11 rounded-full",
+                    "w-full justify-start text-left font-normal h-11 rounded-full active:scale-95 transition-all",
                     !dateRange && "text-muted-foreground",
                   )}
                 >
@@ -269,7 +341,7 @@ export default function AnalyticsPage() {
                   id="date"
                   variant={"outline"}
                   className={cn(
-                    "w-[260px] justify-start text-left font-normal h-10 rounded-full",
+                    "w-[260px] justify-start text-left font-normal h-10 rounded-full active:scale-95 transition-all",
                     !dateRange && "text-muted-foreground",
                   )}
                 >
@@ -308,7 +380,7 @@ export default function AnalyticsPage() {
           >
             <Button
               variant="default"
-              className="w-full sm:w-auto gap-2 shadow-sm font-semibold group h-11 sm:h-10 rounded-full"
+              className="w-full sm:w-auto gap-2 shadow-sm font-semibold group h-11 sm:h-10 rounded-full active:scale-95 transition-all"
             >
               <Activity className="h-4 w-4" />
               Scan details
@@ -344,7 +416,7 @@ export default function AnalyticsPage() {
                 <button
                   key={tab.id}
                   data-active={activeTab === tab.id}
-                  className="flex flex-1 min-w-[100px] flex-col justify-center gap-1 px-4 py-3 sm:px-6 sm:py-4 text-left data-[active=true]:bg-muted/50 transition-colors border-r last:border-r-0"
+                  className="flex flex-1 min-w-[100px] flex-col justify-center gap-1 px-4 py-3 sm:px-6 sm:py-4 text-left data-[active=true]:bg-muted/50 transition-all border-r last:border-r-0 active:scale-95"
                   onClick={() => setActiveTab(tab.id)}
                 >
                   <span className="text-[10px] tracking-wider text-muted-foreground font-bold leading-none">
@@ -361,10 +433,15 @@ export default function AnalyticsPage() {
           </CardHeader>
 
           <div className="flex-1 w-full min-h-[220px]">
-            {scanHistory.length > 0 ? (
+            {isTimelineLoading && scanHistory.length === 0 ? (
+              <ChartSkeleton />
+            ) : scanHistory.length > 0 ? (
               <ChartContainer
                 config={lineChartConfig}
-                className="h-full w-full"
+                className={cn(
+                  "h-full w-full transition-opacity duration-300",
+                  isTimelineLoading ? "opacity-50" : "opacity-100",
+                )}
               >
                 <LineChart
                   accessibilityLayer
@@ -405,7 +482,7 @@ export default function AnalyticsPage() {
                     <Line
                       dataKey="count"
                       type="monotone"
-                      stroke="var(--color-count)"
+                      stroke="hsl(var(--primary))"
                       strokeWidth={3}
                       dot={false}
                       activeDot={{ r: 6, strokeWidth: 0 }}
@@ -414,12 +491,12 @@ export default function AnalyticsPage() {
                     Object.keys(entityTotals)
                       .filter((k) => k !== "all")
                       .slice(0, 5)
-                      .map((key, index) => (
+                      .map((key) => (
                         <Line
                           key={key}
                           dataKey={key}
                           type="monotone"
-                          stroke={`var(--chart-${(index % 5) + 1})`}
+                          stroke={getEntityColor(key)}
                           strokeWidth={2.5}
                           dot={false}
                           activeDot={{ r: 4, strokeWidth: 0 }}
@@ -527,8 +604,16 @@ export default function AnalyticsPage() {
             </CardDescription>
           </CardHeader>
           <div className="p-6 flex-1 w-full min-h-[300px]">
-            {geoData.length > 0 ? (
-              <ChartContainer config={geoChartConfig} className="h-full w-full">
+            {isGeoLoading && geoData.length === 0 ? (
+              <GeoSkeleton />
+            ) : geoData.length > 0 ? (
+              <ChartContainer
+                config={geoChartConfig}
+                className={cn(
+                  "h-full w-full transition-opacity duration-300",
+                  isGeoLoading ? "opacity-50" : "opacity-100",
+                )}
+              >
                 <BarChart
                   accessibilityLayer
                   data={geoData}
@@ -555,16 +640,18 @@ export default function AnalyticsPage() {
                   <Bar
                     dataKey="count"
                     layout="vertical"
-                    fill="var(--color-count)"
+                    fill="hsl(var(--primary))"
                     radius={4}
                     barSize={32}
+                    style={{
+                      fill: "hsl(var(--primary) / 0.8)",
+                    }}
                   >
                     <LabelList
                       dataKey="city"
                       position="insideLeft"
                       offset={12}
-                      className="fill-[hsl(var(--background))] font-medium"
-                      fontSize={12}
+                      className="fill-white font-bold text-[10px] uppercase tracking-tight"
                     />
                     <LabelList
                       dataKey="count"
@@ -603,7 +690,7 @@ export default function AnalyticsPage() {
                     Batch ID
                   </th>
                   <th className="px-4 sm:px-6 py-3 text-[10px] font-bold text-muted-foreground text-right">
-                    Scan Index
+                    Scan index
                   </th>
                 </tr>
               </thead>
@@ -617,6 +704,12 @@ export default function AnalyticsPage() {
                     <td className="px-4 sm:px-6 py-4">
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-1.5 font-black tracking-tight text-sm sm:text-base group-hover:text-primary transition-colors">
+                          <div
+                            className="h-2 w-2 rounded-full shrink-0"
+                            style={{
+                              backgroundColor: getEntityColor(batch.batchNumber),
+                            }}
+                          />
                           {batch.batchNumber}
                           <ArrowRight className="h-3 w-3 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all sm:inline hidden" />
                         </div>
@@ -652,7 +745,7 @@ export default function AnalyticsPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors shrink-0"
+                                  className="h-8 w-8 text-muted-foreground hover:text-primary transition-all active:scale-95 shrink-0"
                                 >
                                   <ExternalLink className="h-3.5 w-3.5" />
                                 </Button>
@@ -675,7 +768,7 @@ export default function AnalyticsPage() {
           </div>
           <div className="px-6 py-4 border-t bg-muted/5">
             <Link href="/manufacturer/analytics/scans">
-              <Button variant="ghost" className="w-full text-xs font-bold hover:bg-muted rounded-xl h-10">
+              <Button variant="ghost" className="w-full text-xs font-bold hover:bg-muted rounded-xl h-10 active:scale-95 transition-all">
                 View detailed scans <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>

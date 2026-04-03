@@ -574,18 +574,18 @@ function VerifyContent() {
             <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col min-h-0 mt-2 sm:mt-8 px-2 sm:px-6 relative z-10">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 mb-6 sm:mb-8">
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">Verification Result</h2>
+                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">Verification result</h2>
                   <p className="text-muted-foreground text-sm font-medium mt-1">
                     Blockchain record confirmed for {product?.productName}
                   </p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                  <Button variant="outline" onClick={() => { setScanned(false); setScanView(defaultView); }} className="rounded-full px-6 w-full sm:w-auto h-12 sm:h-10 font-bold">
-                    Scan New
+                  <Button variant="outline" onClick={() => { setScanned(false); setScanView(defaultView); }} className="rounded-full px-6 w-full sm:w-auto h-12 sm:h-10 font-bold active:scale-95 transition-all">
+                    Scan new
                   </Button>
                   {!isManufacturer && (
-                    <Button onClick={handleSaveToCabinet} className="rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 px-6 transition-all duration-300 w-full sm:w-auto h-12 sm:h-10 font-black">
+                    <Button onClick={handleSaveToCabinet} className="rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 px-6 transition-all duration-300 w-full sm:w-auto h-12 sm:h-10 font-black active:scale-95">
                       <BookmarkPlus className="mr-2 h-5 w-5 sm:h-4 sm:w-4" />
                       Save to My Medicines
                     </Button>
@@ -617,7 +617,7 @@ function VerifyContent() {
                         </span>
                       </div>
                       <p className="text-xl sm:text-2xl font-black leading-tight text-foreground">
-                        {verificationStatus.isRecalled ? "RECALLED: Batch of medicines Flagged Unsafe" : verificationStatus.isInvalid ? "Security Warning: Invalid Entry" : scanStats.isSuspicious ? "High Scan Activity Warning" : "Verified Secure & Authentic"}
+                        {verificationStatus.isRecalled ? "RECALLED: Batch of medicines flagged unsafe" : verificationStatus.isInvalid ? "Security Warning: Invalid entry" : scanStats.isSuspicious ? "High scan activity warning" : "Verified secure & authentic"}
                       </p>
                       <p className="text-[10px] sm:text-xs text-muted-foreground mt-2 font-mono break-all opacity-70">
                         Blockchain Hash: {scanStats.blockchainHash}
@@ -663,7 +663,7 @@ function VerifyContent() {
         <AlertDialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
           <AlertDialogContent className="rounded-[2rem]">
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-2xl font-black">Account Required</AlertDialogTitle>
+              <AlertDialogTitle className="text-2xl font-black">Account required</AlertDialogTitle>
               <AlertDialogDescription className="font-medium">Please log in to save medicines to your personalized list and receive safety alerts if this batch of medicines is ever recalled.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Types, isValidObjectId } from 'mongoose';
-import Product from '../models/product.model.js';
+import Product, { EnrollmentStatus } from '../models/product.model.js';
 import Batch from '../models/batch.model.js';
 import s3Service from '../services/s3.service.js';
 
@@ -9,14 +9,24 @@ const PRODUCT_ID_REGEX = /^[a-zA-Z0-9\-_.]+$/;
 // POST /api/products — Create a new catalogue product
 export const createProduct = async (req: Request, res: Response) => {
 	try {
-		const { name, productId, categories, brand, price, description, composition, images, unit } = req.body;
+		const { name, productId, categories, brand, price, description, composition, images, unit, status = 'completed' } = req.body;
 
-		if (!name || !productId || !categories || !Array.isArray(categories) || categories.length === 0 || !brand) {
-			return res.status(400).json({ message: 'Name, Product ID, Categories (array), and Brand are required.' });
-		}
+		const isPending = status === 'pending';
 
-		if (!PRODUCT_ID_REGEX.test(productId)) {
-			return res.status(400).json({ message: 'Product ID contains invalid characters. Use alphanumeric, dashes, underscores, or dots.' });
+		// Relaxed validation for pending drafts (FIX-001)
+		if (isPending) {
+			if (!name) {
+				return res.status(400).json({ message: 'Product name is required to start a draft.' });
+			}
+		} else {
+			// Strict validation for completed catalog entries
+			if (!name || !productId || !categories || !Array.isArray(categories) || categories.length === 0 || !brand) {
+				return res.status(400).json({ message: 'Name, Product ID, Categories (array), and Brand are required.' });
+			}
+
+			if (!PRODUCT_ID_REGEX.test(productId)) {
+				return res.status(400).json({ message: 'Product ID contains invalid characters. Use alphanumeric, dashes, underscores, or dots.' });
+			}
 		}
 
 		const userId = (req as any).user?.id;
@@ -29,15 +39,17 @@ export const createProduct = async (req: Request, res: Response) => {
 
 		const product = new Product({
 			name,
-			productId,
-			categories,
-			brand,
+			productId: productId || undefined,
+			categories: categories || [],
+			brand: brand || '',
 			price: price || 0,
 			composition,
 			description,
 			unit: unit || 'pills',
 			images: images || [],
 			createdBy: userId,
+			status: (status as EnrollmentStatus) || 'pending',
+			wizardState: req.body.wizardState || {},
 		});
 
 		await product.save();
@@ -239,6 +251,81 @@ export const deleteProduct = async (req: Request, res: Response) => {
 		res.json({ message: 'Product deleted.' });
 	} catch (error) {
 		console.error('Delete product error:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+};
+
+// PATCH /api/products/:id/status — Finalize a pending product or mark as failed
+export const updateProductStatus = async (req: Request, res: Response) => {
+	try {
+		const { id } = req.params;
+		const { status } = req.body;
+		const userId = (req as any).user?.id;
+
+		if (!['completed', 'failed'].includes(status)) {
+			return res.status(400).json({ message: 'Invalid status update. Use "completed" or "failed".' });
+		}
+
+		const product = await Product.findOne({ _id: id, createdBy: userId });
+		if (!product) {
+			return res.status(404).json({ message: 'Product not found.' });
+		}
+
+		if (product.status !== 'pending') {
+			return res.status(400).json({ message: 'Only pending products can be updated.' });
+		}
+
+		product.status = status;
+		await product.save();
+
+		res.json({
+			message: `Product marked as ${status}`,
+			product
+		});
+	} catch (error) {
+		console.error('Update product status error:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+};
+
+// PUT /api/products/:id — Full update of a product (supports draft persistence FIX-004)
+export const updateProductDetails = async (req: Request, res: Response) => {
+	try {
+		const { id } = req.params;
+		const userId = (req as any).user?.id;
+		const updates = req.body;
+
+		// Security: Only the creator can update
+		const product = await Product.findOne({
+			$or: [{ _id: id }, { productId: id }],
+			createdBy: userId
+		});
+
+		if (!product) {
+			return res.status(404).json({ message: 'Product not found.' });
+		}
+
+		// Apply updates
+		const allowedUpdates = [
+			'name', 'productId', 'categories', 'brand', 'price', 
+			'description', 'composition', 'unit', 'images', 
+			'imageAccessLevel', 'customerVisibleImages', 'status', 'wizardState'
+		];
+
+		allowedUpdates.forEach(key => {
+			if (updates[key] !== undefined) {
+				(product as any)[key] = updates[key];
+			}
+		});
+
+		await product.save();
+
+		res.json({ message: 'Product updated successfully', product });
+	} catch (error: any) {
+		console.error('Update product error:', error);
+		if (error.code === 11000) {
+			return res.status(400).json({ message: 'Product ID already exists.' });
+		}
 		res.status(500).json({ message: 'Internal server error' });
 	}
 };

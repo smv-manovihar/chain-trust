@@ -1,4 +1,5 @@
 import { Schema, model, Document, Types } from 'mongoose';
+import { deleteFile } from '../services/s3.service.js';
 
 export interface IReminderTime {
 	time: Date; // Stored as UTC literal
@@ -119,6 +120,19 @@ const cabinetItemSchema = new Schema<ICabinetItem>(
 		collection: 'cabinet_items',
 	},
 );
+
+// Middleware to clean up S3 images on deletion
+cabinetItemSchema.post('findOneAndDelete', async function (doc) {
+	if (doc && doc.images && doc.images.length > 0) {
+		for (const imageUrl of doc.images) {
+			try {
+				await deleteFile(imageUrl);
+			} catch (error) {
+				console.error(`Failed to delete S3 image: ${imageUrl}`, error);
+			}
+		}
+	}
+});
 
 // Indexes
 // Optimized for: (1) Uniqueness per user for manual items using name-derived productId

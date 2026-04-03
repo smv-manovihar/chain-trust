@@ -25,6 +25,7 @@ import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { getCabinet, removeFromCabinet, CabinetItem } from "@/api";
+import { resolveMediaUrl } from "@/lib/media-url";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -239,7 +240,7 @@ export default function MyMedicinesPage() {
                   <div className="flex gap-4 items-center relative z-10 md:w-[250px] shrink-0">
                     {med.images && med.images.length > 0 ? (
                       <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-[0.85rem] overflow-hidden shrink-0 shadow-sm border border-primary/10 bg-white">
-                        <img src={med.images[0]} alt={med.name} className="h-full w-full object-cover" crossOrigin="anonymous" />
+                        <img src={resolveMediaUrl(med.images[0])} alt={med.name} className="h-full w-full object-cover" crossOrigin="anonymous" />
                       </div>
                     ) : (
                       <div

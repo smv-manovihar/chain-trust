@@ -246,6 +246,31 @@ def setup_env():
                     "SMTP configuration is required. Please provide Host, Port, Email, and Password."
                 )
 
+        print_cyan("\n--- Storage Configuration (S3 / Local MinIO) ---")
+        s3_keys = ["S3_ENDPOINT", "S3_ACCESS_KEY", "S3_SECRET_KEY", "S3_REGION"]
+        use_existing_s3 = False
+        if all(k in existing and existing[k] for k in s3_keys):
+            print_cyan("[?] Found existing S3 configuration.")
+            if confirm("    Use this? [Y/n]: ", default_yes=True):
+                use_existing_s3 = True
+                for k in s3_keys:
+                    secrets[k] = existing[k]
+
+        if not use_existing_s3:
+            print_yellow("\nFor Local MinIO, use the defaults provided.")
+            secrets["S3_ENDPOINT"] = get_secret(
+                "S3_ENDPOINT", "Enter S3_ENDPOINT", "http://localhost:9000"
+            )
+            secrets["S3_ACCESS_KEY"] = get_secret(
+                "S3_ACCESS_KEY", "Enter S3_ACCESS_KEY", "minioadmin"
+            )
+            secrets["S3_SECRET_KEY"] = get_secret(
+                "S3_SECRET_KEY", "Enter S3_SECRET_KEY", "minioadmin"
+            )
+            secrets["S3_REGION"] = get_secret(
+                "S3_REGION", "Enter S3_REGION", "us-east-1"
+            )
+
         secrets["PRIVATE_KEY"] = existing.get("PRIVATE_KEY") or "your_private_key_here"
 
         print_cyan("\n--- Summary of Secrets ---")
@@ -261,6 +286,11 @@ def setup_env():
     ai_secrets = {
         "JWT_SECRET": secrets["JWT_SECRET"],
         "OPENROUTER_API_KEY": secrets["OPENROUTER_API_KEY"],
+        "TESSERACT_CMD": globals().get("TESSERACT_CMD", ""),
+        "S3_ENDPOINT": secrets["S3_ENDPOINT"],
+        "S3_ACCESS_KEY": secrets["S3_ACCESS_KEY"],
+        "S3_SECRET_KEY": secrets["S3_SECRET_KEY"],
+        "S3_REGION": secrets["S3_REGION"]
     }
 
     # 2. Create and Update Files
@@ -292,6 +322,11 @@ def setup_env():
         with open(ai_env, "w") as f:
             f.write(f"JWT_SECRET = {ai_secrets['JWT_SECRET']}\n")
             f.write(f"OPENROUTER_API_KEY = {ai_secrets['OPENROUTER_API_KEY']}\n")
+            f.write(f"TESSERACT_CMD = {ai_secrets['TESSERACT_CMD']}\n")
+            f.write(f"S3_ENDPOINT = {ai_secrets['S3_ENDPOINT']}\n")
+            f.write(f"S3_ACCESS_KEY = {ai_secrets['S3_ACCESS_KEY']}\n")
+            f.write(f"S3_SECRET_KEY = {ai_secrets['S3_SECRET_KEY']}\n")
+            f.write(f"S3_REGION = {ai_secrets['S3_REGION']}\n")
             f.write("MONGO_URI = mongodb://localhost:27017\n")
     else:
         update_env_file(ai_env, ai_secrets)
@@ -336,7 +371,47 @@ def handle_prerequisites():
     header()
     print_cyan("\n--- Managing Prerequisites ---")
 
-    # 1. Handle Node.js
+    # 1. Handle MinIO (S3)
+    root = Path(".")
+    is_minio_installed = (
+        check_command("minio")
+        or (root / "minio.exe").exists()
+        or (root / "refs" / "minio.exe").exists()
+    )
+    
+    if confirm("\nDo you want to set up local Storage (MinIO)? Select 'No' if using external S3. [Y/n]: "):
+        if is_minio_installed:
+            print_green("[✓] MinIO is already installed/available.")
+        else:
+            print_red("[✗] MinIO is missing.")
+            if confirm("Open MinIO download page (Windows binary)? [Y/n]: ", extra_yes=["open"]):
+                webbrowser.open(
+                    "https://dl.min.io/server/minio/release/windows-amd64/minio.exe"
+                )
+                print_yellow(
+                    "Note: Download 'minio.exe' and place it in your PATH or the project root."
+                )
+                while True:
+                    if confirm("Have you finished setting up MinIO? [Y/n]: "):
+                        if (
+                            check_command("minio")
+                            or (root / "minio.exe").exists()
+                            or (root / "refs" / "minio.exe").exists()
+                        ):
+                            print_green("[✓] MinIO verified.")
+                            break
+                        else:
+                            print_yellow(
+                                "Could not find 'minio' in PATH, root, or /refs. Try checking again?"
+                            )
+                            if not confirm("Check again? [Y/n]: "):
+                                break
+                    else:
+                        break
+    else:
+        print_yellow("Skipping local MinIO setup.")
+
+    # 2. Handle Node.js
     if check_command("node"):
         print_green("[✓] Node.js is already installed.")
     else:
@@ -357,7 +432,7 @@ def handle_prerequisites():
                         else:
                             break  # Exit loop if user doesn't want to check again
 
-    # 2. Handle pnpm via npm
+    # 3. Handle pnpm via npm
     if check_command("pnpm"):
         print_green("[✓] pnpm is already installed.")
     else:
@@ -383,7 +458,7 @@ def handle_prerequisites():
             else:
                 break
 
-    # 3. Handle uv via pip
+    # 4. Handle uv via pip
     if check_command("uv"):
         print_green("[✓] uv is already installed.")
     else:
@@ -411,39 +486,7 @@ def handle_prerequisites():
             else:
                 break
 
-    # 4. Handle MinIO
-    root = Path(".")
-    is_minio_installed = (
-        check_command("minio")
-        or (root / "minio.exe").exists()
-        or (root / "refs" / "minio.exe").exists()
-    )
-    if is_minio_installed:
-        print_green("[✓] MinIO is already installed/available.")
-    else:
-        print_red("[✗] MinIO is missing.")
-        if confirm("Open MinIO download page (Windows binary)? [Y/n]: ", extra_yes=["open"]):
-            webbrowser.open(
-                "https://dl.min.io/server/minio/release/windows-amd64/minio.exe"
-            )
-            print_yellow(
-                "Note: Download 'minio.exe' and place it in your PATH or the project root."
-            )
-            while True:
-                if confirm("Have you finished setting up MinIO? [Y/n]: "):
-                    if (
-                        check_command("minio")
-                        or (root / "minio.exe").exists()
-                        or (root / "refs" / "minio.exe").exists()
-                    ):
-                        print_green("[✓] MinIO verified.")
-                        break
-                    else:
-                        print_yellow(
-                            "Could not find 'minio' in PATH, root, or /refs. Try checking again?"
-                        )
-                        if not confirm("Check again? [Y/n]: "):
-                            break
+
 
     # 5. Handle Ganache UI
     def check_ganache_ui():
@@ -582,6 +625,47 @@ def handle_prerequisites():
 
     # Store for final instructions
     globals()["MONGO_CMD"] = mongo_path or "mongod"
+
+    # 7. Handle Tesseract OCR
+    def check_tesseract():
+        paths = [
+            Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Tesseract-OCR" / "tesseract.exe",
+            Path("C:/Program Files/Tesseract-OCR/tesseract.exe"),
+            Path("C:/Program Files (x86)/Tesseract-OCR/tesseract.exe")
+        ]
+        if check_command("tesseract"):
+            return True, "tesseract"
+        for p in paths:
+            if p.exists():
+                return True, str(p)
+        return False, None
+
+    is_tess, tess_path = check_tesseract()
+    if is_tess:
+        print_green(f"[✓] Tesseract OCR is already installed at {tess_path}.")
+    else:
+        print_red("[✗] Tesseract OCR is missing.")
+        while True:
+            if confirm("Open Tesseract download page (Windows Setup)? [Y/n]: ", extra_yes=["open"]):
+                webbrowser.open("https://github.com/tesseract-ocr/tesseract/releases/download/5.5.0/tesseract-ocr-w64-setup-5.5.0.20241111.exe")
+                print_yellow("Note: Run the downloaded setup .exe and keep default settings.")
+            
+            if confirm("Have you finished installing Tesseract? [Y/n]: "):
+                is_tess, tess_path = check_tesseract()
+                if is_tess:
+                    print_green(f"[✓] Tesseract verified at {tess_path}.")
+                    break
+                else:
+                    print_yellow("Could not find 'tesseract.exe'. Try checking again?")
+            else:
+                break
+    globals()["TESSERACT_CMD"] = tess_path or ""
+    if tess_path:
+        root = Path(".")
+        ai_env = root / "ai-service" / ".env"
+        if ai_env.exists():
+             update_env_file(ai_env, {"TESSERACT_CMD": tess_path})
+             print_green(f"[i] Automatically updated {ai_env} with TESSERACT_CMD.")
 
     if confirm("\nWould you like to install MongoDB Compass (GUI)? [Y/n]: "):
         webbrowser.open("https://www.mongodb.com/try/download/compass")

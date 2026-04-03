@@ -2,8 +2,8 @@ import { Request, Response } from 'express';
 import CabinetItem from '../models/cabinet.model.js';
 import Scan from '../models/scan.model.js';
 import Batch from '../models/batch.model.js';
-import Notification from '../models/notification.model.js';
 import Prescription from '../models/prescription.model.js';
+import { AI_SERVICE_URL, INTERNAL_API_KEY } from '../config/config.js';
 import { generateIdSlug, resolveItem } from '../utils/identifier.util.js';
 
 /**
@@ -23,41 +23,6 @@ export const getCabinetStats = async (req: Request, res: Response): Promise<void
 			userId,
 			'reminderTimes.0': { $exists: true }
 		});
-
-		// Auto-generate expiry notifications (Side effect for dashboard load)
-		try {
-			const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-			const expiringSoonItems = await CabinetItem.find({
-				userId,
-				expiryDate: { $lte: thirtyDaysFromNow },
-			});
-
-			for (const item of expiringSoonItems) {
-				const existing = await Notification.findOne({
-					user: userId,
-					type: 'medicine_expiry',
-					'metadata.cabinetItemId': item._id,
-					createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
-				});
-
-				if (!existing) {
-					await Notification.create({
-						user: userId,
-						type: 'medicine_expiry',
-						title: 'Medication Expiring Soon',
-						message: `Your medication "${item.name}" is expiring on ${new Date(item.expiryDate as any).toLocaleDateString()}. Please check for a replacement soon.`,
-						link: `/customer/cabinet/${item._id}`,
-						metadata: {
-							cabinetItemId: item._id,
-							medicineName: item.name,
-							expiryDate: item.expiryDate
-						}
-					});
-				}
-			}
-		} catch (expiryNoteErr) {
-			console.error('Error auto-generating expiry notifications:', expiryNoteErr);
-		}
 
 		res.json({
 			totalItems,
@@ -106,18 +71,42 @@ export const getPersonalCabinet = async (req: Request, res: Response): Promise<v
 			.sort({ createdAt: -1 })
 			.skip((page - 1) * limit)
 			.limit(limit)
-			.populate('batchId', 'isRecalled scanCounts')
+			.populate('batchId', 'isRecalled')
 			.populate('prescriptionIds')
 			.lean();
+
+		// Fetch scan counts for all items in bulk to avoid N+1 queries
+		const scanPairs = items
+			.filter(item => item.batchId && item.salt?.includes(':'))
+			.map(item => ({
+				batch: (item.batchId as any)._id,
+				unitIndex: parseInt(item.salt?.split(':')[1] || '0', 10)
+			}));
+
+		let countsMap = new Map<string, number>();
+		if (scanPairs.length > 0) {
+			const counts = await Scan.aggregate([
+				{ $match: { $or: scanPairs } },
+				{ $group: { 
+					_id: { batch: "$batch", unit: "$unitIndex" }, 
+					count: { $sum: 1 } 
+				}}
+			]);
+			counts.forEach(c => {
+				countsMap.set(`${c._id.batch}:${c._id.unit}`, c.count);
+			});
+		}
 
 		const enrichedItems = items.map((item: any) => {
 			const batch = item.batchId as any;
 			if (batch) {
-				const unitIndex = item.salt?.includes(':') ? item.salt.split(':')[1] : '0';
+				const salt = item.salt as string | undefined;
+				const unitIndex = salt?.includes(':') ? salt.split(':')[1] : '0';
+				const countKey = `${batch._id}:${unitIndex}`;
 				return {
 					...item,
 					isRecalled: batch.isRecalled,
-					liveScanCount: batch.scanCounts?.get(String(unitIndex)) || 0
+					liveScanCount: countsMap.get(countKey) || 0
 				};
 			}
 			return item;
@@ -147,7 +136,7 @@ export const getCabinetItem = async (req: Request, res: Response): Promise<void>
 		const userId = (req as any).user.id;
 		const { id } = req.params;
 		const item = await CabinetItem.findOne({ userId, _id: id })
-			.populate('batchId', 'isRecalled scanCounts')
+			.populate('batchId', 'isRecalled')
 			.populate('prescriptionIds')
 			.lean();
 		
@@ -159,9 +148,12 @@ export const getCabinetItem = async (req: Request, res: Response): Promise<void>
 		let enrichedItem: any = { ...item };
 		const batch = item.batchId as any;
 		if (batch) {
-			const unitIndex = item.salt?.includes(':') ? item.salt.split(':')[1] : '0';
+			const unitIndexString = item.salt?.includes(':') ? item.salt.split(':')[1] : '0';
+			const unitIndex = parseInt(unitIndexString, 10) || 0;
+			const liveScanCount = await Scan.countDocuments({ batch: batch._id, unitIndex });
+			
 			enrichedItem.isRecalled = batch.isRecalled;
-			enrichedItem.liveScanCount = batch.scanCounts?.get(String(unitIndex)) || 0;
+			enrichedItem.liveScanCount = liveScanCount;
 		}
 
 		res.json({ item: enrichedItem });
@@ -224,9 +216,18 @@ export const addToCabinet = async (req: Request, res: Response): Promise<void> =
 			reminderTimes: productData.reminderTimes || [],
 			prescriptionIds: productData.prescriptionIds || [],
 		});
-		await newItem.save();
-		
-		res.status(201).json({ message: 'Added to cabinet', item: newItem });
+
+		try {
+			await newItem.save();
+			res.status(201).json({ message: 'Added to cabinet', item: newItem });
+			return;
+		} catch (saveErr: any) {
+			if (saveErr.code === 11000) {
+				res.status(400).json({ message: 'This medication is already in your cabinet.' });
+				return;
+			}
+			throw saveErr;
+		}
 	} catch (err) {
 		console.error("Error adding to cabinet:", err);
 		res.status(500).json({ message: 'Server error' });
@@ -365,30 +366,43 @@ export const getUserPrescriptions = async (req: Request, res: Response): Promise
 		const userId = (req as any).user.id;
 		const skip = parseInt(req.query.skip as string) || 0;
 		const limit = parseInt(req.query.limit as string) || 10;
+		const search = req.query.search as string;
 
-		// 1. Fetch prescriptions with pagination
-		const prescriptions = await Prescription.find({ userId })
+		const query: any = { userId };
+		if (search) {
+			query.$or = [
+				{ label: { $regex: search, $options: 'i' } },
+				{ doctorName: { $regex: search, $options: 'i' } },
+				{ notes: { $regex: search, $options: 'i' } },
+			];
+		}
+
+		// 1. Fetch prescriptions with pagination and search
+		const prescriptions = await Prescription.find(query)
 			.sort({ createdAt: -1 })
 			.skip(skip)
 			.limit(limit);
 
-		const total = await Prescription.countDocuments({ userId });
+		const total = await Prescription.countDocuments(query);
 
-		// 2. For each prescription, find linked cabinet items
-		const prescriptionsWithMedData = await Promise.all(
-			prescriptions.map(async (p) => {
-				const linkedMedications = await CabinetItem.find({
-					userId,
-					prescriptionIds: p._id
-				}).select('name brand productId batchNumber isUserAdded images');
+		const prescriptionIds = prescriptions.map(p => p._id);
+		const allLinkedMedications = await CabinetItem.find({
+			userId,
+			prescriptionIds: { $in: prescriptionIds }
+		}).select('name brand productId batchNumber isUserAdded images prescriptionIds');
 
-				return {
-					...p.toObject(),
-					linkedMedications,
-					itemCount: linkedMedications.length
-				};
-			})
-		);
+		// 2. For each prescription, filter the pre-fetched medications
+		const prescriptionsWithMedData = prescriptions.map((p) => {
+			const linkedMedications = allLinkedMedications.filter(med => 
+				med.prescriptionIds.some(id => id.toString() === p._id.toString())
+			);
+
+			return {
+				...p.toObject(),
+				linkedMedications,
+				itemCount: linkedMedications.length
+			};
+		});
 
 		res.json({
 			prescriptions: prescriptionsWithMedData,
@@ -430,16 +444,39 @@ export const uploadPrescription = async (req: Request, res: Response): Promise<v
 			return;
 		}
 
+		// Ensure label includes extension from URL if missing
+		const extension = url.includes('.') ? url.slice(url.lastIndexOf('.')) : '';
+		const finalLabel = label.toLowerCase().endsWith(extension.toLowerCase()) 
+			? label 
+			: `${label}${extension}`;
+
 		const prescription = new Prescription({
 			userId,
 			url,
-			label,
+			label: finalLabel,
 			doctorName,
 			issuedDate,
 			notes
 		});
 
 		await prescription.save();
+
+		// Trigger background digitalization (fire-and-forget)
+		fetch(`${AI_SERVICE_URL}/api/ai/parse`, {
+			method: 'POST',
+			headers: { 
+				'Content-Type': 'application/json',
+				'X-Internal-Secret': INTERNAL_API_KEY
+			},
+			body: JSON.stringify({
+				url: prescription.url,
+				display_name: prescription.label,
+				prescription_id: prescription._id.toString()
+			})
+		}).catch(err => {
+			console.error('Failed to trigger background prescription parsing:', err);
+		});
+
 		res.status(201).json({ message: 'Prescription added to pool', prescription });
 	} catch (error) {
 		console.error('Error uploading prescription:', error);

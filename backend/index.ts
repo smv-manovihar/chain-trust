@@ -18,6 +18,7 @@ import analyticsRouter from './routers/analytics.router.js';
 import cabinetRouter from './routers/cabinet.router.js';
 import { startCronJobs } from './jobs/cron.js';
 import { initS3 } from './services/s3.service.js';
+import { initReconciliation } from './services/reconciliation.service.js';
 
 // Initialize Express
 const app = express();
@@ -43,7 +44,7 @@ app.use(
 );
 
 // Body parsing
-app.use(express.json({ limit: '10mb', strict: false }));
+app.use(express.json({ limit: '25mb', strict: false }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
@@ -55,10 +56,10 @@ app.use((req, res, next) => {
 	next();
 });
 
-// Rate limiting for auth routes
-const authLimiter = rateLimit({
+// Global API rate limiting
+const apiLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
-	max: 100,
+	max: 2000, // 2000 requests per 15 minutes
 	standardHeaders: true,
 	legacyHeaders: false,
 	message: { message: 'Too many requests, please try again later' },
@@ -74,16 +75,16 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Routes
-app.use('/api/auth', authLimiter, authRouter);
-app.use('/api/company', authLimiter, companyRouter);
-app.use('/api/products', productRouter);
-app.use('/api/batches', batchRouter);
-app.use('/api/media', mediaRouter);
-app.use('/api/users', userRouter);
-app.use('/api/categories', categoryRouter);
-app.use('/api/notifications', notificationRouter);
-app.use('/api/analytics', analyticsRouter);
-app.use('/api/cabinet', cabinetRouter);
+app.use('/api/auth', apiLimiter, authRouter);
+app.use('/api/company', apiLimiter, companyRouter);
+app.use('/api/products', apiLimiter, productRouter);
+app.use('/api/batches', apiLimiter, batchRouter);
+app.use('/api/media', apiLimiter, mediaRouter);
+app.use('/api/users', apiLimiter, userRouter);
+app.use('/api/categories', apiLimiter, categoryRouter);
+app.use('/api/notifications', apiLimiter, notificationRouter);
+app.use('/api/analytics', apiLimiter, analyticsRouter);
+app.use('/api/cabinet', apiLimiter, cabinetRouter);
 
 // 404 handler
 app.use((_req, res) => {
@@ -108,6 +109,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 const startServer = async () => {
 	await connectDB();
 	await initS3();
+	initReconciliation(); // Distributed State Reconciliation
 	startCronJobs();
 
 	const server = app.listen(PORT, () => {

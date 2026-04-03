@@ -20,7 +20,7 @@ export function AuthLayout({
       <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-[-20%] left-[-10%] w-[600px] h-[600px] bg-accent/5 rounded-full blur-3xl pointer-events-none" />
 
-      <Card className="w-full max-w-[1000px] grid md:grid-cols-2 rounded-3xl shadow-2xl border-border/50 overflow-hidden relative z-10 p-0">
+      <Card className="w-full max-w-[1000px] grid md:grid-cols-2 rounded-2xl shadow-2xl border-border/50 overflow-hidden relative z-10 p-0">
         {/* Left: Branding & Info */}
         <div className="hidden md:flex flex-col justify-between p-12 bg-muted/30 border-r border-border/50 relative overflow-hidden shrink-0">
           {/* Subtle texture for left panel */}
@@ -51,7 +51,7 @@ export function AuthLayout({
             <BrandLogo size="sm" />
           </div>
 
-          <div className="w-full max-w-sm mx-auto space-y-6 animate-fade-in-up my-auto">
+          <div className="w-full max-w-sm mx-auto space-y-6 my-auto">
             {children}
           </div>
         </div>

@@ -1,34 +1,45 @@
-# Route: /customer/cabinet (My Medicines)
+# My Medicines — Operational Manual
+**Route:** `/customer/cabinet`
 
-The "My Medicines" page is the user's comprehensive personal medication archive and inventory management suite.
+The "My Medicines" page is a premium medication archive and live inventory management suite. It serves as the user's personal medication list, tracking both verified authentic products and manually added entries.
 
-## Layout Overview
-- **Dynamic Floating Header**: A sticky, responsive header that collapses into a compact bar upon scroll. It contains:
-  - **Dynamic Context**: Welcomes the user and summarizes the total medication count.
-  - **Global Actions**: Buttons for "Add Manual Entry" and "Verify New Medicine".
-  - **Integrated Search**: A rounded input that syncs with the URL to filter the list by name, brand, or batch.
-- **Rich Medication Cards**: Modernized cards featuring:
-  - **Identity**: Color-coded icons distinguishing "Verified Authentic" (Primary) from "Self-Added" (Neutral).
-  - **Supply Inventory**: A visual `Progress` bar reflecting `(Current Quantity / Total Quantity)`.
-  - **Quick Action**: An "emerald" Record Dose button to immediately decrement supply without leaving the page.
-  - **Metadata**: Expiry dates, **Medicine Codes** (Identity), and **Composition / Molecules** formatted for readability.
+---
 
-## Key Features & User Interactions
+## 🎨 Visual Details & Layout
+- **Dynamic Floating Header**: A high-z-index, glassmorphic header that stays stuck to the viewport top but collapses into a sleek, compact bar on scroll.
+- **Unified Action Hub**: Consistent h-12 rounded-full buttons for "Add Medicine" and "Verify Medicine".
+- **Medication Cards**: Uses `bg-card/40 backdrop-blur-md` for verified items and a subtle `bg-muted/30` for manual ones.
 
-### 1. Dynamic Search & State
-- **URL Synchronization**: The `?search=` parameter is updated in real-time (500ms debounce), allowing the AI to observe the user's active filter via `get_current_view_data`.
-- **Responsive Transitions**: On mobile devices, the search bar repositions into a compact floating view to maximize list visibility.
+---
 
-### 2. Supply Tracking (New)
-- **Inventory Progress**: Each card now displays "Supply Inventory" to prevent sudden stock-outs. If `currentQuantity` drops below 5, the indicator highlights in red.
-- **Dose Recording**: Clicking "Take Dose" sends a request to the `/api/user/cabinet/:id/take-dose` endpoint, which decrements the quantity and triggers a visual refresh.
+## 🔗 URL & Navigation (Link Generation)
+The agent can generate deep-links to this page using the following query parameters:
 
-### 3. Detail & Artifact Management
-- **Navigation**: Clicking any card routes the user to the `[id]` page where they can manage deeper settings (Treatment Plans, **Medical Documents**, and **Packaging Photos**).
-- **Attachments (New)**: Users can store clinical prescriptions and photograph the original drug box (Packaging Photos) for verification and long-term security records.
-- **Smart Date Selection**: When adding manual entries, the interface uses a floating [Calendar + Popover](file:///d:/Coding/ChainTrust/frontend/components/ui/calendar.tsx) for superior date management.
+| Parameter | Type | Description | Example Link |
+| :--- | :--- | :--- | :--- |
+| `search` | String | Filters the list by name, brand, or batch. | `/customer/cabinet?search=Paracetamol` |
+| `showInactive` | Boolean | If `true`, shows archived/finished medications. | `/customer/cabinet?showInactive=true` |
 
-## AI Guidance & Context
-- **Inventory Analysis**: The AI should monitor the `currentQuantity` field. If a user asks "What am I running low on?", the AI should identify medicines where the progress bar is nearing 0.
-- **Dose Recording**: If a user says "I just took my medicine," the AI should offer to "Record the dose" using the `markDoseTaken` action.
-- **Verification Priority**: Always distinguish between "Verified Authentic" products (monitored by global security agents) and "Self-Added" items (patient-managed labels).
+**AI Rule:** When a user asks to "see" or "find" a specific medicine, generate a link with the `search` parameter to provide a refined view.
+
+---
+
+## 🛠️ Tool Integration & AI Guidance
+
+| User Intent | Tool Strategy | Notes |
+| :--- | :--- | :--- |
+| "What's in My Medicines?" | `list_my_medicines` | Use summary statistics first. |
+| "Am I running low on X?" | `get_view_data` | Check `currentQuantity`. |
+| "I just took my pill." | `mark_dose_taken` | Prompt for specific medicine if multiple match. |
+
+---
+
+## 🚨 Error & Empty States
+- **No Results Found**: Shows a custom `EmptyState` component with a `Pill` icon.
+- **Low Stock Warning**: UI turns the inventory progress bar **red** when units < 5.
+
+---
+
+## 🧠 Operational Best Practices
+- **Link Generation**: Always offer a filtered link (e.g., `/customer/cabinet?search=...`) when responding to a search query.
+- **Blockchain Identity**: Distinguish "Verified Authentic" items (ShieldCheck icon) from "Manual" items (Pill icon).

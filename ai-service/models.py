@@ -132,3 +132,9 @@ class ChatMessageDB(BaseModel):
 
 class RetryChatRequest(BaseModel):
     context: Optional[Dict[str, Any]] = None
+
+
+class ParseDocumentRequest(BaseModel):
+    url: str
+    display_name: str
+    prescription_id: str

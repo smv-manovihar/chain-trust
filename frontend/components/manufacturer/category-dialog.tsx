@@ -84,7 +84,7 @@ export function CategoryManagementDialog({
       const data = await fetchCategories(controller.signal);
       setCategories(data.categories);
     } catch (err: any) {
-      if (err.name === 'AbortError') return;
+      if (err.name === "AbortError") return;
       toast.error(err.message || "Failed to load categories");
     } finally {
       if (fetchAbortRef.current === controller) {
@@ -128,20 +128,27 @@ export function CategoryManagementDialog({
     setSaving(true);
     try {
       if (editingId) {
-        await updateCategory(editingId, {
-          name: formName,
-          description: formDescription,
-        }, controller.signal);
+        await updateCategory(
+          editingId,
+          {
+            name: formName,
+            description: formDescription,
+          },
+          controller.signal,
+        );
         toast.success("Category updated");
       } else {
-        await createCategory({ name: formName, description: formDescription }, controller.signal);
+        await createCategory(
+          { name: formName, description: formDescription },
+          controller.signal,
+        );
         toast.success("Category created");
       }
       setFormDialogOpen(false);
       await loadCategories();
       onCategoriesChange?.();
     } catch (err: any) {
-      if (err.name === 'AbortError') return;
+      if (err.name === "AbortError") return;
       toast.error(err.message || "Failed to save category");
     } finally {
       if (saveAbortRef.current === controller) {
@@ -171,10 +178,10 @@ export function CategoryManagementDialog({
           {trigger || (
             <Button
               variant="outline"
-              className="h-10 sm:h-12 flex-1 sm:flex-none px-4 sm:px-6 rounded-xl gap-2 font-medium"
+              className="sm:h-11 flex-1 sm:flex-none px-4 sm:px-6 gap-2 font-medium"
             >
               <Settings2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Manage categories</span>
+              <span className="hidden sm:inline">Manage Categories</span>
               <span className="sm:hidden">Categories</span>
             </Button>
           )}
@@ -184,18 +191,28 @@ export function CategoryManagementDialog({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:pr-8">
               <div className="flex items-center gap-2">
                 <ResponsiveDialogTitle className="text-xl sm:text-2xl font-bold tracking-tight">
-                  Manage categories
+                  Manage Categories
                 </ResponsiveDialogTitle>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-primary/10 transition-colors">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-full hover:bg-primary/10 transition-colors"
+                      >
                         <Info className="h-3.5 w-3.5 text-muted-foreground" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[280px] p-3 rounded-xl bg-popover/90 backdrop-blur-md border shadow-xl">
+                    <TooltipContent
+                      side="top"
+                      className="max-w-[280px] p-3 rounded-xl bg-popover/90 backdrop-blur-md border shadow-xl"
+                    >
                       <p className="text-xs leading-relaxed font-medium">
-                        Create and organize categories for your products to help users filter their cabinet and search more effectively. Categories are shared across your product line.
+                        Categories are catalog organization tools for
+                        manufacturers to manage their product portfolio. They
+                        help in structuring your clinical inventory for internal
+                        analysis and consumer accessibility.
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -211,8 +228,6 @@ export function CategoryManagementDialog({
               </Button>
             </div>
           </ResponsiveDialogHeader>
-
-
 
           <ScrollArea className="flex-1 min-h-0 max-h-[80vh] sm:max-h-[600px]">
             <div className="p-6">
@@ -294,7 +309,11 @@ export function CategoryManagementDialog({
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 rounded-full"
+                    >
                       <Info className="h-3 w-3 text-muted-foreground" />
                     </Button>
                   </TooltipTrigger>
@@ -310,7 +329,9 @@ export function CategoryManagementDialog({
           <ScrollArea className="max-h-[80vh] sm:max-h-[400px]">
             <div className="grid gap-5 py-4 px-1">
               <div className="grid gap-2">
-                <Label htmlFor="name" className="text-sm font-semibold px-1">Category name</Label>
+                <Label htmlFor="name" className="text-sm font-semibold px-1">
+                  Category name
+                </Label>
                 <Input
                   id="name"
                   placeholder="e.g. Antibiotics"
@@ -373,9 +394,12 @@ export function CategoryManagementDialog({
             <div className="h-12 w-12 rounded-full border border-destructive/20 flex items-center justify-center mb-2">
               <Trash2 className="h-6 w-6 text-destructive" />
             </div>
-            <AlertDialogTitle className="text-xl font-bold">Delete category?</AlertDialogTitle>
+            <AlertDialogTitle className="text-xl font-bold">
+              Delete category?
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-sm text-muted-foreground leading-relaxed">
-              This action cannot be undone. Products using this category will no longer display it. Are you sure you want to proceed?
+              This action cannot be undone. Products using this category will no
+              longer display it. Are you sure you want to proceed?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-6 gap-3">

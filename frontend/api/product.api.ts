@@ -2,13 +2,15 @@ import client from './client';
 
 export interface ProductDto {
 	name: string;
-	productId: string;
+	productId?: string;
 	categories: string[];
 	brand: string;
 	price?: number;
 	description?: string;
 	composition?: string;
 	images?: string[];
+	unit?: string;
+	status?: 'pending' | 'completed' | 'failed';
 	imageAccessLevel?: 'public' | 'verified_only' | 'internal_only';
 	customerVisibleImages?: number[];
 	qrSettings?: {
@@ -18,6 +20,7 @@ export interface ProductDto {
 		showBatchNumber: boolean;
 		labelPadding: number;
 	};
+	wizardState?: any; // Dynamic dict for UI state tracking (FIX-004)
 }
 
 export const createProduct = async (data: ProductDto, signal?: AbortSignal) => {

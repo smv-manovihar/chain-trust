@@ -30,12 +30,31 @@ import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
 
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+
 function NotificationsContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
-  const [filter, setFilter] = useState<"all" | "unread">("unread");
+  
+  const urlFilter = (searchParams.get("filter") as "all" | "unread") || "unread";
+  const [filter, setFilter] = useState<"all" | "unread">(urlFilter);
+
+  // Sync filter to URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("filter", filter);
+    const queryString = params.toString();
+    if (queryString !== searchParams.toString()) {
+      router.replace(`${pathname}?${queryString}`, { scroll: false });
+    }
+  }, [filter, pathname, router, searchParams]);
+
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const fetchAbortRef = useRef<AbortController | null>(null);
@@ -151,7 +170,7 @@ function NotificationsContent() {
             onClick={handleMarkAllRead} 
             disabled={isMarkingAll}
             variant="outline" 
-            className="rounded-full font-bold h-10 border-primary/20 hover:bg-primary/5 text-primary"
+            className="rounded-full font-bold h-10 border-primary/20 hover:bg-primary/5 text-primary active:scale-95 transition-all"
           >
             {isMarkingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
             Mark all read
@@ -231,7 +250,7 @@ function NotificationsContent() {
                       <Button 
                         variant="ghost" 
                         onClick={() => fetchNotifications(false)}
-                        className="rounded-full text-muted-foreground hover:text-foreground font-bold"
+                        className="rounded-full text-muted-foreground hover:text-foreground font-bold active:scale-95 transition-all"
                       >
                         <History className="mr-2 h-4 w-4" /> Load older history
                       </Button>
@@ -303,7 +322,7 @@ function NotificationCard({
               variant="ghost"
               size="icon"
               onClick={() => onMarkRead(notification._id)}
-              className="h-8 w-8 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all opacity-0 group-hover:opacity-100"
+              className="h-8 w-8 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all opacity-0 group-hover:opacity-100 active:scale-95"
               title="Mark as read"
             >
               <Check className="h-4 w-4" />
@@ -319,9 +338,9 @@ function NotificationCard({
         </p>
 
         {notification.link && (
-          <Button asChild variant="link" className="p-0 h-auto mt-4 w-fit text-xs font-bold text-primary hover:text-primary decoration-primary/20 group-hover:decoration-primary">
+          <Button asChild variant="link" className="p-0 h-auto mt-4 w-fit text-xs font-bold text-primary hover:text-primary decoration-primary/20 group-hover:decoration-primary active:scale-95 transition-all">
             <Link href={notification.link}>
-              View Details →
+              View details →
             </Link>
           </Button>
         )}

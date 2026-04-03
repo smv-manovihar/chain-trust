@@ -35,6 +35,9 @@ winget install Python.Python.3.12
 
 ## How to Use This Skill
 
+> [!IMPORTANT]
+> If the current environment provides specialized tools, these **MUST** be used instead of their raw terminal equivalents to take advantage of the agent's optimized capabilities.
+
 When user requests UI/UX work (design, build, create, implement, review, fix, improve), follow this workflow:
 
 ### Step 1: Analyze User Requirements

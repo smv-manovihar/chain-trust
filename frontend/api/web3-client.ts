@@ -79,6 +79,17 @@ export const getContract = () => {
     return chainTrustContract;
 };
 
+// Reliability FIX-003: Blockchain Timeout wrapper
+const BLOCKCHAIN_TIMEOUT = 15000; // 15 seconds
+const withTimeout = (promise: Promise<any>, timeoutMs: number = BLOCKCHAIN_TIMEOUT) => {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Blockchain transaction timeout')), timeoutMs)
+        )
+    ]);
+};
+
 export const requestExecutionAccounts = async () => {
     if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
@@ -130,7 +141,7 @@ export const registerBatchOnChain = async (batchData: BatchData, deployerAccount
     const contract = getContract();
     if (!contract) throw new Error("Could not initialize Web3 connection.");
 
-    return await contract.methods.registerBatch(
+    return await withTimeout(contract.methods.registerBatch(
         batchData.productId,
         batchData.productName,
         batchData.brand,
@@ -139,7 +150,7 @@ export const registerBatchOnChain = async (batchData: BatchData, deployerAccount
         batchData.manufactureDate,
         batchData.expiryDate,
         batchData.quantity
-    ).send({ from: deployerAccount, gas: '5000000' });
+    ).send({ from: deployerAccount, gas: '5000000' }));
 };
 
 /**
@@ -157,8 +168,8 @@ export async function verifyOnBlockchain(batchSalt: string, signal?: AbortSignal
     if (signal?.aborted) throw new Error('AbortError');
 
       try {
-        // Query using bytes32 salt
-        const batch: any = await contract.methods.getBatch(formatBytes32(batchSalt)).call();
+        // Query using bytes32 salt with timeout (Reliability FIX-003)
+        const batch: any = await withTimeout(contract.methods.getBatch(formatBytes32(batchSalt)).call());
 
         if (signal?.aborted) throw new Error('AbortError');
 
@@ -226,10 +237,10 @@ export async function recallProductOnChain(batchSalt: string, account: string): 
     throw new Error('Web3 Contract instance not found');
   }
 
-  return await contract.methods.recallBatch(formatBytes32(batchSalt)).send({
+  return await withTimeout(contract.methods.recallBatch(formatBytes32(batchSalt)).send({
     from: account,
     gas: "500000"
-  });
+  }));
 }
 
 /**
@@ -241,10 +252,10 @@ export async function restoreProductOnChain(batchSalt: string, account: string):
     throw new Error('Web3 Contract instance not found');
   }
 
-  return await contract.methods.restoreBatch(formatBytes32(batchSalt)).send({
+  return await withTimeout(contract.methods.restoreBatch(formatBytes32(batchSalt)).send({
     from: account,
     gas: "500000"
-  });
+  }));
 }
 
 /**

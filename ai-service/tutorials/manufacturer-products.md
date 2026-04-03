@@ -1,24 +1,42 @@
-# Route: /manufacturer/products (Product Catalog)
+# Product List (Catalog) — Operational Manual
+**Route:** `/manufacturer/products`
 
-The central repository for all product SKUs enrolled by the manufacturer on the ChainTrust blockchain.
+The Product List is the definitive catalog of all SKUs enrolled in the ChainTrust security ecosystem. It provides a technical overview of each product's base metadata and its production run (batch) history.
 
-## Layout Overview (Bento Grid)
-- **Fluid Header**: Contains the "Enroll Product" button and "Manage Categories" action. Supports a sticky, responsive search bar that synchronizes with the URL.
-- **Product Inventory Cards**: Rich cards that display:
-  - **Identity**: Name and Serialized SKU.
-  - **Market Position**: Current unit price (USDT) and assigned categories.
-  - **Production Maturity**: Count of active batches associated with the SKU.
-  - **Visuals**: High-resolution packaging previews managed via decentralized S3/MinIO storage.
+---
 
-## Key Management Features
-### 1. Categories & Organization
-- **Dynamic Grouping**: Manufacturers can create custom category tags (e.g., "Antibiotics," "Pediatrics") to organize their internal catalog.
-- **Filter State**: URL parameters (`?categories=` and `?search=`) are maintained in real-time for shareable and AI-observable views.
+## 🎨 Visual Details & Layout
+- **Dynamic Catalog Header**: A glassmorphic header that stays stuck to the viewport top and provides a "High-Value" count of the total catalog size.
+- **Product Hub (ListView / Cards)**: Prominent "Brand Name", high-resolution packaging photo, SKU metadata, and total batch count badge.
 
-### 2. Batch Linking
-- **Direct Integration**: Each product card monitors its linked batches. If a product has 0 active batches, it is flagged for further production enrollment.
+---
 
-## AI Guidance & Context
-- **Inventory Health**: If the user is viewing the catalog, the AI should observe which products have "0 Batches" and suggest: "Would you like to register a production run for [Product Name]?"
-- **Price Optimization**: If the user asks about market positioning, the AI can call the `updateProduct` tool to adjust unit pricing (USDT) for the blockchain record.
-- **Shareable Views**: The AI observes the current search and category filters to understand exactly what product subset the user is focusing on.
+## 🔗 URL & Navigation (Link Generation)
+The agent can generate deep-links with precise filters to view specific data segments:
+
+| Parameter | Type | Description | Example Link |
+| :--- | :--- | :--- | :--- |
+| `search` | String | Filters the catalog by name, brand, or SKU. | `/manufacturer/products?search=Paracetamol` |
+| `category` | String | Filters the catalog by a specific category. | `/manufacturer/products?category=Analgesic` |
+
+**AI Rule:** When a manufacturer asks for a product list or a specific SKU, provide the filtered link to the [Catalog](/manufacturer/products) page.
+
+---
+
+## 🛠️ Tool Integration & AI Guidance
+
+| User Intent | Tool Strategy | Notes |
+| :--- | :--- | :--- |
+| "What products do we have?" | `list_products` | Provide names and SKUs from the list. |
+| "Show me details for SKU-101." | `get_product_info("SKU-101")` | Access technical metadata. |
+
+---
+
+## 🚨 Error & Empty States
+- **No Catalog Enrolled**: AI should guide the user to the `/manufacturer/products/new` flow.
+
+---
+
+## 🧠 Operational Best Practices
+- **Link Comparison**: Mention that products are best searched for using the `search` param in the link.
+- **Detailed Metadata**: When a user asks for product info, mention the **Categories** and **Batch Count** for context.

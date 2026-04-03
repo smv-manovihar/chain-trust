@@ -45,6 +45,7 @@ interface PublicUser {
 	lastActivity: Date;
 	isEmailVerified: boolean;
 	mustChangePassword: boolean;
+	isApprovedByAdmin: boolean;
 	avatar: string | null;
 }
 
@@ -57,6 +58,7 @@ const publicUser = (u: IUser): PublicUser => ({
 	lastActivity: u.lastActivity,
 	isEmailVerified: u.isEmailVerified,
 	mustChangePassword: u.mustChangePassword,
+	isApprovedByAdmin: u.isApprovedByAdmin,
 	avatar: u.avatar,
 });
 
@@ -131,57 +133,33 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
 		};
 
 		if (user) {
-			// If user exists but linked to different provider, allow linking if currently 'local'
-			if (user.provider !== 'google') {
-				user.provider = 'google';
-				user.providerId = userInfo.sub;
-			} else if (user.providerId !== userInfo.sub) {
-				res.redirect(
-					`${FRONTEND_URL}/register?error=provider_mismatch`,
-				);
-				return;
-			}
+			// Update profile if Google data is more recent
 			if (userInfo.picture && user.avatar !== getHighResAvatar(userInfo.picture))
 				user.avatar = getHighResAvatar(userInfo.picture);
 			if (userInfo.name && user.name !== userInfo.name)
 				user.name = userInfo.name;
 			
-			// If user was invited but logs in via Google, activate them if emails match
-			if (user.isInvited) {
-				user.isActive = true;
-				user.isEmailVerified = true;
-				user.isInvited = false;
-				user.emailVerificationOtp = null;
+			// Always sync provider info
+			if (user.provider !== 'google') {
+				user.provider = 'google';
+				user.providerId = userInfo.sub;
 			}
 			
 			await user.save();
 		} else {
-			// Check for company domain
-			const emailDomain = userInfo.email.split('@')[1];
-			const company = await Company.findOne({ domain: emailDomain });
-			
 			user = new User({
 				email: userInfo.email.toLowerCase(),
 				name: userInfo.name || 'User',
-				role: company ? 'employee' : 'customer', // Default to employee if company match, else customer
-				companyId: company?._id,
-				companyPolicies: company ? company.policies : {},
+				role: 'customer', 
 				provider: 'google',
 				providerId: userInfo.sub,
 				avatar: getHighResAvatar(userInfo.picture),
 				isEmailVerified: userInfo.email_verified === true,
 				isActive: true,
+				isApprovedByAdmin: true, // Auto-approving all registrations for now
 			});
 
 			await user.save();
-			
-			// If new user and NO company match, default to customer and proceed to dashboard
-			if (!company) {
-				const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id, req);
-				attachTokens(accessToken, refreshToken, res);
-				res.redirect(`${FRONTEND_URL}/customer`);
-				return;
-			}
 		}
 
 		const { accessToken, refreshToken } =
@@ -358,17 +336,6 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
 			return;
 		}
 
-		// Check for company domain
-		const emailDomain = email.split('@')[1];
-		const company = await Company.findOne({ domain: emailDomain });
-
-		if (company) {
-			res.status(400).json({ 
-				message: `This domain is managed by ${company.name}. Please contact your administrator for an invitation.` 
-			});
-			return;
-		}
-
 		const hashed = await hash(password, 10);
 
 		const verificationToken = generateVerificationToken();
@@ -397,11 +364,15 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
 			emailVerificationExpiresAt: tokenExpiry,
 			emailVerificationOtp: verificationOtp,
 			emailVerificationOtpExpiresAt: otpExpiry,
+			
+			// Security FIX-007: Currently auto-approving all roles
+			isApprovedByAdmin: true,
 		});
 
 		await newUser.save();
 
 		if (role === 'manufacturer') {
+			const emailDomain = email.split('@')[1];
 			const newCompany = new Company({
 				name: companyName || emailDomain,
 				domain: emailDomain,

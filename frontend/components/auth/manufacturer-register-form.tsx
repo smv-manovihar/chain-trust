@@ -115,15 +115,15 @@ export function ManufacturerRegisterForm() {
 
   return (
     <AuthLayout
-      title="Partner With Us"
+      title="Partner with us"
       subtitle="Join the leading supply chain integrity network to secure your product authenticity."
     >
       <div className="flex flex-col space-y-2 text-center mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Corporate Application
+          Corporate application
         </h1>
         <p className="text-sm text-muted-foreground">
-          Step {step} of {totalSteps}: {step === 1 ? "Admin Contact" : step === 2 ? "Office Address" : "Business Details"}
+          Step {step} of {totalSteps}: {step === 1 ? "Admin contact" : step === 2 ? "Office address" : "Business details"}
         </p>
       </div>
 
@@ -354,7 +354,7 @@ export function ManufacturerRegisterForm() {
                 disabled={isLoading}
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isLoading ? "Submitting Application..." : "Submit Application"}
+                {isLoading ? "Submitting application..." : "Submit application"}
               </Button>
             )}
           </div>
@@ -364,14 +364,14 @@ export function ManufacturerRegisterForm() {
       <p className="text-center text-sm text-muted-foreground mt-6">
         Already approved?{" "}
         <Link href="/login" className="text-primary font-semibold hover:underline">
-          Sign In
+          Sign in
         </Link>
       </p>
 
       <p className="text-center text-sm text-muted-foreground mt-2">
         Not a manufacturer?{" "}
         <Link href="/register" className="text-primary font-semibold hover:underline">
-          Customer Portal
+          Member setup
         </Link>
       </p>
     </AuthLayout>

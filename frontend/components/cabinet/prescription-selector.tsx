@@ -8,6 +8,7 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
   ResponsiveDialogTrigger,
+  ResponsiveDialogBody,
 } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -149,7 +150,7 @@ export function PrescriptionSelector({
   return (
     <>
       <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
-        <ResponsiveDialogContent className="w-full sm:max-w-3xl h-[95dvh] sm:max-h-[85vh] flex flex-col p-0 border-border bg-background sm:rounded-[2rem] overflow-hidden shadow-2xl">
+        <ResponsiveDialogContent className="w-full sm:max-w-3xl bg-background sm:rounded-[2.5rem] p-0 overflow-hidden shadow-2xl">
           <ResponsiveDialogHeader className="p-4 sm:p-6 pb-4 border-b border-border/50 space-y-4">
             <div className="flex items-center gap-2 min-w-0 pr-8">
               <ResponsiveDialogTitle className="text-xl sm:text-2xl font-bold truncate">
@@ -191,7 +192,7 @@ export function PrescriptionSelector({
             </div>
           </ResponsiveDialogHeader>
 
-          <ScrollArea className="flex-1 w-full bg-muted/10">
+          <ResponsiveDialogBody className="bg-muted/10">
             <div className="p-4 sm:p-6">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-4">
@@ -329,7 +330,7 @@ export function PrescriptionSelector({
                 </div>
               )}
             </div>
-          </ScrollArea>
+          </ResponsiveDialogBody>
 
           <ResponsiveDialogFooter className="p-4 sm:p-6 border-t border-border/50 bg-background shrink-0 mt-auto">
             <Button

@@ -77,9 +77,9 @@ export const markDoseTaken = async (id: string, signal?: AbortSignal) => {
 };
 
 // Prescription Pool
-export const getPrescriptions = async (skip: number = 0, limit: number = 10, signal?: AbortSignal) => {
+export const getPrescriptions = async (skip: number = 0, limit: number = 10, search?: string, signal?: AbortSignal) => {
   const response = await client.get('/cabinet/prescriptions/list', { 
-    params: { skip, limit },
+    params: { skip, limit, search },
     signal 
   });
   return response.data;

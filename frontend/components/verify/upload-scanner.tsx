@@ -98,7 +98,7 @@ export function UploadScanner({
       {/* Header & Camera Switch */}
       <div className="flex items-start justify-between gap-4 px-2 sm:px-0">
         <div className="hidden sm:block">
-          <h3 className="text-2xl tracking-tight">Upload QR Image</h3>
+          <h3 className="text-2xl tracking-tight">Upload QR image</h3>
           <p className="text-muted-foreground text-sm mt-1">
             Drag and drop a screenshot or photo of the product's QR code.
           </p>
@@ -107,10 +107,10 @@ export function UploadScanner({
           <Button
             onClick={onSwitchToCamera}
             variant="outline"
-            className="rounded-full bg-background font-bold shadow-sm sm:ml-auto w-full sm:w-auto"
+            className="rounded-full bg-background font-bold shadow-sm sm:ml-auto w-full sm:w-auto active:scale-95 transition-all"
           >
             <Camera className="h-4 w-4 mr-2" />
-            Use Device Camera
+            Use device camera
           </Button>
         )}
       </div>

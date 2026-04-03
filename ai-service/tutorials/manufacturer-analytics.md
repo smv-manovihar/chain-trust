@@ -1,33 +1,45 @@
-# Route: /manufacturer/analytics (Analytics Dashboard)
+# Manufacturer Analytics — Operational Manual
+**Route:** `/manufacturer/analytics`
 
-The Analytics Dashboard is a high-density, data-focused command center designed for real-time monitoring of cryptographic verification trends and geographic product distribution.
+The Analytics page is the high-fidelity center for geographic and security monitoring. It provides interactive visualizations of scan volume, market distribution, and potential threat clusters.
 
-## Layout Overview (2:1 Bento Grid)
- 
-- **Sticky Command Bar**: The analytics header containing date filters is sticky, ensuring accessibility as the user scrolls.
-- **Scrollable Canvas**: Unlike the dashboard, the analytics page uses an expanded vertical layout to allow for higher Chart density without visual compression.
- 
-### Main Panel (Left 2/3)
-- **Verification Velocity (Area Chart)**:
-  - Visualizes consumer engagement over the selected time range (7d, 30d, 90d).
-  - Used to identify peak scanning periods and overall adoption trends.
-- **Regional Scan Density (Bar Chart)**:
-  - Displays top geographic locations where products are being verified.
-  - Helps identify market penetration and potential regional anomalies.
-- **Scan Deep Dive (Navigation)**:
-  - A prominent action banner that transitions to the [Detailed Scan Analysis](/manufacturer/analytics/scans) for unit-level investigation.
+---
 
-### Sidebar (Right 1/3)
-- **Performance Summary (Executive KPIs)**:
-  - **Products**: Total medicine catalogue size.
-  - **Batches**: Number of production runs in distribution.
-  - **Total Scans**: Cumulative lifetime verification count.
-  - **Incidents**: Count of detected security anomalies or threat flags.
-- **Batch Performance (Ranking)**:
-  - A compact table listing the top-performing batches by scan volume.
+## 🎨 Visual Details & Layout
+- **Dynamic Metrics (Stats Bar)**: Glassmorphic KPI cards for: "Scan Pulse", "Market Reach", and "Risk Vector".
+- **Geographic Coverage (Chart Segment)**: A responsive, animated Bar Chart showing the top 10 countries by scan volume and tooltips with product-level depth.
+- **Security Incident Timeline**: A dynamic area for "Top Threats".
 
-## AI Context
-This page provides the "Manufacturer Persona" AI with structured data to answer technical operational questions.
-- **Trend Analysis**: When asked about growth or engagement, the AI should reference the "Verification Velocity" data.
-- **Geographic Insights**: For questions like "Where are my products being scanned?", the AI should focus on the "Regional Scan Density" components.
-- **Operational Health**: The "Performance Summary" sidebar is the root source for general health checks.
+---
+
+## 🔗 URL & Navigation (Link Generation)
+The agent can generate deep-links with precise filters to view specific data segments:
+
+| Parameter | Type | Description | Example Link |
+| :--- | :--- | :--- | :--- |
+| `productId` | String | Filters all charts and threats for a specific SKU. | `/manufacturer/analytics?productId=SKU-101` |
+| `batchNumber`| String | Filters all data for a specific production run. | `/manufacturer/analytics?batchNumber=AC-202` |
+| `from` | Date | Start date for analysis (YYYY-MM-DD). | `/manufacturer/analytics?from=2026-03-01` |
+| `to` | Date | End date for analysis (YYYY-MM-DD). | `/manufacturer/analytics?to=2026-03-31` |
+
+**AI Rule:** When a manufacturer asks for a geographic summary or threat analysis for a specific product/batch, provide the filtered link to the [Analytics](/manufacturer/analytics) page.
+
+---
+
+## 🛠️ Tool Integration & AI Guidance
+
+| User Intent | Tool Strategy | Notes |
+| :--- | :--- | :--- |
+| "Where are our products being scanned?" | `get_scan_geography` | Identify top countries and cities. |
+| "Show me any threats." | `get_threat_intelligence` | Reference the total visitor and scan count per unit. |
+
+---
+
+## 🚨 Error & Empty States
+- **Insufficient Data Warning**: Suggest expanding the dates if `get_scan_geography` returns no results.
+
+---
+
+## 🧠 Operational Best Practices
+- **Data Filtering Linkage**: Always offer a filtered link when answering product-specific volume questions.
+- **Threat Prioritization**: Mention the **Analytics** deep-link when high-severity threats are detected.

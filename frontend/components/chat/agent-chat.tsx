@@ -126,13 +126,6 @@ export function AgentChat({
   const lastScrolledSessionId = useRef<string | null>(null);
   const wasAtBottomRef = useRef(true);
 
-  // Initialize with initialSessionId if provided and no session is active
-  useEffect(() => {
-    if (initialSessionId && !currentSessionId) {
-      handleSetCurrentSessionId(initialSessionId);
-    }
-  }, [initialSessionId, currentSessionId, handleSetCurrentSessionId]);
-
   // Sync session change to parent if needed
   useEffect(() => {
     if (currentSessionId) {

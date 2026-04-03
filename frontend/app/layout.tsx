@@ -78,7 +78,7 @@ export default function RootLayout({
                 </Web3Provider>
               </AuthProvider>
             </TooltipProvider>
-            <Toaster />
+            <Toaster position="top-center" />
           </ThemeProvider>
         </div>
       </body>

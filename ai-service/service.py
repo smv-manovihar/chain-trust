@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timezone
 from typing import Dict, Any
 
@@ -9,7 +10,7 @@ from tools import Tools
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from config import get_settings
-from store import chat_store as naming_store
+from store import chat_store as store
 
 
 class ChatService:
@@ -45,9 +46,6 @@ class ChatService:
         req_context: dict,
         assistant_message_id: str,
     ):
-        logger.info(
-            f"\n[AGENT CONTEXT] Incoming from frontend (Session: {session_id}):\n{json.dumps(req_context, indent=2)}"
-        )
         sse_manager.clear_buffer(session_id)
         sse_manager.mark_active(session_id)
 
@@ -184,7 +182,7 @@ class ChatService:
                     tool_input = event["data"].get("input", {})
 
                     # Generate dynamic message
-                    display_message = Tools.get_tool_message(
+                    display_message = self.tools_instance.get_tool_message(
                         tool_name, tool_input, tense="present", context=context_obj
                     )
 
@@ -264,7 +262,7 @@ class ChatService:
                         del tool_event_buffers[run_id]
 
                     # Generate past tense message
-                    display_message = Tools.get_tool_message(
+                    display_message = self.tools_instance.get_tool_message(
                         tool_name, tool_input, tense="past", context=context_obj
                     )
 
@@ -342,7 +340,7 @@ class ChatService:
         try:
             settings = get_settings()
             llm = ChatOpenAI(
-                model="stepfun/step-3.5-flash:free",
+                model="qwen/qwen3.6-plus:free",
                 api_key=settings.OPENROUTER_API_KEY,
                 base_url="https://openrouter.ai/api/v1",
                 temperature=0.7,
@@ -366,7 +364,7 @@ class ChatService:
                 # For non-/agent routes, fetch real view data for richer naming
                 if not normalized_route.startswith("/agent"):
                     try:
-                        view_data = await naming_store.get_view_data(
+                        view_data = await store.get_view_data(
                             route=normalized_route,
                             user_id=self.user_id,
                             role=self.role,
@@ -378,45 +376,66 @@ class ChatService:
                                 f"- Page Data Summary: {view_data[:400]}...\n"
                             )
                     except Exception as e:
-                        logger.debug(
-                            f"Could not fetch view data for naming: {e}"
-                        )
+                        logger.debug(f"Could not fetch view data for naming: {e}")
 
                 if context.get("active_data"):
                     data_str = json.dumps(context["active_data"])
-                    context_str += (
-                        f"- Active Data Summary: {data_str[:300]}...\n"
-                    )
+                    context_str += f"- Active Data Summary: {data_str[:300]}...\n"
 
             system_prompt = (
                 "You are a professional assistant that generates very concise chat session titles. "
-                "Your goal is to describe exactly what the user is looking at or doing in 2 to 4 words. "
                 "STRICT RULES:\n"
-                "1. Output ONLY the raw title text.\n"
-                "2. No quotes, no preamble, no trailing punctuation.\n"
-                "3. Use specific names (Product IDs, Batches, Product Names) if provided in context.\n"
-                "4. If context is sparse, extract 2-4 key words from the User Message.\n"
-                "5. NEVER return an empty string. Fallback to extracting keywords from the message."
+                "1. Output ONLY the raw title text (2 to 4 words total).\n"
+                "2. No quotes, no preamble ('Title:'), no trailing punctuation.\n"
+                "3. Describe exactly what the user is looking at or doing.\n"
+                "4. Use specific names (Product IDs, Batches) if available in context.\n"
+                "5. Example: 'Batch PRD-102 Analysis', 'Prescription OCR Read', 'Medicine Cabinet Search'."
             )
-
+            
             user_data = f"User Message: {first_message}\n\n{context_str}"
 
-            response = await llm.ainvoke([
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=user_data)
-            ])
+            try:
+                response = await llm.ainvoke(
+                    [
+                        SystemMessage(content=system_prompt),
+                        HumanMessage(content=user_data),
+                    ]
+                )
+            except Exception as e:
+                # If primary model is rate limited (429), try a fallback Gemini model
+                if "429" in str(e) or "rate" in str(e).lower():
+                    logger.warning(
+                        f"Title primary model rate limited, trying fallback: {e}"
+                    )
+                    fallback_llm = ChatOpenAI(
+                        model="nvidia/nemotron-3-super-120b-a12b:free",
+                        api_key=settings.OPENROUTER_API_KEY,
+                        base_url="https://openrouter.ai/api/v1",
+                        temperature=0.7,
+                        max_tokens=50,
+                    )
+                    response = await fallback_llm.ainvoke(
+                        [
+                            SystemMessage(content=system_prompt),
+                            HumanMessage(content=user_data),
+                        ]
+                    )
+                else:
+                    raise e
+
             raw_content = response.content or ""
+            # Clean up common LLM prefixes
             title = raw_content.strip().strip('"').strip("'").strip(".")
+            title = re.sub(
+                r"^(Title|Session|Topic|Name):\s*", "", title, flags=re.IGNORECASE
+            )
 
             if not title:
                 logger.warning(
                     f"LLM returned empty title for message. Raw: '{raw_content}'"
                 )
-                title = first_message[:40] + (
-                    "..." if len(first_message) > 40 else ""
-                )
+                title = first_message[:40] + ("..." if len(first_message) > 40 else "")
 
-            logger.info(f"Session title resolved to: {title}")
             return title[:50]
         except Exception as e:
             logger.error(f"Error generating session title: {e}")

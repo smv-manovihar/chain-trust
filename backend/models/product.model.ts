@@ -1,5 +1,7 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 
+export type EnrollmentStatus = 'pending' | 'completed' | 'failed';
+
 export interface IProduct extends Document {
 	name: string;
 	productId: string; // SKU, NDC, or any identifier the manufacturer uses
@@ -23,18 +25,25 @@ export interface IProduct extends Document {
 	createdBy: Types.ObjectId;
 	createdAt: Date;
 	updatedAt: Date;
+	status: EnrollmentStatus;
+	wizardState: any; // Dynamic dict for UI state tracking (FIX-004)
 }
 
 const productSchema = new Schema<IProduct>(
 	{
 		name: {
 			type: String,
-			required: true,
+			required: true, // Name is still mandated at Step 1
 			trim: true,
+		},
+		status: {
+			type: String,
+			enum: ['pending', 'completed', 'failed'],
+			default: 'pending',
 		},
 		productId: {
 			type: String,
-			required: true,
+			required: false, // Draft support
 			trim: true,
 		},
 		categories: {
@@ -43,7 +52,7 @@ const productSchema = new Schema<IProduct>(
 		},
 		brand: {
 			type: String,
-			required: true,
+			required: false, // Draft support
 			trim: true,
 		},
 		price: {
@@ -87,6 +96,11 @@ const productSchema = new Schema<IProduct>(
 			type: Schema.Types.ObjectId,
 			ref: 'User',
 			required: true,
+		},
+		// Dynamic Wizard State: Stores the full UI context for resuming (FIX-004)
+		wizardState: {
+			type: Schema.Types.Mixed,
+			default: {},
 		},
 	},
 	{

@@ -16,21 +16,31 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 
 import { getPrescriptions, deletePrescription } from "@/api/customer.api";
 import { LinkedMedications } from "@/components/cabinet/linked-medications";
 import { PrescriptionUploadDialog } from "@/components/cabinet/prescription-upload-dialog";
 import { DocumentViewerDialog } from "@/components/common/document-viewer";
-import { LoadingScreen } from "@/components/ui/loading-screen";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+import { useDebounce } from "@/hooks/use-debounce";
 
 interface Prescription {
   _id: string;
@@ -45,6 +55,8 @@ interface Prescription {
 }
 
 export default function PrescriptionExplorerPage() {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
@@ -52,12 +64,34 @@ export default function PrescriptionExplorerPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [skip, setSkip] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(
+    searchParams.get("search") || "",
+  );
   const [previewDoc, setPreviewDoc] = useState<{
     url: string;
     label: string;
   } | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteConfirmLabel, setDeleteConfirmLabel] = useState<string>("");
+
+  const debouncedSearch = useDebounce(searchTerm, 500);
+
+  // Sync state to URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (searchTerm) {
+      params.set("search", searchTerm);
+    } else {
+      params.delete("search");
+    }
+
+    const queryString = params.toString();
+    if (queryString !== searchParams.toString()) {
+      const url = queryString ? `${pathname}?${queryString}` : pathname;
+      router.replace(url, { scroll: false });
+    }
+  }, [searchTerm, pathname, router, searchParams]);
 
   const observer = useRef<IntersectionObserver | null>(null);
   const lastElementRef = useCallback(
@@ -84,7 +118,7 @@ export default function PrescriptionExplorerPage() {
     else setLoadingMore(true);
 
     try {
-      const data = await getPrescriptions(skipCount, 10);
+      const data = await getPrescriptions(skipCount, 10, debouncedSearch);
       if (isInitial) {
         setPrescriptions(data.prescriptions);
       } else {
@@ -100,38 +134,36 @@ export default function PrescriptionExplorerPage() {
     }
   };
 
+  // Reset and fetch when search query changes
   useEffect(() => {
+    setSkip(0);
     fetchPrescriptions(0, true);
-  }, []);
+  }, [debouncedSearch]);
 
+  // Load more data when skip changes (and it's not the initial fetch which is handled by debouncedSearch effect)
   useEffect(() => {
     if (skip > 0) {
       fetchPrescriptions(skip);
     }
   }, [skip]);
 
-  const handleDelete = async (id: string, label: string) => {
-    if (
-      !confirm(
-        `Are you sure you want to delete "${label}"? This will unlink it from all medications.`,
-      )
-    )
-      return;
+  const handleDelete = (id: string, label: string) => {
+    setDeleteConfirmId(id);
+    setDeleteConfirmLabel(label);
+  };
 
+  const onConfirmDelete = async () => {
+    if (!deleteConfirmId) return;
     try {
-      await deletePrescription(id);
-      setPrescriptions((prev) => prev.filter((p) => p._id !== id));
+      await deletePrescription(deleteConfirmId);
+      setPrescriptions((prev) => prev.filter((p) => p._id !== deleteConfirmId));
       toast.success("Prescription deleted successfully");
     } catch (error) {
       toast.error("Failed to delete prescription");
+    } finally {
+      setDeleteConfirmId(null);
     }
   };
-
-  const filteredPrescriptions = prescriptions.filter(
-    (p) =>
-      p.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.doctorName?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
 
   return (
     <div className="max-w-[1600px] mx-auto pb-20 space-y-2 lg:space-y-4">
@@ -151,7 +183,7 @@ export default function PrescriptionExplorerPage() {
             variant="ghost"
             size="sm"
             asChild
-            className="hidden sm:flex text-[10px] font-bold text-muted-foreground hover:text-primary transition-colors h-10 rounded-full px-4"
+            className="hidden sm:flex text-[10px] font-bold text-muted-foreground hover:text-primary transition-all active:scale-95 h-10 rounded-full px-4"
           >
             <Link
               href="/customer/cabinet"
@@ -204,7 +236,7 @@ export default function PrescriptionExplorerPage() {
                 className="h-64 rounded-[2.5rem] bg-muted animate-pulse"
               />
             ))
-          ) : filteredPrescriptions.length === 0 ? (
+          ) : prescriptions.length === 0 ? (
             <div className="md:col-span-2 py-8">
               <EmptyState
                 icon={FileText}
@@ -217,7 +249,7 @@ export default function PrescriptionExplorerPage() {
               />
             </div>
           ) : (
-            filteredPrescriptions.map((p) => (
+            prescriptions.map((p) => (
               <Card
                 key={p._id}
                 className="group p-5 sm:p-6 rounded-[2rem] sm:rounded-[2.5rem] border-primary/5 bg-card/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:shadow-primary/5 transition-all duration-500 overflow-hidden relative flex flex-col md:flex-row md:items-center gap-4 sm:gap-6"
@@ -258,7 +290,7 @@ export default function PrescriptionExplorerPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-9 w-9 rounded-xl hover:bg-primary/10 text-primary transition-all"
+                      className="h-9 w-9 rounded-xl hover:bg-primary/10 text-primary transition-all active:scale-95"
                       onClick={() =>
                         setPreviewDoc({ url: p.url, label: p.label })
                       }
@@ -268,7 +300,7 @@ export default function PrescriptionExplorerPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-9 w-9 rounded-xl hover:bg-red-50 text-red-500 transition-all"
+                      className="h-9 w-9 rounded-xl hover:bg-red-50 text-red-500 transition-all active:scale-95"
                       onClick={() => handleDelete(p._id, p.label)}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -286,7 +318,7 @@ export default function PrescriptionExplorerPage() {
                       variant="secondary"
                       className="text-[9px] font-bold px-2 py-0 h-4 bg-primary/5 text-primary border-none"
                     >
-                      {p.itemCount} Items
+                      {p.itemCount} items
                     </Badge>
                   </div>
                   <LinkedMedications medications={p.linkedMedications} />
@@ -304,17 +336,17 @@ export default function PrescriptionExplorerPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-10 w-10 rounded-xl hover:bg-primary/10 text-primary transition-all"
+                    className="h-10 w-10 rounded-xl hover:bg-primary/10 text-primary transition-all active:scale-95"
                     onClick={() =>
                       setPreviewDoc({ url: p.url, label: p.label })
                     }
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
-                  <Button 
-                    variant="destructive" 
-                    size="icon" 
-                    className="h-10 w-10 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="h-10 w-10 rounded-xl transition-all opacity-0 group-hover:opacity-100 active:scale-95"
                     onClick={() => handleDelete(p._id, p.label)}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -341,6 +373,39 @@ export default function PrescriptionExplorerPage() {
         onOpenChange={(open) => !open && setPreviewDoc(null)}
         document={previewDoc}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!deleteConfirmId}
+        onOpenChange={(open) => !open && setDeleteConfirmId(null)}
+      >
+        <AlertDialogContent className="rounded-[2rem] border-primary/10 shadow-2xl backdrop-blur-3xl bg-card/90">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-black">
+              Delete Prescription?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium">
+              Are you sure you want to delete{" "}
+              <span className="text-foreground font-bold">
+                "{deleteConfirmLabel}"
+              </span>
+              ? This will permanently unlink it from all medications in your
+              vault.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0">
+            <AlertDialogCancel className="rounded-full font-bold transition-all active:scale-95">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 hover:bg-red-600 rounded-full font-bold transition-all active:scale-95"
+              onClick={onConfirmDelete}
+            >
+              Delete doc
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

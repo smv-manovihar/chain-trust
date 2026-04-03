@@ -105,11 +105,7 @@ function LoginForm() {
             )}
           />
 
-          <div className="flex justify-between items-center text-sm">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" className="rounded border-input" />
-              <span className="text-muted-foreground">Remember me</span>
-            </label>
+          <div className="flex justify-end items-center text-sm">
             <Link href="#" className="text-primary hover:underline">
               Forgot password?
             </Link>
@@ -119,7 +115,7 @@ function LoginForm() {
             {isLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : null}
-            {isLoading ? "Signing in..." : "Sign In"}
+            {isLoading ? "Signing in..." : "Sign in"}
           </Button>
         </form>
       </Form>
@@ -134,7 +130,7 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title="Secure Verification"
+      title="Secure verification"
       subtitle="Access your dashboard and stay connected with the entire supply chain."
     >
       <div className="flex flex-col space-y-2 text-center mb-6">

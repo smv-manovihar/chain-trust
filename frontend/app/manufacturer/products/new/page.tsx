@@ -30,8 +30,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createProduct } from "@/api/product.api";
+import { createProduct, getProduct, updateProduct } from "@/api/product.api";
 import { uploadImages } from "@/api/upload.api";
+import { resolveMediaUrl } from "@/lib/media-url";
 import { toast } from "sonner";
 import Link from "next/link";
 import {
@@ -53,6 +54,7 @@ import { CategoryFilter } from "@/components/manufacturer/category-filter";
 import { requestExecutionAccounts } from "@/api/web3-client";
 import { useWeb3 } from "@/contexts/web3-context";
 import { motion, AnimatePresence } from "framer-motion";
+import { useWizardPersistence } from "@/hooks/use-wizard-persistence";
 
 export default function NewProductWizard() {
   const router = useRouter();
@@ -64,23 +66,82 @@ export default function NewProductWizard() {
   } = useWeb3();
   const isConnecting = walletStatus === "connecting";
 
-  // Form State
-  const [form, setForm] = useState({
-    name: "",
-    productId: "",
-    categories: [] as string[],
-    brand: "",
-    price: "",
-    description: "",
-    composition: "",
-    unit: "pills",
-    images: [] as File[],
-    imageAccessLevel: "public" as "public" | "verified_only" | "internal_only",
-    customerVisibleImages: [] as number[],
-  });
+  // Form State with Persistence (FIX-003)
+  const {
+    wizardData: form,
+    setWizardData: setForm,
+    clearWizardPersistence,
+    isWizardDataLoaded,
+  } = useWizardPersistence(
+    "ct_new_product_wizard",
+    {
+      name: "",
+      productId: "",
+      categories: [] as string[],
+      brand: "",
+      price: "",
+      description: "",
+      composition: "",
+      unit: "pills",
+      images: [] as File[],
+      imageAccessLevel: "public" as
+        | "public"
+        | "verified_only"
+        | "internal_only",
+      customerVisibleImages: [] as number[],
+    },
+    {
+      excludeFields: ["images"],
+    },
+  );
 
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [resumeId, setResumeId] = useState<string | null>(null);
+
+  const syncWizardState = async (nextStep: number) => {
+    if (!resumeId) return;
+    try {
+      await updateProduct(resumeId, {
+        wizardState: {
+          step: nextStep,
+          form,
+        },
+      });
+    } catch (err) {
+      console.error("Failed to sync wizard state", err);
+    }
+  };
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const id = urlParams.get("id");
+    if (id) {
+      setResumeId(id);
+      // Fetch pending product
+      getProduct(id)
+        .then((data) => {
+          if (data.product && data.product.status === "pending") {
+            const state = data.product.wizardState || {};
+            if (state.form) {
+              setForm(state.form);
+            } else if (data.product) {
+              updateForm({
+                name: data.product.name,
+                productId: data.product.productId,
+                categories: data.product.categories || [],
+                brand: data.product.brand,
+                composition: data.product.composition || "",
+                unit: data.product.unit || "pills",
+              });
+            }
+            setStep(state.step || 1);
+            toast.info("Resuming pending product catalog...");
+          }
+        })
+        .catch((err) => console.error("Failed to resume product", err));
+    }
+  }, []);
 
   const updateForm = (updates: Partial<typeof form>) =>
     setForm((f) => ({ ...f, ...updates }));
@@ -96,12 +157,24 @@ export default function NewProductWizard() {
   };
 
   const handleSave = async () => {
-    if (!walletAddress) {
-      toast.error("Wallet connection required.");
-      return;
-    }
     setSaving(true);
     try {
+      let productIdToUpdate = resumeId;
+
+      // Step 1: Create pending record if not already resuming
+      if (!productIdToUpdate) {
+        const pendingProduct = await createProduct({
+          ...form,
+          price: parseFloat(form.price) || 0,
+          images: [], // No images yet
+          status: "pending",
+        });
+        productIdToUpdate = pendingProduct.product._id;
+        setResumeId(productIdToUpdate);
+        window.history.replaceState(null, "", `?id=${productIdToUpdate}`);
+      }
+
+      // Step 2: Upload images
       let imageUrls: string[] = [];
       if (form.images.length > 0) {
         setUploading(true);
@@ -109,17 +182,23 @@ export default function NewProductWizard() {
         setUploading(false);
       }
 
-      await createProduct({
+      // Step 3: Finalize status
+      await updateProduct(productIdToUpdate!, {
         ...form,
         price: parseFloat(form.price) || 0,
+        status: "completed",
         images: imageUrls,
-        customerVisibleImages: form.customerVisibleImages,
+        wizardState: {}, // Clear state on success
       });
 
-      toast.success("Product created successfully.");
+      toast.success("Product successfully registered.");
+      clearWizardPersistence(); // FIX-003: Clear persistence on success
+      window.history.replaceState(null, "", window.location.pathname);
       router.push("/manufacturer/products");
     } catch (err: any) {
-      toast.error(err.message || "Failed to create product.");
+      toast.error(
+        err.message || "Failed to create product. You can resume later.",
+      );
     } finally {
       setSaving(false);
     }
@@ -130,7 +209,13 @@ export default function NewProductWizard() {
   const canGoToStep = (targetStep: number) => {
     if (targetStep <= step) return true;
     if (targetStep === 2)
-      return form.name && form.productId && form.categories.length > 0 && form.brand && form.composition;
+      return (
+        form.name &&
+        form.productId &&
+        form.categories.length > 0 &&
+        form.brand &&
+        form.composition
+      );
     if (targetStep === 3)
       return (
         form.name &&
@@ -143,15 +228,51 @@ export default function NewProductWizard() {
     return false;
   };
 
-  const nextStep = () => {
-    if (step === 1 && (!form.name || !form.productId || form.categories.length === 0 || !form.brand || !form.composition || !form.unit)) {
-      toast.error("Please fill in all basic details.");
-      return;
+  const nextStep = async () => {
+    if (step === 1) {
+      if (
+        !form.name ||
+        !form.brand ||
+        form.categories.length === 0 ||
+        !form.composition ||
+        !form.unit
+      ) {
+        toast.error("Please fill in basic details.");
+        return;
+      }
+
+      // Step 1 -> 2: Initiate DB record (FIX-001)
+      if (!resumeId) {
+        try {
+          const pending = await createProduct({
+            name: form.name,
+            brand: form.brand,
+            categories: form.categories,
+            composition: form.composition,
+            unit: form.unit,
+            status: "pending",
+            wizardState: { step: 2, form },
+          });
+          const id = pending.product._id;
+          setResumeId(id);
+          window.history.replaceState(null, "", `?id=${id}`);
+        } catch (err: any) {
+          toast.error("Failed to initiate draft.");
+          return;
+        }
+      }
     }
-    setStep((s) => s + 1);
+
+    const next = step + 1;
+    setStep(next);
+    syncWizardState(next);
   };
 
-  const prevStep = () => setStep((s) => s - 1);
+  const prevStep = () => {
+    const prev = step - 1;
+    setStep(prev);
+    syncWizardState(prev);
+  };
 
   if (!walletAddress) {
     return (
@@ -162,9 +283,12 @@ export default function NewProductWizard() {
             <div className="absolute top-0 right-0 h-4 w-4 bg-destructive rounded-full" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold">Wallet Connection Required</h2>
+            <h2 className="text-xl font-semibold">
+              Wallet Connection Required
+            </h2>
             <p className="text-sm text-muted-foreground mt-2">
-              To enroll products on the ledger, you must authenticate with a Web3 wallet to sign the transaction.
+              To enroll products on the ledger, you must authenticate with a
+              Web3 wallet to sign the transaction.
             </p>
           </div>
           <div className="space-y-3 pt-4 border-t border-border/40">
@@ -180,7 +304,11 @@ export default function NewProductWizard() {
               )}
               Connect Wallet
             </Button>
-            <Button variant="outline" asChild className="w-full rounded-full h-11">
+            <Button
+              variant="outline"
+              asChild
+              className="w-full rounded-full h-11"
+            >
               <Link href="/manufacturer/products">Cancel</Link>
             </Button>
           </div>
@@ -204,7 +332,9 @@ export default function NewProductWizard() {
           </Link>
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Add New Product</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            Add new product
+          </h1>
         </div>
         <div className="text-right hidden sm:block">
           <p className="text-xs text-muted-foreground">Step</p>
@@ -225,7 +355,9 @@ export default function NewProductWizard() {
             className={cn(
               "h-1.5 flex-1 rounded-full transition-all duration-500",
               i <= step ? "bg-primary" : "bg-muted",
-              canGoToStep(i) ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+              canGoToStep(i)
+                ? "cursor-pointer"
+                : "cursor-not-allowed opacity-50",
             )}
           />
         ))}
@@ -245,7 +377,9 @@ export default function NewProductWizard() {
                 <div className="space-y-6">
                   <div>
                     <h2 className="text-lg font-semibold">Basic Details</h2>
-                    <p className="text-sm text-muted-foreground">Product identity and categorization</p>
+                    <p className="text-sm text-muted-foreground">
+                      Product identity and categorization
+                    </p>
                   </div>
                   <div className="grid sm:grid-cols-2 gap-6">
                     <div className="space-y-2">
@@ -263,7 +397,9 @@ export default function NewProductWizard() {
                       <Input
                         placeholder="e.g. NDC-12345"
                         value={form.productId}
-                        onChange={(e) => updateForm({ productId: e.target.value })}
+                        onChange={(e) =>
+                          updateForm({ productId: e.target.value })
+                        }
                         className="rounded-full h-11"
                       />
                     </div>
@@ -272,7 +408,9 @@ export default function NewProductWizard() {
                       <Input
                         placeholder="e.g. Paracetamol 500mg"
                         value={form.composition}
-                        onChange={(e) => updateForm({ composition: e.target.value })}
+                        onChange={(e) =>
+                          updateForm({ composition: e.target.value })
+                        }
                         className="rounded-full h-11"
                       />
                     </div>
@@ -280,7 +418,9 @@ export default function NewProductWizard() {
                       <Label className="mb-2">Categories</Label>
                       <CategoryFilter
                         selectedCategories={form.categories}
-                        onCategoryChange={(cats) => updateForm({ categories: cats })}
+                        onCategoryChange={(cats) =>
+                          updateForm({ categories: cats })
+                        }
                         canManage={true}
                         placeholder="Select categories..."
                         className="w-full justify-between h-auto min-h-[44px] px-4 py-2 rounded-full border-border/40"
@@ -291,7 +431,7 @@ export default function NewProductWizard() {
                       <Label>Brand / manufacturer</Label>
                       <Input
                         placeholder="e.g. PharmaCorp"
-                         value={form.brand}
+                        value={form.brand}
                         onChange={(e) => updateForm({ brand: e.target.value })}
                         className="rounded-full h-11"
                       />
@@ -324,7 +464,9 @@ export default function NewProductWizard() {
                 <div className="space-y-6">
                   <div>
                     <h2 className="text-lg font-semibold">Specifications</h2>
-                    <p className="text-sm text-muted-foreground">Pricing and descriptive protocol</p>
+                    <p className="text-sm text-muted-foreground">
+                      Pricing and descriptive protocol
+                    </p>
                   </div>
                   <div className="space-y-6">
                     <div className="space-y-2 sm:w-1/2">
@@ -343,7 +485,9 @@ export default function NewProductWizard() {
                       <Textarea
                         placeholder="Enter formulation details, dosage instructions..."
                         value={form.description}
-                        onChange={(e) => updateForm({ description: e.target.value })}
+                        onChange={(e) =>
+                          updateForm({ description: e.target.value })
+                        }
                         className="min-h-[160px] resize-none rounded-[1.5rem] p-4 shadow-inner"
                       />
                     </div>
@@ -355,7 +499,9 @@ export default function NewProductWizard() {
                 <div className="space-y-6">
                   <div>
                     <h2 className="text-lg font-semibold">Visual Identity</h2>
-                    <p className="text-sm text-muted-foreground">Upload product packaging imagery</p>
+                    <p className="text-sm text-muted-foreground">
+                      Upload product packaging imagery
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -365,7 +511,11 @@ export default function NewProductWizard() {
                         className="relative aspect-square rounded-lg overflow-hidden group border border-border"
                       >
                         <img
-                          src={URL.createObjectURL(file)}
+                          src={
+                            typeof file === "string"
+                              ? resolveMediaUrl(file)
+                              : URL.createObjectURL(file)
+                          }
                           className="w-full h-full object-cover"
                         />
                         <button
@@ -376,20 +526,27 @@ export default function NewProductWizard() {
                         </button>
                         <button
                           onClick={() => {
-                            const isVisible = form.customerVisibleImages.includes(idx);
+                            const isVisible =
+                              form.customerVisibleImages.includes(idx);
                             updateForm({
                               customerVisibleImages: isVisible
-                                ? form.customerVisibleImages.filter(i => i !== idx)
-                                : [...form.customerVisibleImages, idx]
+                                ? form.customerVisibleImages.filter(
+                                    (i) => i !== idx,
+                                  )
+                                : [...form.customerVisibleImages, idx],
                             });
                           }}
                           className={cn(
                             "absolute bottom-2 right-2 p-1.5 rounded-full transition-all border",
                             form.customerVisibleImages.includes(idx)
                               ? "bg-primary text-white border-primary"
-                              : "bg-black/60 text-white/70 border-white/20 hover:bg-black/80"
+                              : "bg-black/60 text-white/70 border-white/20 hover:bg-black/80",
                           )}
-                          title={form.customerVisibleImages.includes(idx) ? "Visible to Customers" : "Hidden from Customers"}
+                          title={
+                            form.customerVisibleImages.includes(idx)
+                              ? "Visible to Customers"
+                              : "Hidden from Customers"
+                          }
                         >
                           {form.customerVisibleImages.includes(idx) ? (
                             <Check className="h-4 w-4" />
@@ -403,7 +560,7 @@ export default function NewProductWizard() {
                       htmlFor="img-up"
                       className={cn(
                         "aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors",
-                        uploading && "opacity-50 pointer-events-none"
+                        uploading && "opacity-50 pointer-events-none",
                       )}
                     >
                       {uploading ? (
@@ -411,7 +568,9 @@ export default function NewProductWizard() {
                       ) : (
                         <Plus className="h-6 w-6 text-muted-foreground" />
                       )}
-                      <span className="text-xs text-muted-foreground mt-2 font-medium">Upload</span>
+                      <span className="text-xs text-muted-foreground mt-2 font-medium">
+                        Upload
+                      </span>
                       <input
                         id="img-up"
                         type="file"
@@ -426,23 +585,31 @@ export default function NewProductWizard() {
                   <div className="space-y-4 pt-4 border-t border-border/40">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div>
-                        <Label className="text-sm font-bold">Image access level</Label>
-                        <p className="text-xs text-muted-foreground mt-0.5">Control who can view these product images</p>
+                        <Label className="text-sm font-bold">
+                          Image access level
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Control who can view these product images
+                        </p>
                       </div>
                       <div className="flex bg-muted/50 p-1.5 rounded-full border border-border/50 w-full sm:w-auto">
-                        {(['public', 'verified_only', 'internal_only'] as const).map((level) => (
+                        {(
+                          ["public", "verified_only", "internal_only"] as const
+                        ).map((level) => (
                           <button
                             key={level}
                             type="button"
-                            onClick={() => updateForm({ imageAccessLevel: level })}
+                            onClick={() =>
+                              updateForm({ imageAccessLevel: level })
+                            }
                             className={cn(
                               "px-4 py-2 text-[10px] font-bold rounded-full transition-all flex-1 sm:flex-none",
                               form.imageAccessLevel === level
                                 ? "bg-background text-primary shadow-sm border border-border/50"
-                                : "text-muted-foreground hover:text-foreground"
+                                : "text-muted-foreground hover:text-foreground",
                             )}
                           >
-                            {level.replace('_', ' ')}
+                            {level.replace("_", " ")}
                           </button>
                         ))}
                       </div>
@@ -452,7 +619,9 @@ export default function NewProductWizard() {
                   <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/40 text-muted-foreground">
                     <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" />
                     <p className="text-sm">
-                      Provide high-quality images. Consumers use these specifically to verify physical authenticity against real packaging.
+                      Provide high-quality images. Consumers use these
+                      specifically to verify physical authenticity against real
+                      packaging.
                     </p>
                   </div>
                 </div>
@@ -475,7 +644,10 @@ export default function NewProductWizard() {
             )}
 
             {step < 3 ? (
-              <Button onClick={nextStep} className="gap-2 rounded-full h-10 px-8">
+              <Button
+                onClick={nextStep}
+                className="gap-2 rounded-full h-10 px-8"
+              >
                 Next <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
@@ -484,7 +656,11 @@ export default function NewProductWizard() {
                 disabled={saving}
                 className="gap-2 rounded-full h-10 px-8"
               >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
                 {saving ? "Saving..." : "Create Product"}
               </Button>
             )}

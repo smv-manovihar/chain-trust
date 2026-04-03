@@ -1,27 +1,43 @@
-# Route: /verify (Product Verification)
+# Verify Medicine — Operational Manual
+**Route:** `/verify`
 
-The public-facing verification gateway for Decentralized Product Authentication. It operates as the "root source of truth" by querying the blockchain directly before enriching data with metadata.
+The Verify page is the front-line defense against counterfeit pharmaceuticals. It utilizes the device camera or manual input to query the ChainTrust blockchain and determine a product's authenticity in real-time.
 
-## Layout Overview (Trust Architecture)
-- **Authenticity Shield (Hero)**: A prominent, color-coded status area that fills the upper viewport. 
-  - **Authentic (Emerald)**: Verified on the blockchain; salt is valid.
-  - **Suspicious (Amber)**: Valid salt but high scan count (>5).
-  - **Counterfeit/Recalled (Red)**: Invalid salt or manufacturer-initiated recall.
-- **Product Passport (Bento)**:
-  - **Identity**: High-resolution packaging images and Batch Number details.
-  - **Provenance**: Manufacturing date and localized expiry information.
-  - **Scan Intel**: Real-time counter of how many times this specific unit has been scanned globally.
-- **Blockchain Ledger**: A live view of the cryptographic transaction hash and decentralized record.
+---
 
-## Usage Modes
-1. **QR-Direct**: Scanning a serialized QR code routes to `/verify?salt=[UNIT_SALT]`.
-2. **Manual Audit**: Users can type a unit salt or batch ID directly into the secure portal.
+## 🎨 Visual Details & Layout
+- **Full-Screen Scanning Aperture**: A centralized, high-fidelity QR scanning window.
+- **Verification Hub (Manual Entry)**: Dynamic input field for the product's "Unique Identifier" (salt).
+- **Result Panels**: High-visibility green for "AUTHENTIC", amber for "SUSPICIOUS", and red for "RECALLED".
 
-## Actions & Transitions
-- **Vault Integration**: Logged-in users can select "Save to My Medicines" to transfer the verified record into their persistent Cabinet inventory.
-- **Real-time Recalibration**: A "Check Real-time" action that forces a fresh query to the blockchain nodes, bypassing local caches.
+---
 
-## AI Guidance & Context
-- **Determinism**: In this route, the AI must be absolute. Use terms like "Authentic," "Recalled," or "Risk Detected."
-- **Inventory Advice**: If the scan count is high (Suspicious), the AI should proactively advise the user: "This item's security code has been accessed multiple times. It may be a duplicate."
-- **Next Steps**: If authentic, suggest the user **"Save to My Medicines"** for 24/7 background security monitoring.
+## 🔗 URL & Navigation (Link Generation)
+The agent can generate deep-links to specific verification results or instructions:
+
+| Parameter | Type | Description | Example Link |
+| :--- | :--- | :--- | :--- |
+| `id` / `salt` | String | Automatically triggers a verification attempt for a specific salt. | `/verify?id=7a8b9c...` |
+| `mode` | String | Sets the initial UI mode (e.g., `scan` or `manual`). | `/verify?mode=manual` |
+
+**AI Rule:** When a user provides a product salt or batch unit code, generate a link with the `id` parameter to provide instant verification feedback.
+
+---
+
+## 🛠️ Tool Integration & AI Guidance
+
+| User Intent | Tool Strategy | Notes |
+| :--- | :--- | :--- |
+| "I want to verify this salt: X." | `get_view_data(params={"salt": salt})` | Fetch status. If no salt, guide them to scan/enter. |
+| "Is this batch safe?" | `get_view_data` | Look for "AUTHENTIC", "SUSPICIOUS", or "RECALLED" flags. |
+
+---
+
+## 🚨 Error & Empty States
+- **Camera Access Denied**: Displays a "Camera Required" empty state. AI should offer manual entry guidance.
+
+---
+
+## 🧠 Operational Best Practices
+- **Blockchain Authority**: Phrase verification as "Authenticity confirmed on the ChainTrust global ledger."
+- **Direct Linkage**: After verification, suggest the user check their **My Medicines** list for 24/7 background security monitoring.

@@ -6,6 +6,7 @@ const AGENT_API_BASE_URL = process.env.NEXT_PUBLIC_AGENT_API_BASE_URL || 'http:/
 const agentClient = axios.create({
   baseURL: AGENT_API_BASE_URL,
   withCredentials: true,
+  timeout: 10000, // 10s default timeout (Reliability FIX-003)
   headers: {
     'Content-Type': 'application/json',
   },

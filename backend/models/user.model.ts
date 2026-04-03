@@ -53,6 +53,9 @@ export interface IUser extends Document {
 	// Password Change Requirement
 	mustChangePassword: boolean;
 
+	// Security: Admin approval state (FIX-007)
+	isApprovedByAdmin: boolean;
+
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -137,6 +140,9 @@ const userSchema = new Schema<IUser>(
 
 		// Force password change
 		mustChangePassword: { type: Boolean, default: false },
+
+		// Security: Admin approval state (FIX-007) - Currently AUTO-APPROVING per user request
+		isApprovedByAdmin: { type: Boolean, default: true },
 	},
 	{
 		timestamps: true,

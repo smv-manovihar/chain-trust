@@ -105,3 +105,26 @@ export const checkRole = (roles: string[]) => {
 		next();
 	};
 };
+
+/**
+ * Middleware to check if the user account has been approved by an administrator.
+ * Gating FIX-007.
+ */
+export const checkApproval = (req: Request, res: Response, next: NextFunction): void => {
+	const user = (req as any).user;
+	
+	if (!user) {
+		res.status(401).json({ message: 'Authentication required' });
+		return;
+	}
+
+	if (!user.isApprovedByAdmin) {
+		res.status(403).json({
+			code: 'PENDING_APPROVAL',
+			message: 'Your account is pending administrator approval. Please contact support.'
+		});
+		return;
+	}
+
+	next();
+};

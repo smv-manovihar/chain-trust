@@ -90,13 +90,20 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const loadMoreAbortRef = useRef<AbortController | null>(null);
   const messagesAbortRef = useRef<AbortController | null>(null);
 
-  // Sync session ID with URL search param 'session'
+  // Sync session ID from URL to state
   useEffect(() => {
-    const sessionParam = searchParams.get("session");
-    if (sessionParam && sessionParam !== currentSessionId) {
-      setCurrentSessionId(sessionParam);
-    }
-  }, [searchParams, currentSessionId]);
+    // Only sync from URL if the current page actually uses URL for session state
+    if (!pathname.includes("/agent")) return;
+
+    const sessionParam = searchParams.get("session") || undefined;
+    
+    // Only update state if the URL actually differs from our current state
+    // We use the functional update pattern to check the current state without adding it to deps
+    setCurrentSessionId(prev => {
+      if (sessionParam !== prev) return sessionParam;
+      return prev;
+    });
+  }, [searchParams, pathname]);
 
   // Update URL when currentSessionId changes (only on specific pages if needed, but here we do it generally)
   const updateUrl = useCallback(
@@ -513,13 +520,23 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const deleteSession = async (id: string) => {
     try {
       await agentApi.deleteSession(id);
+
+      // Now that deletion is complete, clear the state
       setSessions((prev) => prev.filter((s) => s.id !== id));
+
       if (currentSessionId === id) {
         handleSetCurrentSessionId(undefined);
+        // "Clear the things" - clear search and input
+        setSearchQuery("");
+        setInput("");
       }
+
       toast.success("Chat deleted");
     } catch (error) {
+      console.error("Failed to delete chat session", error);
       toast.error("Failed to delete chat");
+      // Re-fetch sessions on failure to restore consistency
+      loadSessions(searchQuery);
     }
   };
 

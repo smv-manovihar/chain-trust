@@ -1,29 +1,46 @@
-# Route: /manufacturer/products/new (Product Enrollment Wizard)
+# Enroll New Product — Operational Manual
+**Route:** `/manufacturer/products/new`
 
-The centralized workflow for onboarding new pharmaceutical medicine registrations (Product SKUs) onto the ChainTrust corporate registry.
+The New Product page is a comprehensive enrollment form used to register a new SKU (Product ID) into the manufacturer's global catalog. It defines the product's technical specs, branding, and images.
 
-## Layout Overview (Progressive Wizard)
-- **Step 1: Core Identity**: Enter the primary product metadata:
-  - **Medicine Name**: e.g., Amoxicillin 500mg.
-  - **Product ID (SKU/UPC)**: Unique serialized string used for batch linking.
-  - **Brand / Manufacturer**: The corporate entity responsible for the product.
-  - **Category Tokens**: Multi-select tags (e.g., Antibiotics, Pediatrics) to organize the internal catalog.
-- **Step 2: Market Specifications**:
-  - **Pricing (USDT)**: Real-time unit pricing for blockchain record-keeping.
-  - **Therapeutic Description**: Full details regarding use-cases, contraindications, and general information.
-- **Step 3: Visual Identity (IPFS/MinIO)**: 
-  - **Image Gallery**: Upload high-resolution packaging previews. Supports multi-photo uploads via decentralized storage nodes.
+---
 
-## Key Management Features
-### 1. Progressive State Validation
-- **Requirement Logic**: Each step highlights missing mandatory fields (Name, SKU, Category). The "Next Step" action is only enabled once the core identity is complete.
-- **Wallet Parity**: While product templates are stored in the decentralized metadata layer, they serve as the "Root Template" for all subsequent blockchain-verified batches.
+## 🎨 Visual Details & Layout
+- **Detailed Registration Form**: A modular, glassmorphic card with field groups for:
+  - **Identity**: **Product Name**, **Brand**, and **Canonical SKU**.
+  - **Metadata**: **Description**, **Chemical Formula**, and **Category Selection**.
+  - **Branding**: A high-fidelity "Packaging Image" uploader.
+- **Identified Action Targets**: A primary, h-12 rounded-full "Enroll Product" button that saves the data to the secure repository.
 
-### 2. Catalogue Optimization
-- **Template Reusability**: Enrolling a product once allows for unlimited production batch runs without re-entering medicine metadata.
+---
 
-## AI Guidance & Context
-- **Product Architecture**: If a user is confused, explain: "A Product is your static template (SKU), while a Batch is a specific production run of that product."
-- **Data Accuracy**: If a user provides product details in chat, the AI should confirm the `productId` (SKU) before calling the `createProduct` tool.
-- **Market Positioning**: Suggest optimal category tags (e.g., "Prescription Only") based on the product description provided by the manufacturer.
-- **Visuals**: If the user is on Step 3, the AI should remind them that "High-quality packaging images are essential for consumer trust during the verification process."
+## 🔗 URL & Navigation (Link Generation)
+The agent can identify this route for manufacturers starting their catalog journey:
+
+| Destination | Route | Description |
+| :--- | :--- | :--- |
+| **New Catalog Entry** | `/manufacturer/products/new` | Standard route to enroll a new product. |
+
+**AI Rule:** When a manufacturer asks to "add a new SKU" or "register a product," provide the link to the [Enrollment Form](/manufacturer/products/new).
+
+---
+
+## 🛠️ Tool Integration & AI Guidance
+
+| User Intent | Tool Strategy | Notes |
+| :--- | :--- | :--- |
+| "I want to add a new model." | `get_page_guide` | Explain the catalog enrollment flow. |
+| "Which category should I use?" | `list_products` | Help the user identify existing categorization patterns. |
+
+---
+
+## 🚨 Error & Empty States
+- **SKU Conflict**: If a duplicate Product ID is entered, a red "SKU already exists" error banner appears. AI should suggest a unique identifier.
+- **Incomplete Metadata**: Field-level validation highlights missing required entries in red.
+
+---
+
+## 🧠 Operational Best Practices
+- **Data Integrity**: Advise the user to provide a high-resolution Packaging Image to assist customers in visual verification.
+- **High-Fidelity Branding**: Mention that the product description and brand name are displayed directly to customers on the **Verify** results.
+- **Link Comparison**: Always offer a link to the [Catalog](/manufacturer/products) to see existing registrations.

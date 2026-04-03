@@ -36,4 +36,6 @@ export const S3_ACCESS_KEY = process.env.S3_ACCESS_KEY || 'minioadmin';
 export const S3_SECRET_KEY = process.env.S3_SECRET_KEY || 'minioadmin';
 export const S3_BUCKET = process.env.S3_BUCKET || 'chaintrust';
 export const S3_PUBLIC_URL = process.env.S3_PUBLIC_URL || `${S3_ENDPOINT}/${S3_BUCKET}`;
+export const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+export const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'chaintrust_internal_2026_secret';
 

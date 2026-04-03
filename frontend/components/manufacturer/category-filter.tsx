@@ -56,7 +56,7 @@ export function CategoryFilter({
         }
       })
       .catch((err) => {
-        if (err.name === 'AbortError') return;
+        if (err.name === "AbortError") return;
         console.error("Failed to load categories", err);
       });
   }, []);
@@ -85,8 +85,9 @@ export function CategoryFilter({
           variant="outline"
           className={cn(
             "h-10 px-3 md:px-4 rounded-md gap-2 border-border/40 bg-background/80 backdrop-blur-md shadow-sm transition-all",
-            selectedCategories.length > 0 && "border-primary/50 text-primary bg-primary/5 hover:bg-primary/10",
-            className
+            selectedCategories.length > 0 &&
+              "border-primary/50 text-primary bg-primary/5 hover:bg-primary/10",
+            className,
           )}
         >
           <div className="relative">
@@ -100,14 +101,17 @@ export function CategoryFilter({
           <span className="hidden sm:inline-block">
             {selectedCategories.length === 0
               ? placeholder
-              : selectedCategories.length === 1 
+              : selectedCategories.length === 1
                 ? selectedCategories[0]
                 : `${selectedCategories.length} Selected`}
           </span>
           <ChevronsUpDown className="h-3 w-3 opacity-30 ml-auto hidden sm:block" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[240px] p-1.5 rounded-md shadow-xl border-border/50" align={align}>
+      <PopoverContent
+        className="w-[240px] p-1.5 rounded-md shadow-xl border-border/50"
+        align={align}
+      >
         <Command className="rounded-md">
           <CommandInput placeholder="Search categories..." className="h-9" />
           <CommandList className="max-h-[300px]">
@@ -130,7 +134,7 @@ export function CategoryFilter({
                           "w-4 h-4 border rounded flex items-center justify-center transition-colors shadow-sm",
                           selectedCategories.includes(cat.name)
                             ? "bg-primary border-primary text-white"
-                            : "border-input bg-background"
+                            : "border-input bg-background",
                         )}
                       >
                         {selectedCategories.includes(cat.name) && (
@@ -143,27 +147,27 @@ export function CategoryFilter({
                 ))
               )}
             </CommandGroup>
-            
+
             {(selectedCategories.length > 0 || canManage) && (
               <div className="p-1.5 border-t border-border/50 mt-1 flex flex-col gap-1">
                 {selectedCategories.length > 0 && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="w-full text-[10px] font-bold tracking-tight h-8 hover:bg-destructive/10 hover:text-destructive"
+                    className="w-full text-[10px] font-bold h-8 hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => onCategoryChange([])}
                   >
                     CLEAR SELECTION
                   </Button>
                 )}
                 {canManage && (
-                  <CategoryManagementDialog 
+                  <CategoryManagementDialog
                     onCategoriesChange={handleCategoriesChange}
                     trigger={
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="w-full text-[10px] font-bold tracking-tight h-8 text-primary hover:bg-primary/5"
+                        className="w-full text-[10px] font-bold h-8 text-primary hover:bg-primary/5"
                       >
                         <Settings2 className="h-3 w-3 mr-2" />
                         MANAGE CATEGORIES

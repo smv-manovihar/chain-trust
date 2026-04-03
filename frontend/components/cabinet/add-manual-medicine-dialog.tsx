@@ -12,6 +12,7 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
   ResponsiveDialogTrigger,
+  ResponsiveDialogBody,
 } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -170,7 +171,7 @@ export function AddManualMedicineDialog({
           <span>Add Medicine</span>
         </Button>
       </ResponsiveDialogTrigger>
-      <ResponsiveDialogContent className="w-full max-w-none sm:max-w-xl h-auto sm:h-[85vh] flex flex-col bg-background/95 sm:bg-background/80 backdrop-blur-3xl border-0 sm:border border-zinc-800 rounded-none sm:rounded-[2.5rem] p-0 overflow-hidden shadow-2xl">
+      <ResponsiveDialogContent className="w-full max-w-none sm:max-w-xl bg-background/95 sm:bg-background/80 backdrop-blur-3xl border-0 sm:border border-zinc-800 p-0 overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
 
         <ResponsiveDialogHeader className="p-5 sm:p-8 pb-3 relative z-auto shrink-0 border-b border-primary/5 sm:border-none mt-2 sm:mt-0">
@@ -209,8 +210,7 @@ export function AddManualMedicineDialog({
             onSubmit={form.handleSubmit(onSubmit)}
             className="flex-1 flex flex-col min-h-0 relative z-10 w-full overflow-hidden"
           >
-            <ScrollArea className="flex-1 w-full">
-              <div className="px-4 sm:px-10 py-5 sm:py-6 space-y-8 pb-10 overflow-x-hidden">
+            <ResponsiveDialogBody className="px-4 sm:px-10 py-5 sm:py-6 space-y-8 pb-10 overflow-x-hidden w-full">
                 <div className="space-y-4">
                   <div className={SECTION_LABEL_CLASSES}>
                     <Pill className={SECTION_ICON_CLASSES} />
@@ -469,8 +469,7 @@ export function AddManualMedicineDialog({
                     )}
                   </div>
                 </div>
-              </div>
-            </ScrollArea>
+            </ResponsiveDialogBody>
 
             {/* Added pb-8 on mobile to ensure it sits safely above the iOS home indicator */}
             <ResponsiveDialogFooter className="p-4 pb-8 sm:p-6 sm:pt-4 shrink-0 border-t border-primary/5 bg-background/80 backdrop-blur-md">

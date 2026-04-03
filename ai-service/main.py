@@ -7,19 +7,24 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+
 # No longer using HTTPBearer as primary auth
-from models import ChatRequest, EditChatRequest, RetryChatRequest
+from models import ChatRequest, EditChatRequest, RetryChatRequest, ParseDocumentRequest
 from sse import sse_manager
 from config import get_settings
 from store import chat_store
 from service import ChatService
 from database import get_db
+from utils.file_reader import fetch_and_parse
 
 settings = get_settings()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     get_db()  # Ensure database singleton is initialized
+    # Cleanup any tasks that were interrupted by a previous crash/restart
+    await chat_store.cleanup_incomplete_tasks()
     yield
     await sse_manager.shutdown()
 
@@ -27,7 +32,7 @@ async def lifespan(app: FastAPI):
 async def get_current_user_payload(request: Request):
     # Read token from cookies
     token = request.cookies.get("accessToken")
-    
+
     if not token:
         # Fallback to Authorization header if present (for backward compatibility/testing)
         auth_header = request.headers.get("Authorization")
@@ -36,7 +41,7 @@ async def get_current_user_payload(request: Request):
 
     if not token:
         raise HTTPException(status_code=401, detail="Access token missing")
-        
+
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
         if payload.get("id") is None:
@@ -48,6 +53,16 @@ async def get_current_user_payload(request: Request):
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+async def verify_internal_secret(request: Request):
+    """Verifies internal secret for service-to-service calls."""
+    secret = request.headers.get("X-Internal-Secret")
+    if not secret or secret != settings.INTERNAL_API_KEY:
+        raise HTTPException(
+            status_code=403, detail="Forbidden: Invalid internal secret"
+        )
+    return True
 
 
 app = FastAPI(title="ChainTrust AI Service", lifespan=lifespan)
@@ -102,10 +117,10 @@ async def create_session(
 
 @app.get("/api/ai/sessions")
 async def list_sessions(
-    search: str = None, 
-    limit: int = 20, 
+    search: str = None,
+    limit: int = 20,
     offset: int = 0,
-    payload: dict = Depends(get_current_user_payload)
+    payload: dict = Depends(get_current_user_payload),
 ):
     user_id = payload.get("id")
     sessions = await chat_store.list_sessions(user_id, search, limit, offset)
@@ -170,20 +185,12 @@ async def subscribe_stream(
 
     # Check if session is already active in SSE manager
     if not sse_manager.is_active(session_id):
-        # Auto-Resume Logic: Check if the latest message is still generating
-        messages = await chat_store.list_messages(
-            session_id, sort_order=-1
-        )  # Fetch descending
-        latest_msg = messages[0] if messages else None
-
-        if latest_msg and latest_msg.get("status") == "generating":
-            sse_manager.mark_active(session_id)
-        else:
-            # If not generating and not active, assume done
-            return StreamingResponse(
-                iter([f"data: {json.dumps({'event': 'done', 'data': {}})}\n\n"]),
-                media_type="text/event-stream",
-            )
+        # We no longer auto-resume generating status from DB.
+        # Startup cleanup marks such sessions as error.
+        return StreamingResponse(
+            iter([f"data: {json.dumps({'event': 'done', 'data': {}})}\n\n"]),
+            media_type="text/event-stream",
+        )
 
     # Configure SSE headers to prevent proxy buffering (like Nginx)
     headers = {
@@ -344,6 +351,35 @@ async def retry_chat_message(
     )
 
     return {"status": "processing", "message_id": assist_msg["id"]}
+
+
+async def run_document_extraction(req: ParseDocumentRequest):
+    """Bridge to extract text and update the prescription in the background."""
+    try:
+        content = await fetch_and_parse(req.url, req.display_name)
+        await chat_store.update_prescription(
+            prescription_id=req.prescription_id, content=content, status="completed"
+        )
+    except Exception as e:
+        await chat_store.update_prescription(
+            prescription_id=req.prescription_id,
+            content=f"Error: {str(e)}",
+            status="failed",
+        )
+
+
+@app.post("/api/ai/parse")
+async def parse_document(
+    req: ParseDocumentRequest,
+    background_tasks: BackgroundTasks,
+    _auth: bool = Depends(verify_internal_secret),
+):
+    """
+    Internal endpoint to read a document and return the extracted text.
+    Used by the backend to background-digitize prescriptions.
+    """
+    background_tasks.add_task(run_document_extraction, req)
+    return {"status": "processing"}
 
 
 if __name__ == "__main__":

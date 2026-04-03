@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft,
   MapPin,
@@ -39,7 +40,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
+import { cn, getEntityColor } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { listBatches } from "@/api/batch.api";
 import {
@@ -58,6 +59,12 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+import {
+  StatsSkeleton,
+  ChartSkeleton,
+  GeoSkeleton,
+  TableSkeleton,
+} from "@/components/manufacturer/analytics-skeletons";
 
 function ScanAnalysisContent() {
   const router = useRouter();
@@ -94,6 +101,8 @@ function ScanAnalysisContent() {
   const isMobile = useIsMobile();
   const batchesAbortRef = useRef<AbortController | null>(null);
   const detailsAbortRef = useRef<AbortController | null>(null);
+
+  const batchColor = getEntityColor(selectedBatchNumber || "");
 
   const updateUrlParams = useCallback(
     (newBatch: string | null, newDates: { from?: Date; to?: Date }) => {
@@ -219,12 +228,12 @@ function ScanAnalysisContent() {
     return () => detailsAbortRef.current?.abort();
   }, [selectedBatchNumber, dateRange, batches]);
 
-  if (isLoading) {
+  if (isLoading && batches.length === 0) {
     return (
-      <div className="h-full flex flex-1 flex-col items-center justify-center gap-4 min-h-[50vh]">
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-muted-foreground text-sm font-medium">
-          Loading analytics data...
+          Loading analytics workspace...
         </p>
       </div>
     );
@@ -245,7 +254,7 @@ function ScanAnalysisContent() {
             data.
           </p>
         </div>
-        <Button asChild className="rounded-full px-8">
+        <Button asChild className="rounded-full px-8 active:scale-95 transition-all">
           <Link href="/manufacturer/batches/new">Enroll now</Link>
         </Button>
       </div>
@@ -290,7 +299,7 @@ function ScanAnalysisContent() {
           onChange={(e) => setBatchSearch(e.target.value)}
         />
       </div>
-      <div className="max-h-[300px] overflow-y-auto custom-scrollbar flex flex-col gap-2 pr-1">
+      <div className="max-h-[400px] overflow-y-auto custom-scrollbar flex flex-col gap-2 pr-1">
         {filteredBatches.length > 0 ? (
           filteredBatches.map((batch) => (
             <button
@@ -326,7 +335,7 @@ function ScanAnalysisContent() {
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-theme(spacing.24))] sm:h-full gap-6">
+    <div className="flex flex-col gap-6 pb-12">
       {/* --------------------- CONTEXTUAL DIALOGS --------------------- */}
 
       {/* Geo Distribution Full View */}
@@ -498,15 +507,9 @@ function ScanAnalysisContent() {
         </Link>
 
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 px-1">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-none">
-              Scan analytics
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1.5 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-primary" /> Root source:
-              Blockchain
-            </p>
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-none">
+            Scan analytics
+          </h1>
 
           {/* Controls: Batch & Date */}
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
@@ -519,7 +522,7 @@ function ScanAnalysisContent() {
                 <DrawerTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-full sm:w-[240px] justify-between rounded-xl h-11 bg-card"
+                    className="w-full sm:w-[240px] justify-between rounded-xl h-11 bg-card active:scale-95 transition-all"
                   >
                     <span className="truncate flex items-center gap-2 font-medium">
                       <Boxes className="h-4 w-4 text-muted-foreground" />
@@ -547,7 +550,7 @@ function ScanAnalysisContent() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-[240px] justify-between rounded-xl h-10 bg-card"
+                    className="w-[240px] justify-between rounded-xl h-10 bg-card active:scale-95 transition-all"
                   >
                     <span className="truncate flex items-center gap-2 font-medium">
                       <Boxes className="h-4 w-4 text-muted-foreground" />
@@ -572,7 +575,7 @@ function ScanAnalysisContent() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full sm:w-auto justify-start text-left font-normal h-11 rounded-xl bg-card",
+                      "w-full sm:w-auto justify-start text-left font-normal h-11 rounded-xl bg-card active:scale-95 transition-all",
                       !dateRange && "text-muted-foreground",
                     )}
                   >
@@ -617,7 +620,7 @@ function ScanAnalysisContent() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-[260px] justify-start text-left font-normal h-10 rounded-xl bg-card",
+                      "w-[260px] justify-start text-left font-normal h-10 rounded-xl bg-card active:scale-95 transition-all",
                       !dateRange && "text-muted-foreground",
                     )}
                   >
@@ -653,11 +656,14 @@ function ScanAnalysisContent() {
         </div>
       </div>
 
-      {/* Main Workspace Scroll Area */}
-      <div className="flex-1 min-w-0 overflow-y-auto custom-scrollbar pb-12 space-y-6">
-        {detailsLoading ? (
-          <div className="h-full min-h-[300px] flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      {/* Main Workspace */}
+      <div className="space-y-6">
+        {detailsLoading && !scanData ? (
+          <div className="space-y-6">
+            <StatsSkeleton />
+            <Card className="p-6 h-[400px]">
+              <ChartSkeleton />
+            </Card>
           </div>
         ) : scanData ? (
           <>
@@ -668,23 +674,23 @@ function ScanAnalysisContent() {
                   TOTAL SCANS
                 </p>
                 <h3 className="text-2xl sm:text-3xl font-bold">
-                  {scanData.batch.totalScans}
+                  {detailsLoading ? <Skeleton className="h-8 w-12" /> : scanData.batch.totalScans}
                 </h3>
               </Card>
 
               <Card className="p-4 sm:p-6 rounded-2xl border bg-muted/20 space-y-1">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  UNIQUE UNITS
+                   UNIQUE UNITS
                 </p>
                 <h3 className="text-2xl sm:text-3xl font-bold">
-                  {unitStats.length}
+                  {detailsLoading ? <Skeleton className="h-8 w-12" /> : unitStats.length}
                 </h3>
               </Card>
 
               <Card
                 className={cn(
                   "p-4 sm:p-6 rounded-2xl lg:col-span-1 col-span-2 flex flex-col justify-center border transition-colors",
-                  scanData.scans.some((s: any) => s.isSuspicious)
+                  !detailsLoading && scanData.scans.some((s: any) => s.isSuspicious)
                     ? "bg-destructive/5 border-destructive/20"
                     : "bg-card",
                 )}
@@ -692,7 +698,7 @@ function ScanAnalysisContent() {
                 <p
                   className={cn(
                     "text-xs font-medium mb-1 uppercase tracking-wider",
-                    scanData.scans.some((s: any) => s.isSuspicious)
+                    !detailsLoading && scanData.scans.some((s: any) => s.isSuspicious)
                       ? "text-destructive"
                       : "text-muted-foreground",
                   )}
@@ -700,101 +706,127 @@ function ScanAnalysisContent() {
                   RISK STATUS
                 </p>
                 <div className="flex items-center gap-2">
-                  <div
-                    className={cn(
-                      "h-2.5 w-2.5 rounded-full",
-                      scanData.scans.some((s: any) => s.isSuspicious)
-                        ? "bg-destructive animate-pulse"
-                        : "bg-green-500",
-                    )}
-                  />
-                  <span className="text-lg sm:text-xl font-bold">
-                    {scanData.scans.some((s: any) => s.isSuspicious)
-                      ? "Threats detected"
-                      : "No threats detected"}
-                  </span>
+                  {detailsLoading ? (
+                    <Skeleton className="h-6 w-32" />
+                  ) : (
+                    <>
+                      <div
+                        className={cn(
+                          "h-2.5 w-2.5 rounded-full",
+                          scanData.scans.some((s: any) => s.isSuspicious)
+                            ? "bg-destructive animate-pulse"
+                            : "bg-green-500",
+                        )}
+                      />
+                      <span className="text-lg sm:text-xl font-bold">
+                        {scanData.scans.some((s: any) => s.isSuspicious)
+                          ? "Threats detected"
+                          : "No threats detected"}
+                      </span>
+                    </>
+                  )}
                 </div>
               </Card>
             </div>
 
             {/* Timeline Activity */}
             <Card className="p-4 sm:p-6 rounded-2xl bg-card border shadow-sm space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                  <TrendingUp className="h-4 w-4" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{
+                      backgroundColor: `${batchColor.replace("60%)", "10%)")}`,
+                      color: batchColor,
+                    }}
+                  >
+                    <TrendingUp className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold">Activity trend</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Scan volume over selected period
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold">Activity trend</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Scan volume over selected period
-                  </p>
-                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-primary text-xs font-bold rounded-lg h-8 active:scale-95 transition-all"
+                  onClick={() => setActiveModal("log")}
+                >
+                  View logs
+                </Button>
               </div>
 
               <div className="h-[220px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={history}
-                    margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient
-                        id="colorCount"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="hsl(var(--primary))"
-                          stopOpacity={0.2}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="hsl(var(--primary))"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      vertical={false}
-                      stroke="hsl(var(--muted)/0.4)"
-                    />
-                    <XAxis
-                      dataKey="date"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{
-                        fontSize: 11,
-                        fill: "hsl(var(--muted-foreground))",
-                      }}
-                      tickFormatter={(val) => format(new Date(val), "MMM dd")}
-                      dy={10}
-                    />
-                    <YAxis hide />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        borderRadius: "12px",
-                        border: "1px solid hsl(var(--border))",
-                        fontSize: "12px",
-                      }}
-                      labelFormatter={(val) =>
-                        format(new Date(val), "MMMM dd, yyyy")
-                      }
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="count"
-                      stroke="hsl(var(--primary))"
-                      fillOpacity={1}
-                      fill="url(#colorCount)"
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {detailsLoading ? (
+                  <ChartSkeleton />
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={history}
+                      margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id="colorCount"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="hsl(var(--primary))"
+                            stopOpacity={0.2}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="hsl(var(--primary))"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke="hsl(var(--muted)/0.4)"
+                      />
+                      <XAxis
+                        dataKey="date"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{
+                          fontSize: 11,
+                          fill: "hsl(var(--muted-foreground))",
+                        }}
+                        tickFormatter={(val) => format(new Date(val), "MMM dd")}
+                        dy={10}
+                      />
+                      <YAxis hide />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          borderRadius: "12px",
+                          border: "1px solid hsl(var(--border))",
+                          fontSize: "12px",
+                        }}
+                        labelFormatter={(val) =>
+                          format(new Date(val), "MMMM dd, yyyy")
+                        }
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="count"
+                        stroke={batchColor}
+                        fillOpacity={1}
+                        fill="url(#colorCount)"
+                        strokeWidth={2}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </Card>
 
@@ -804,12 +836,17 @@ function ScanAnalysisContent() {
               <Card className="p-4 sm:p-6 rounded-2xl bg-card border flex flex-col">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-muted text-muted-foreground">
+                    <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500">
                       <MapPin className="h-4 w-4" />
                     </div>
-                    <h3 className="text-base font-bold">
-                      Geographic distribution
-                    </h3>
+                    <div>
+                      <h3 className="text-base font-bold">
+                        Geographic distribution
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        Top verification locations
+                      </p>
+                    </div>
                   </div>
                   {geoData.length > 5 && (
                     <Button
@@ -824,7 +861,9 @@ function ScanAnalysisContent() {
                 </div>
 
                 <div className="space-y-4 flex-1">
-                  {sortedGeo.length > 0 ? (
+                  {detailsLoading ? (
+                    <GeoSkeleton />
+                  ) : geoData.length > 0 ? (
                     sortedGeo.map((item: any, i: number) => (
                       <div key={i} className="flex items-center gap-3">
                         <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground shrink-0">
@@ -841,9 +880,11 @@ function ScanAnalysisContent() {
                           </div>
                           <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-primary/60 rounded-full transition-all"
+                              className="h-full rounded-full transition-all"
                               style={{
                                 width: `${(item.count / scanData.batch.totalScans) * 100}%`,
+                                backgroundColor: batchColor,
+                                opacity: 0.8,
                               }}
                             />
                           </div>
@@ -880,7 +921,9 @@ function ScanAnalysisContent() {
                 </div>
 
                 <div className="space-y-3 flex-1">
-                  {suspiciousScans.length > 0 ? (
+                  {detailsLoading ? (
+                    <TableSkeleton />
+                  ) : suspiciousScans.length > 0 ? (
                     suspiciousScans.slice(0, 5).map((scan: any, i: number) => (
                       <div
                         key={i}
@@ -917,10 +960,15 @@ function ScanAnalysisContent() {
             <Card className="p-4 sm:p-6 rounded-2xl bg-card border space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-muted text-muted-foreground">
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500">
                     <Activity className="h-4 w-4" />
                   </div>
-                  <h3 className="text-base font-bold">Recent scan activity</h3>
+                  <div>
+                    <h3 className="text-base font-bold">Recent scan activity</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Latest verification events
+                    </p>
+                  </div>
                 </div>
                 {scanData.scans.length > 10 && (
                   <Button

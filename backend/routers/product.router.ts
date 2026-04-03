@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { createProduct, listProducts, getProduct, updateProduct, deleteProduct } from '../controllers/product.controller.js';
+import { createProduct, listProducts, getProduct, updateProductDetails, deleteProduct, updateProductStatus } from '../controllers/product.controller.js';
 import { authenticateJWT, checkRole } from '../middlewares/auth.middleware.js';
 
 const router: Router = express.Router();
@@ -11,7 +11,8 @@ router.use(authenticateJWT, checkManufacturer);
 router.post('/', createProduct);
 router.get('/', listProducts);
 router.get('/:productId', getProduct);
-router.put('/:productId', updateProduct);
+router.put('/:id', updateProductDetails);
 router.delete('/:productId', deleteProduct);
+router.patch('/:id/status', updateProductStatus);
 
 export default router;

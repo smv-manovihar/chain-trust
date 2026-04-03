@@ -11,8 +11,10 @@ description: >
 compatibility: >
   Tool-agnostic. Works in any AI code editor or agent runtime: Cursor, Windsurf, GitHub Copilot
   Workspace, Zed, JetBrains AI, Cline, Continue, Aider, Claude Code, or any environment with the
-  ability to read files and write markdown. Requires no terminal, no shell commands, no specific
-  OS tooling. Every step is described as a reading and reasoning task, not a command to execute.
+  ability to read files and write markdown. If the environment provides specialized tools, these
+  **MUST** be used instead of their raw terminal equivalents to take advantage of the agent's
+  optimized capabilities. Every step is described as a reading and reasoning task, not a command to
+  execute.
 ---
 
 

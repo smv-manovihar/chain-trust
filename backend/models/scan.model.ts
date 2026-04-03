@@ -2,6 +2,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IScan extends Document {
 	batch: Types.ObjectId;
+	manufacturer: Types.ObjectId; // Denormalized for high-speed analytics
 	unitIndex: number;
 	visitorId: string; // Anonymous UUID from frontend
 	user?: Types.ObjectId; // Populated if logged in
@@ -21,6 +22,11 @@ const scanSchema = new Schema<IScan>(
 		batch: {
 			type: Schema.Types.ObjectId,
 			ref: 'Batch',
+			required: true,
+		},
+		manufacturer: {
+			type: Schema.Types.ObjectId,
+			ref: 'User',
 			required: true,
 		},
 		unitIndex: {
@@ -50,6 +56,9 @@ const scanSchema = new Schema<IScan>(
 		collection: 'scans',
 	},
 );
+
+// Analytics Index: Optimized for time-series filtering per manufacturer
+scanSchema.index({ manufacturer: 1, createdAt: -1 });
 
 // Unique index to ensure one visitor only counts as one scan for a specific unit
 scanSchema.index({ batch: 1, unitIndex: 1, visitorId: 1 }, { unique: true });

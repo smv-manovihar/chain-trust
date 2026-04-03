@@ -369,6 +369,22 @@ class ChatStore:
         except InvalidId:
             return None
 
+    async def cleanup_incomplete_tasks(self):
+        """Finds all messages with status 'generating' and marks them as 'error' (System Restart Cleanup)."""
+        now = datetime.now(timezone.utc)
+        result = await self.db.chat_messages.update_many(
+            {"status": "generating"},
+            {
+                "$set": {
+                    "status": "error",
+                    "content": "Generation interrupted due to system restart or service failure. Please retry or send a new message.",
+                    "updated_at": now,
+                }
+            },
+        )
+        if result.modified_count > 0:
+            print(f"[Cleanup] Repaired {result.modified_count} interrupted generation tasks.")
+
     # --- View Data & Dashboard Aggregators ---
 
     async def get_view_data(
@@ -376,6 +392,29 @@ class ChatStore:
     ) -> str:
         """Centralized aggregator for view-specific data digests, delegating to tool_store."""
         return await tool_store.get_view_data(route, user_id, role, params)
+
+
+    async def update_prescription(
+        self, prescription_id: str, content: str, status: str = "completed"
+    ) -> bool:
+        """Updates digitized content for a prescription document."""
+        try:
+            # Ensure content is always a string to prevent MongoDB from storing BinData
+            safe_content = str(content) if content is not None else ""
+            
+            result = await self.db.prescriptions.update_one(
+                {"_id": PyObjectId(prescription_id)},
+                {
+                    "$set": {
+                        "content": safe_content,
+                        "status": status,
+                        "updatedAt": datetime.now(timezone.utc),
+                    }
+                },
+            )
+            return result.modified_count > 0
+        except InvalidId:
+            return False
 
 
 chat_store = ChatStore()

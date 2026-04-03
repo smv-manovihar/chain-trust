@@ -199,7 +199,7 @@ export function VideoScanner({
       {onClose && (
         <button
           onClick={onClose}
-          className="absolute top-6 right-6 z-50 h-10 w-10 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 active:bg-white/20 hover:bg-white/10 transition-colors"
+          className="absolute top-6 right-6 z-50 h-10 w-10 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 active:bg-white/20 hover:bg-white/10 transition-all active:scale-95"
           aria-label="Close scanner"
         >
           <X className="h-5 w-5 text-white" />
@@ -232,9 +232,9 @@ export function VideoScanner({
                 {onSwitchToUpload && (
                   <Button
                     onClick={onSwitchToUpload}
-                    className="mt-4 rounded-full bg-white text-black hover:bg-white/90 font-bold"
+                    className="mt-4 rounded-full bg-white text-black hover:bg-white/90 font-bold active:scale-95 transition-all"
                   >
-                    <ImageIcon className="h-4 w-4 mr-2" /> Upload Image
+                    <ImageIcon className="h-4 w-4 mr-2" /> Upload image
                   </Button>
                 )}
               </div>
@@ -248,9 +248,9 @@ export function VideoScanner({
                 {onSwitchToUpload && (
                   <Button
                     onClick={onSwitchToUpload}
-                    className="rounded-full bg-white text-black font-bold"
+                    className="rounded-full bg-white text-black font-bold active:scale-95 transition-all"
                   >
-                    <ImageIcon className="h-4 w-4 mr-2" /> Upload QR Image
+                    <ImageIcon className="h-4 w-4 mr-2" /> Upload QR image
                   </Button>
                 )}
               </div>
@@ -266,7 +266,7 @@ export function VideoScanner({
         {onSwitchToUpload && (
           <button
             onClick={onSwitchToUpload}
-            className="pointer-events-auto h-14 w-14 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/20 active:bg-white/20 transition-colors shadow-lg"
+            className="pointer-events-auto h-14 w-14 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/20 active:bg-white/20 transition-all shadow-lg active:scale-95"
           >
             <ImageIcon className="h-6 w-6 text-white" />
           </button>
@@ -275,7 +275,7 @@ export function VideoScanner({
         {(isMobileDevice || cameras.length > 1) && (
           <button
             onClick={handleFlipCamera}
-            className="pointer-events-auto h-14 w-14 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/20 active:bg-white/20 transition-colors shadow-lg"
+            className="pointer-events-auto h-14 w-14 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/20 active:bg-white/20 transition-all shadow-lg active:scale-95"
           >
             <SwitchCamera className="h-6 w-6 text-white" />
           </button>

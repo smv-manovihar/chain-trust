@@ -22,11 +22,12 @@ import {
 } from '../controllers/auth.controller.js';
 import { authenticateJWT } from '../middlewares/auth.middleware.js';
 import { trackUserActivity } from '../middlewares/activity.middleware.js';
+import { loginLimiter, emailOpsLimiter } from '../middlewares/rate-limit.middleware.js';
 
 const router: RouterType = Router();
 
 // Public routes
-router.post('/login', loginUser);
+router.post('/login', loginLimiter, loginUser);
 router.post('/register', registerUser);
 router.post('/setup-account', setupAccount);
 router.post('/refresh', refreshAccessToken);
@@ -37,9 +38,9 @@ router.get('/google/callback', googleCallback);
 router.post('/google-login', googleLoginWithToken);
 
 // Email verification routes (public)
-router.post('/verify-email/otp', verifyEmailWithOTP);
+router.post('/verify-email/otp', emailOpsLimiter, verifyEmailWithOTP);
 router.get('/verify-email/:token', verifyEmailWithToken);
-router.post('/resend-verification', resendVerificationEmail);
+router.post('/resend-verification', emailOpsLimiter, resendVerificationEmail);
 router.get('/verification-status/:email', checkEmailVerificationStatus);
 
 // Protected routes (require authentication)

@@ -27,6 +27,7 @@
     "mongoose": "^8.23.0",
     "multer": "^2.0.2",
     "multer-s3": "^3.0.1",
+    "node-cache": "^5.1.2",
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.13",
     "nodemon": "^3.1.14",

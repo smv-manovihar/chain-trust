@@ -43,6 +43,7 @@ interface Batch {
   isRecalled: boolean;
   blockchainHash: string;
   batchSalt: string;
+  status: string;
 }
 
 
@@ -247,7 +248,13 @@ export default function BatchesPage() {
                     <TableRow
                       key={batch._id}
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => router.push(`/manufacturer/batches/${encodeURIComponent(batch.batchNumber)}`)}
+                      onClick={() => {
+                        if (batch.status === 'pending') {
+                          router.push(`/manufacturer/batches/new?id=${batch._id}`);
+                        } else {
+                          router.push(`/manufacturer/batches/${encodeURIComponent(batch.batchNumber)}`);
+                        }
+                      }}
                     >
                       <TableCell className="font-medium">
                         {batch.batchNumber}
@@ -287,7 +294,13 @@ export default function BatchesPage() {
                 <Card
                   key={batch._id}
                   className="cursor-pointer hover:border-primary/40 transition-colors"
-                  onClick={() => router.push(`/manufacturer/batches/${encodeURIComponent(batch.batchNumber)}`)}
+                  onClick={() => {
+                    if (batch.status === 'pending') {
+                      router.push(`/manufacturer/batches/new?id=${batch._id}`);
+                    } else {
+                      router.push(`/manufacturer/batches/${encodeURIComponent(batch.batchNumber)}`);
+                    }
+                  }}
                 >
                   <CardContent className="p-5">
                     <div className="flex justify-between items-start mb-3">

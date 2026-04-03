@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
-import Batch, { IBatch } from '../models/batch.model.js';
+import Batch, { IBatch, EnrollmentStatus } from '../models/batch.model.js';
 import Product from '../models/product.model.js';
 import Scan from '../models/scan.model.js';
 import * as pdfService from '../services/pdf.service.js';
@@ -13,8 +13,12 @@ import Notification from '../models/notification.model.js';
 import CabinetItem from '../models/cabinet.model.js';
 import { resolveItem } from '../utils/identifier.util.js';
 import { getOnChainBatch } from '../services/blockchain.service.js';
+import NodeCache from 'node-cache';
 
 const BATCH_NUMBER_REGEX = /^[a-zA-Z0-9\-_.]+$/;
+
+// [FIX-007] Initialize Blockchain Cache: 5-minute TTL (300 seconds)
+const blockchainCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
 
 /**
  * Derive a unit-level salt from a batch salt and unit index.
@@ -69,17 +73,24 @@ async function findBatchByUnitSalt(salt: string): Promise<{ batch: any; unitInde
 /**
  * Synchronizes the batch's state (isRecalled, blockchainHash) with the actual
  * blockchain state. This is called during verification and detail views to 
- * ensure the caching layer (MongoDB) matches the Source of Truth.
+ * ensure local data matches the immutable truth.
+ * uses [FIX-007] RPC Caching to reduce latency.
  */
-async function syncBatchWithChain(batch: IBatch, newTxHash?: string) {
+export const syncBatchWithBlockchain = async (batch: any, newTxHash?: string) => {
 	try {
-		// Log removed to reduce noise
-		
-		// 1. Fetch on-chain status
-		const onChainData = await getOnChainBatch(batch.batchSalt);
-		
+		// [FIX-007] RPC Caching Layer
+		const cacheKey = `bc_${batch.batchSalt}`;
+		let onChainData = blockchainCache.get(cacheKey) as any;
+
 		if (!onChainData) {
-			console.warn(`[Blockchain Sync] Batch ${batch.batchSalt} not found on-chain.`);
+			onChainData = await getOnChainBatch(batch.batchSalt);
+			if (onChainData) {
+				blockchainCache.set(cacheKey, onChainData);
+			}
+		}
+
+		if (!onChainData) {
+			// console.warn(`[Blockchain Sync] Batch ${batch.batchSalt} not found on-chain.`);
 			return batch;
 		}
 
@@ -93,7 +104,6 @@ async function syncBatchWithChain(batch: IBatch, newTxHash?: string) {
 		}
 
 		// 3. Update blockchainHash if a new transaction occurred or if it's currently missing
-		// Note: Every Recall/Restore transaction generates a new hash.
 		if (newTxHash && batch.blockchainHash !== newTxHash) {
 			console.log(`[Blockchain Sync] Updating transaction hash: ${batch.blockchainHash} -> ${newTxHash}`);
 			batch.blockchainHash = newTxHash;
@@ -103,13 +113,13 @@ async function syncBatchWithChain(batch: IBatch, newTxHash?: string) {
 		// 4. Persistence
 		if (hasChanged) {
 			await batch.save();
-			console.log(`[Blockchain Sync] Batch ${batch.batchNumber} synchronized (status changed).`);
+			console.log(`[Blockchain Sync] Batch ${batch.batchNumber} synchronized.`);
 		}
 
 		return batch;
 	} catch (error) {
-		console.error(`[Blockchain Sync] Critical failure for batch ${batch.batchSalt}:`, error);
-		return batch; // Fail-safe: return current state
+		console.error(`[Blockchain Sync] Failure for batch ${batch.batchSalt}:`, error);
+		return batch;
 	}
 }
 
@@ -125,20 +135,30 @@ export const createBatch = async (req: Request, res: Response) => {
 			description,
 			batchSalt,
 			blockchainHash,
+			status = 'completed',
 		} = req.body;
 
 		const userId = (req as any).user?.id;
+		const isPending = status === 'pending';
 
-		if (!productRef || !batchNumber || !quantity || !manufactureDate || !batchSalt) {
-			return res.status(400).json({ message: 'Missing required fields (productRef, batchNumber, quantity, manufactureDate, batchSalt)' });
-		}
+		// Relaxed validation for pending drafts (FIX-001)
+		if (isPending) {
+			if (!productRef) {
+				return res.status(400).json({ message: 'Product reference is required to start a draft.' });
+			}
+		} else {
+			// Strict validation for completed enrollments
+			if (!productRef || !batchNumber || !quantity || !manufactureDate || !batchSalt) {
+				return res.status(400).json({ message: 'Missing required fields (productRef, batchNumber, quantity, manufactureDate, batchSalt)' });
+			}
 
-		if (!BATCH_NUMBER_REGEX.test(batchNumber)) {
-			return res.status(400).json({ message: 'Batch number contains invalid characters.' });
-		}
+			if (!BATCH_NUMBER_REGEX.test(batchNumber)) {
+				return res.status(400).json({ message: 'Batch number contains invalid characters.' });
+			}
 
-		if (quantity < 1 || quantity > 10000000) {
-			return res.status(400).json({ message: 'Quantity must be between 1 and 10,000,000' });
+			if (quantity < 1 || quantity > 10000000) {
+				return res.status(400).json({ message: 'Quantity must be between 1 and 10,000,000' });
+			}
 		}
 
 		// Look up the product from the manufacturer's catalogue
@@ -150,10 +170,12 @@ export const createBatch = async (req: Request, res: Response) => {
 			return res.status(403).json({ message: 'This product does not belong to your catalogue.' });
 		}
 
-		// Check for duplicate batch number
-		const existingBatch = await Batch.findOne({ batchNumber, createdBy: userId });
-		if (existingBatch) {
-			return res.status(400).json({ message: 'Batch number already exists for your account.' });
+		// Check for duplicate batch number (only if provided)
+		if (batchNumber) {
+			const existingBatch = await Batch.findOne({ batchNumber, createdBy: userId });
+			if (existingBatch) {
+				return res.status(400).json({ message: 'Batch number already exists for your account.' });
+			}
 		}
 
 		const newBatch = new Batch({
@@ -171,11 +193,13 @@ export const createBatch = async (req: Request, res: Response) => {
 			manufactureDate,
 			expiryDate,
 			description,
-			batchSalt,
+			batchSalt: batchSalt || undefined,
 			blockchainHash: blockchainHash || '',
 			isOnBlockchain: !!blockchainHash,
 			isRecalled: false,
 			createdBy: userId,
+			status: (status as EnrollmentStatus) || 'pending',
+			wizardState: req.body.wizardState || {},
 		});
 
 		await newBatch.save();
@@ -193,13 +217,63 @@ export const createBatch = async (req: Request, res: Response) => {
 	}
 };
 
+// PUT /api/batches/:id — Full update of a batch (supports draft persistence FIX-004)
+export const updateBatch = async (req: Request, res: Response) => {
+	try {
+		const { id } = req.params;
+		const userId = (req as any).user?.id;
+		const updates = req.body;
+
+		// Security: Only the creator can update
+		const batch = await Batch.findOne({ _id: id, createdBy: userId });
+		if (!batch) {
+			return res.status(404).json({ message: 'Batch not found.' });
+		}
+
+		// Validation if finalizing
+		if (updates.status === 'completed') {
+			const required = ['batchNumber', 'quantity', 'manufactureDate', 'batchSalt'];
+			const missing = required.filter(field => !updates[field] && !batch[field as keyof IBatch]);
+			if (missing.length > 0) {
+				return res.status(400).json({ message: `Cannot finalize: missing fields (${missing.join(', ')})` });
+			}
+		}
+
+		// Apply updates
+		const allowedUpdates = [
+			'batchNumber', 'quantity', 'manufactureDate', 'expiryDate', 
+			'description', 'batchSalt', 'status', 'wizardState', 'blockchainHash'
+		];
+
+		allowedUpdates.forEach(key => {
+			if (updates[key] !== undefined) {
+				(batch as any)[key] = updates[key];
+			}
+		});
+
+		if (updates.blockchainHash) {
+			batch.isOnBlockchain = true;
+		}
+
+		await batch.save();
+
+		res.json({ message: 'Batch updated successfully', batch });
+	} catch (error: any) {
+		console.error('Update batch error:', error);
+		if (error.code === 11000) {
+			return res.status(400).json({ message: 'Batch number or salt already exists.' });
+		}
+		res.status(500).json({ message: 'Internal server error' });
+	}
+};
+
 // GET /api/batches — List all batches for the authenticated user
 export const listBatches = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
 		const { search, categories } = req.query;
 
-		const matchQuery: any = { createdBy: new mongoose.Types.ObjectId(userId) };
+		const matchQuery: any = { createdBy: mongoose.Types.ObjectId.createFromHexString(userId) };
 
 		if (search) {
 			matchQuery.$or = [
@@ -214,28 +288,73 @@ export const listBatches = async (req: Request, res: Response) => {
 			matchQuery.categories = { $in: catList };
 		}
 
-		const batches = await Batch.find(matchQuery)
-			.sort({ createdAt: -1 })
-			.lean();
-
-		// Add total scan count for each batch
-		const batchesWithStats = batches.map((batch) => {
-			const scanCountsObj = batch.scanCounts || {};
-			let totalScans = 0;
-			if (scanCountsObj instanceof Map) {
-				scanCountsObj.forEach((v: number) => { totalScans += v; });
-			} else {
-				Object.values(scanCountsObj).forEach((v: any) => { totalScans += Number(v) || 0; });
+		const batches = await Batch.aggregate([
+			{ $match: matchQuery },
+			{ $sort: { createdAt: -1 } },
+			{
+				$lookup: {
+					from: 'scans',
+					let: { batchId: '$_id' },
+					pipeline: [
+						{ $match: { $expr: { $eq: ['$batch', '$$batchId'] } } },
+						{ $count: 'count' }
+					],
+					as: 'scanCountData'
+				}
+			},
+			{
+				$addFields: {
+					totalScans: { $ifNull: [{ $arrayElemAt: ['$scanCountData.count', 0] }, 0] }
+				}
+			},
+			{
+				$project: {
+					scanCountData: 0
+				}
 			}
-			return {
-				...batch,
-				totalScans,
-			};
-		});
+		]);
 
-		res.json({ batches: batchesWithStats });
+		res.json({ batches });
 	} catch (error) {
 		console.error('List batches error:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+};
+
+// PATCH /api/batches/:id/status — Finalize a pending batch or mark as failed
+export const updateBatchStatus = async (req: Request, res: Response) => {
+	try {
+		const { id } = req.params;
+		const { status, blockchainHash } = req.body;
+		const userId = (req as any).user?.id;
+
+		if (!['completed', 'failed'].includes(status)) {
+			return res.status(400).json({ message: 'Invalid status update. Use "completed" or "failed".' });
+		}
+
+		const batch = await Batch.findOne({ _id: id, createdBy: userId });
+		if (!batch) {
+			return res.status(404).json({ message: 'Batch not found.' });
+		}
+
+		if (batch.status !== 'pending') {
+			return res.status(400).json({ message: 'Only pending batches can be updated.' });
+		}
+
+		batch.status = status;
+		if (status === 'completed' && blockchainHash) {
+			batch.blockchainHash = blockchainHash;
+			batch.isOnBlockchain = true;
+		}
+
+		await batch.save();
+
+		res.json({
+			message: `Batch marked as ${status}`,
+			batch
+		});
+	} catch (error) {
+		console.error('Update batch status error:', error);
 		res.status(500).json({ message: 'Internal server error' });
 	}
 };
@@ -252,8 +371,8 @@ export const getBatch = async (req: Request, res: Response) => {
 			return res.status(404).json({ message: 'Batch not found' });
 		}
 
-		// Perform live blockchain synchronization
-		await syncBatchWithChain(batch as unknown as IBatch);
+		// Perform blockchain synchronization in the background to avoid blocking the detail view
+		syncBatchWithBlockchain(batch).catch(err => console.error('[Background Sync] Error:', err));
 
 		res.json({ batch });
 	} catch (error) {
@@ -279,13 +398,21 @@ export const getBatchQRData = async (req: Request, res: Response) => {
 		const startIdx = (page - 1) * limit;
 		const endIdx = Math.min(startIdx + limit, (batch as any).quantity);
 
+		// Fetch scan counts for the current range of units
+		const scanCounts = await Scan.aggregate([
+			{ $match: { batch: (batch as any)._id, unitIndex: { $gte: startIdx, $lt: endIdx } } },
+			{ $group: { _id: '$unitIndex', count: { $sum: 1 } } }
+		]);
+
+		const countsMap = new Map(scanCounts.map(item => [item._id, item.count]));
+
 		const units = [];
 		for (let i = startIdx; i < endIdx; i++) {
 			// The secure QR format includes: batchSalt : unitIndex : cryptographicHash
 			const unitHash = deriveUnitSalt(batch.batchSalt, i);
 			const qrSalt = `${batch.batchSalt}:${i}:${unitHash}`;
 			
-			const scanCount = batch.scanCounts?.get(String(i)) || 0;
+			const scanCount = countsMap.get(i) || 0;
 			units.push({
 				unitIndex: i,
 				salt: qrSalt,
@@ -345,48 +472,27 @@ export const verifyScan = async (req: Request, res: Response) => {
 		let longitude = lng !== undefined ? Number(lng) : undefined;
 		let city, country;
 
+		// Reliability FIX-005: Use local, synchronous lookup first to prevent external API blocking
 		if (ip && ip !== 'unknown' && ip !== '::1' && ip !== '127.0.0.1') {
-			// Phase 1: Try FreeIPAPI for high accuracy (no API key required)
-			try {
-				const freeGeo = await getGeoLocation(ip);
-				if (freeGeo) {
-					console.log(`[Geolocation] FreeIPAPI success for ${ip}: ${freeGeo.cityName}, ${freeGeo.countryName}`);
-					city = freeGeo.cityName;
-					country = freeGeo.countryName;
-					
-					// Use coordinates from FreeIPAPI if available
-					if (latitude === undefined && longitude === undefined) {
-						latitude = freeGeo.latitude;
-						longitude = freeGeo.longitude;
-					}
-				} else {
-					// Phase 2: Fallback to local geoip-lite if API fails
-					const pGeo = geoip.lookup(ip);
-					if (pGeo) {
-						city = pGeo.city;
-						country = pGeo.country;
-						if (latitude === undefined && longitude === undefined) {
-							latitude = pGeo.ll[0];
-							longitude = pGeo.ll[1];
-						}
-					}
-				}
-			} catch (err) {
-				console.error("[Geolocation] Lookup error, falling back to local DB:", err);
-				const fallbackGeo = geoip.lookup(ip);
-				if (fallbackGeo) {
-					city = fallbackGeo.city;
-					country = fallbackGeo.country;
-					if (latitude === undefined && longitude === undefined) {
-						latitude = fallbackGeo.ll[0];
-						longitude = fallbackGeo.ll[1];
-					}
+			const pGeo = geoip.lookup(ip);
+			if (pGeo) {
+				city = pGeo.city;
+				country = pGeo.country;
+				if (latitude === undefined && longitude === undefined) {
+					latitude = pGeo.ll[0];
+					longitude = pGeo.ll[1];
 				}
 			}
+
+			// Background enrichment: Fire-and-forget external API for more precision
+			getGeoLocation(ip).then(freeGeo => {
+				if (freeGeo) {
+					console.log(`[Geolocation] Background Enrichment for ${ip}: ${freeGeo.cityName}`);
+				}
+			}).catch(() => {}); 
 		} else if (ip === '::1' || ip === '127.0.0.1') {
 			city = 'Local Development';
 			country = 'Internal Network';
-			console.log(`[Geolocation] Local IP detected (${ip}) - Marking as Local Development`);
 		}
 
 		// Calculate Suspiciousness using the history of scans
@@ -415,7 +521,7 @@ export const verifyScan = async (req: Request, res: Response) => {
 		}
 
 		// Attempt to record a unique scan
-		let newCount = batch.scanCounts?.get(String(unitIndex)) || 0;
+		let newCount = await Scan.countDocuments({ batch: batch._id, unitIndex });
 		try {
 			// Require frontend to send visitorId (UUID). Fallback if old client.
 			const queryVisitorId = visitorId || `legacy-${ip}`;
@@ -430,6 +536,7 @@ export const verifyScan = async (req: Request, res: Response) => {
 				// Record new unique scan
 				const newScan = await Scan.create({
 					batch: batch._id,
+					manufacturer: batch.createdBy, // Essential for fast analytics
 					unitIndex,
 					visitorId: queryVisitorId,
 					user: userId,
@@ -443,15 +550,14 @@ export const verifyScan = async (req: Request, res: Response) => {
 					suspiciousReason: suspiciousResult.reason || undefined,
 				});
 
-				// Increment cached count only for first-time unique scan
+				// We no longer update the batch model for scan counts per user instruction.
+				// The Scan collection is the solo source of truth.
 				newCount += 1;
-				batch.scanCounts.set(String(unitIndex), newCount);
-				await batch.save();
 
 				console.log(`\x1b[32m[Verification]\x1b[0m New Unique Scan Saved | ID: ${newScan._id} | Location: ${city || 'Unknown'}, ${country || 'Unknown'} | Risk: ${newScan.isSuspicious ? 'HIGH' : 'Safe'}`);
 
 				// Check for scan milestones (100, 500, 1000, etc.)
-				const totalScans = Array.from(batch.scanCounts.values()).reduce((a: number, b: any) => a + Number(b), 0);
+				const totalScans = await Scan.countDocuments({ batch: batch._id });
 				const milestones = [100, 500, 1000, 5000, 10000];
 				
 				if (milestones.includes(totalScans)) {
@@ -493,8 +599,8 @@ export const verifyScan = async (req: Request, res: Response) => {
 			filteredImages = [];
 		}
 
-		// Perform live blockchain synchronization before returning results to consumer
-		await syncBatchWithChain(batch as unknown as IBatch);
+		// Trigger background blockchain synchronization without awaiting it
+		syncBatchWithBlockchain(batch).catch(err => console.error('[Background Sync] Error:', err));
 
 		res.json({
 			isValid: !batch.isRecalled,
@@ -548,13 +654,15 @@ export const recallBatch = async (req: Request, res: Response) => {
 		}
 
 		// Update backend state and link to the new transaction hash via forced sync
-		await syncBatchWithChain(batch as unknown as IBatch, transactionHash);
+		// [FIX-007] Invalidate cache for real-time consistency on status change
+		blockchainCache.del(`bc_${batch.batchSalt}`);
+		await syncBatchWithBlockchain(batch, transactionHash);
 
 		// Notify users who have this batch in their cabinet
 		try {
 			const batchToRecall = batch; // Local constant for closure safety
 			const affectedCabinetItems = await CabinetItem.find({
-				batchNumber: batchToRecall.batchNumber,
+				batchId: batchToRecall._id,
 				isUserAdded: false // Only for verified batches
 			});
 
@@ -613,13 +721,15 @@ export const restoreBatch = async (req: Request, res: Response) => {
 		}
 
 		// Update backend state and link to the new transaction hash via forced sync
-		await syncBatchWithChain(batch as unknown as IBatch, transactionHash);
+		// [FIX-007] Invalidate cache for real-time consistency on status change
+		blockchainCache.del(`bc_${batch.batchSalt}`);
+		await syncBatchWithBlockchain(batch, transactionHash);
 
 		// Notify users who have this batch in their cabinet that it's restored
 		try {
 			const batchToRestore = batch;
 			const affectedCabinetItems = await CabinetItem.find({
-				batchNumber: batchToRestore.batchNumber,
+				batchId: batchToRestore._id,
 				isUserAdded: false
 			});
 
@@ -641,7 +751,7 @@ export const restoreBatch = async (req: Request, res: Response) => {
 				await Notification.insertMany(notifications);
 			}
 		} catch (notificationError) {
-			console.error('Error creating restoration notifications:', notificationError);
+			console.error('Error creating restore notifications:', notificationError);
 		}
 
 		res.json({ message: 'Batch restored successfully', batch });
@@ -681,11 +791,12 @@ export const getBatchPDF = async (req: Request, res: Response) => {
 			labelPadding: 5
 		};
 
-		const pdfBuffer = await pdfService.generateBatchPDF(batch, settings);
-
+		// Set response headers for PDF download
 		res.setHeader('Content-Type', 'application/pdf');
 		res.setHeader('Content-Disposition', `attachment; filename=batch-${batch.batchNumber}-labels.pdf`);
-		res.send(pdfBuffer);
+
+		// Generate and stream directly to response
+		await pdfService.generateBatchPDF(batch, settings, res);
 	} catch (error) {
 		console.error('Generate PDF error:', error);
 		res.status(500).json({ message: 'Internal server error' });
@@ -721,10 +832,12 @@ export const getBatchScanDetails = async (req: Request, res: Response) => {
 			.sort({ createdAt: -1 })
 			.limit(100); // Limit to top 100 recent scans for deep dive
 
+		const totalScans = await Scan.countDocuments({ batch: batchId });
+
 		res.json({ scans, batch: {
 			batchNumber: batch.batchNumber,
 			productName: batch.productName,
-			totalScans: Array.from(batch.scanCounts?.values() || []).reduce((a: number, b: any) => a + Number(b), 0)
+			totalScans
 		} });
 	} catch (error) {
 		console.error('Error fetching batch scan details:', error);

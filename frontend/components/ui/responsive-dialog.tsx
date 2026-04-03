@@ -78,16 +78,33 @@ const ResponsiveDialogContent = ({
       ref={ref}
       aria-describedby={undefined}
       onOpenAutoFocus={(e) => e.preventDefault()}
-      className={cn(isMobile ? "max-h-[96dvh] flex flex-col" : "", className)}
+      className={cn(
+        isMobile ? "max-h-[96dvh] flex flex-col" : "max-h-[90vh] flex flex-col sm:rounded-[2rem]",
+        className
+      )}
       {...props}
     >
       {isMobile ? <DrawerDescription className="hidden" /> : <DialogDescription className="hidden" />}
-      {isMobile ? (
-        <div className="overflow-y-auto flex-1 px-4 pb-12">{children}</div>
-      ) : (
-        children
-      )}
+      {children}
     </ResponsiveContent>
+  );
+};
+
+const ResponsiveDialogBody = ({
+  children,
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) => {
+  return (
+    <div 
+      className={cn(
+        "flex-1 overflow-y-auto px-6 py-4", 
+        className
+      )} 
+      {...props}
+    >
+      {children}
+    </div>
   );
 };
 
@@ -166,6 +183,7 @@ export {
   ResponsiveDialogTrigger,
   ResponsiveDialogClose,
   ResponsiveDialogContent,
+  ResponsiveDialogBody,
   ResponsiveDialogHeader,
   ResponsiveDialogFooter,
   ResponsiveDialogTitle,

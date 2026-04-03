@@ -107,7 +107,7 @@ export function CustomerRegisterForm() {
 
   return (
     <AuthLayout
-      title="Start Your Journey"
+      title="Start your journey"
       subtitle="Join our community of customers securing the pharmaceutical supply chain."
     >
       <div className="flex flex-col space-y-2 text-center mb-6">
@@ -115,7 +115,7 @@ export function CustomerRegisterForm() {
           Create an account
         </h1>
         <p className="text-sm text-muted-foreground">
-          Step {step} of {totalSteps}: {step === 1 ? "Account Details" : "Contact Info"}
+          Step {step} of {totalSteps}: {step === 1 ? "Account details" : "Contact info"}
         </p>
       </div>
 
@@ -289,7 +289,7 @@ export function CustomerRegisterForm() {
                 disabled={isLoading}
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isLoading ? "Creating Account..." : "Create Account"}
+                {isLoading ? "Creating account..." : "Create account"}
               </Button>
             )}
           </div>

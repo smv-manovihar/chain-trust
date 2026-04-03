@@ -1,5 +1,7 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 
+export type EnrollmentStatus = 'pending' | 'completed' | 'failed';
+
 export interface IBatch extends Document {
 	batchNumber: string;
 	product: Types.ObjectId; // Reference to the Product catalogue item
@@ -13,24 +15,31 @@ export interface IBatch extends Document {
 	// Batch-specific fields
 	quantity: number;
 	manufactureDate: Date;
-	expiryDate?: Date;
+	expiryDate: Date;
 	description?: string;
 	batchSalt: string; // SHA-256 base salt for deriving unit salts
 	blockchainHash: string;
 	isOnBlockchain: boolean;
 	isRecalled: boolean;
 	createdBy: Types.ObjectId;
-	scanCounts: Map<string, number>; // unitIndex -> scan count
 	createdAt: Date;
 	updatedAt: Date;
+	status: EnrollmentStatus;
+	wizardState: any; // Dynamic dict for UI state tracking (FIX-004)
 }
 
 const batchSchema = new Schema<IBatch>(
 	{
 		batchNumber: {
 			type: String,
-			required: true,
+			// Required set to false to support early "Draft" initiation (FIX-001)
+			required: false,
 			trim: true,
+		},
+		status: {
+			type: String,
+			enum: ['pending', 'completed', 'failed'],
+			default: 'pending',
 		},
 		product: {
 			type: Schema.Types.ObjectId,
@@ -68,15 +77,16 @@ const batchSchema = new Schema<IBatch>(
 		// Batch-specific
 		quantity: {
 			type: Number,
-			required: true,
+			required: false, // Draft support
 			min: 1,
 		},
 		manufactureDate: {
 			type: Date,
-			required: true,
+			required: false, // Draft support
 		},
 		expiryDate: {
 			type: Date,
+			required: false, // Draft support
 		},
 		description: {
 			type: String,
@@ -84,8 +94,9 @@ const batchSchema = new Schema<IBatch>(
 		},
 		batchSalt: {
 			type: String,
-			required: true,
+			required: false, // Draft support
 			unique: true,
+			sparse: true, // Allow multiple drafts with null salt
 		},
 		blockchainHash: {
 			type: String,
@@ -104,10 +115,10 @@ const batchSchema = new Schema<IBatch>(
 			ref: 'User',
 			required: true,
 		},
-		scanCounts: {
-			type: Map,
-			of: Number,
-			default: new Map(),
+		// Dynamic Wizard State: Stores the full UI context for resuming (FIX-004)
+		wizardState: {
+			type: Schema.Types.Mixed,
+			default: {},
 		},
 	},
 	{

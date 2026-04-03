@@ -1,21 +1,45 @@
-# Route: /manufacturer (Manufacturer Dashboard)
+# Manufacturer Dashboard — Operational Manual
+**Route:** `/manufacturer`
 
-The Manufacturer Dashboard is the automated command center for real-time production tracking, security monitoring, and geographic chain-of-custody analytics.
+The Manufacturer Dashboard is the command center for production-level authenticity monitoring. It provides a real-time pulse on global scan volume, active batches, and critical security alerts.
 
-## Layout Overview (Bento Grid)
-- **KPI StatCards (4-Card Grid)**:
-  - **Products Enrolled**: Size of the medicine catalogue registered on the blockchain.
-  - **Active Batches**: Count of production runs currently in distribution.
-  - **Scans Today**: Real-time ticker of global verification attempts with a 24-hour percentage tendency indicator.
-  - **Unread Alerts**: Count of security items requiring immediate investigation.
-- **Quick Actions (4-Card Grid)**:
-  - **Manage Products**: View and edit your entire product catalog (`/manufacturer/products`).
-  - **Enroll Batch**: The primary entry point for registering new production runs on the blockchain (`/manufacturer/batches/new`).
-  - **View Analytics**: Deep dive into global scan locations and consumer trends ([Supply Intelligence](/manufacturer/analytics)).
-  - **Security Reports**: Investigative analytics for suspicious activity and security flags.
-- **Recent Activity Feed**: A list of the latest system events, scan attempts, and automated security monitoring logs.
+---
 
-## AI Context
-This page is the primary source for the "Manufacturer Persona" AI when summarizing operational health.
-- **Operational Query**: Phrases like "How is my production today?" or "Show me my stats" should trigger an analysis of the KPI StatCards and the tendency in "Scans Today".
-- **Security Check**: If "Unread Alerts" > 0, the AI should prioritize informing the manufacturer of the most recent item in the "Recent Activity" feed.
+## 🎨 Visual Details & Layout
+- **Global Intelligence Banner**: A prominent, glassmorphic header welcoming the executive and displaying the company's name.
+- **KPI Metrics (High-Fidelity Cards)**: "Daily Scan Velocity", "Active Catalog", "Production History", and "Security Alerts".
+- **Live Threat Activity Feed**: A chronological list of the most recent security incidents.
+
+---
+
+## 🔗 URL & Navigation (Link Generation)
+The agent can generate links to specific areas or actions:
+
+| Destination | Route | Description |
+| :--- | :--- | :--- |
+| **Manufacturer Home** | `/manufacturer` | Main dashboard and activity pulse. |
+| **Active Catalog** | `/manufacturer/products` | View the full list of products. |
+| **Add New Batch** | `/manufacturer/batches/new` | Directly opens the batch enrollment wizard. |
+| **Catalog Analytics** | `/manufacturer/analytics` | Deep-dive into geographic and threat data. |
+
+**AI Rule:** When a manufacturer asks for a status summary or wants to perform an action, provide the corresponding deep-link alongside the technical response.
+
+---
+
+## 🛠️ Tool Integration & AI Guidance
+
+| User Intent | Tool Strategy | Notes |
+| :--- | :--- | :--- |
+| "How's production today?" | `get_view_data` | Reference "Daily Scan Velocity" and "Active Catalog" stats. |
+| "Show me our alerts." | `get_view_data` | Read the "Live Threat Activity Feed" for recent incidents. |
+
+---
+
+## 🚨 Error & Empty States
+- **New Manufacturer State**: If no products exist, the dashboard shows an "Onboarding Wizard" state. Suggest starting with the [Catalog](/manufacturer/products).
+
+---
+
+## 🧠 Operational Best Practices
+- **Executive Navigation**: Always offer a link to the [Analytics](/manufacturer/analytics) page if the user is asking about volume or geography.
+- **Security Recognition**: If a user is on the dashboard and asks a general question while alerts are unread, acknowledge those alerts first.

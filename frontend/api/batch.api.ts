@@ -2,13 +2,15 @@ import client from './client';
 
 export interface CreateBatchDto {
 	productRef: string; // ObjectId of the Product catalogue item
-	batchNumber: string;
-	quantity: number;
-	manufactureDate: string;
+	batchNumber?: string;
+	quantity?: number;
+	manufactureDate?: string;
 	expiryDate?: string;
 	description?: string;
-	batchSalt: string;
-	blockchainHash: string;
+	batchSalt?: string;
+	blockchainHash?: string;
+	status?: 'pending' | 'completed' | 'failed';
+	wizardState?: any; // Dynamic dict for UI state tracking (FIX-004)
 }
 
 export const createBatch = async (data: CreateBatchDto, signal?: AbortSignal) => {
@@ -62,5 +64,10 @@ export const getBatchScanDetails = async (batchNumber: string, signal?: AbortSig
 		params: { batchNumber, limit: 100 },
 		signal
 	});
+	return response.data;
+};
+
+export const updateBatch = async (id: string, data: Partial<CreateBatchDto>, signal?: AbortSignal) => {
+	const response = await client.put(`/batches/${id}`, data, { signal });
 	return response.data;
 };
