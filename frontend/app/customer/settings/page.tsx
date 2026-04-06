@@ -35,6 +35,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { PageHeader } from "@/components/ui/page-header";
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -134,15 +135,10 @@ export default function CustomerSettingsPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
-      <div className="px-1">
-        <h1 className="text-3xl sm:text-4xl font-black tracking-tighter leading-none text-foreground">
-          My Account
-        </h1>
-        <p className="text-muted-foreground text-sm font-medium mt-2 italic px-1">
-          Manage your personal details, security preferences, and account
-          activity.
-        </p>
-      </div>
+      <PageHeader
+        title="My Account"
+        description="Manage your personal details, security preferences, and account activity."
+      />
 
       <Tabs defaultValue="general" className="w-full">
         <TabsList className="mb-8 bg-muted/50 p-1.5 rounded-2xl border border-border/50 h-auto w-full flex justify-start sm:w-auto sm:inline-flex overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">

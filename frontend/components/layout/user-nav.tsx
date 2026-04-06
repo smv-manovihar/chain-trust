@@ -67,7 +67,7 @@ export function UserNav() {
             <span className="max-w-[100px] truncate text-sm font-semibold">
               {user.name}
             </span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium mt-0.5">
+            <span className="text-[10px] text-muted-foreground font-medium mt-0.5">
               {user.role || "User"}
             </span>
           </div>

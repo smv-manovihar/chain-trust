@@ -49,12 +49,11 @@ export function DocumentViewerDialog({ open, onOpenChange, document }: DocumentV
 
   const resolvedUrl = useMemo(() => document ? resolveMediaUrl(document.url) : "", [document]);
 
-  if (!document) return null;
-
-  const isPDF = document.url.toLowerCase().endsWith(".pdf") || document.type === "pdf";
+  const isPDF = document?.url?.toLowerCase().endsWith(".pdf") || document?.type === "pdf";
   const isImage = !isPDF;
 
   const handleDownload = async () => {
+    if (!document) return;
     try {
       const response = await fetch(resolvedUrl);
       if (!response.ok) throw new Error("Network response was not ok");
@@ -89,7 +88,7 @@ export function DocumentViewerDialog({ open, onOpenChange, document }: DocumentV
             </div>
             <div className="flex items-center gap-1.5">
               <DialogTitle className="text-lg font-semibold truncate max-w-[200px] sm:max-w-md">
-                {document.label}
+                {document?.label || "Document Preview"}
               </DialogTitle>
               <TooltipProvider>
                 <Tooltip>
@@ -108,7 +107,7 @@ export function DocumentViewerDialog({ open, onOpenChange, document }: DocumentV
             </div>
           </div>
           <DialogDescription className="sr-only">
-            Preview of {document.label}
+            Preview of {document?.label || "document"}
           </DialogDescription>
           <div className="flex items-center gap-2 mr-8">
              <Button variant="outline" size="sm" onClick={handleOpenNewTab} className="gap-2 hidden sm:flex">
@@ -137,30 +136,32 @@ export function DocumentViewerDialog({ open, onOpenChange, document }: DocumentV
             </div>
           )}
 
-          {isImage ? (
-            <img 
-              src={resolvedUrl} 
-              alt={document.label}
-              className="max-w-full max-h-full object-contain p-4"
-              onLoad={() => setIsLoading(false)}
-              onError={() => {
-                setIsLoading(false);
-                setError("Failed to load image preview.");
-              }}
-            />
-          ) : (
-            <div className="w-full h-full relative">
-              <iframe
-                src={`${resolvedUrl}#toolbar=0&navpanes=0`}
-                className="w-full h-full border-0 absolute inset-0 z-10"
+          {document && (
+            isImage ? (
+              <img 
+                src={resolvedUrl} 
+                alt={document.label}
+                className="max-w-full max-h-full object-contain p-4"
                 onLoad={() => setIsLoading(false)}
                 onError={() => {
                   setIsLoading(false);
-                  setError("Failed to render PDF preview.");
+                  setError("Failed to load image preview.");
                 }}
-                title={document.label}
               />
-            </div>
+            ) : (
+              <div className="w-full h-full relative">
+                <iframe
+                  src={`${resolvedUrl}#toolbar=0&navpanes=0`}
+                  className="w-full h-full border-0 absolute inset-0 z-10"
+                  onLoad={() => setIsLoading(false)}
+                  onError={() => {
+                    setIsLoading(false);
+                    setError("Failed to render PDF preview.");
+                  }}
+                  title={document.label}
+                />
+              </div>
+            )
           )}
         </div>
       </DialogContent>

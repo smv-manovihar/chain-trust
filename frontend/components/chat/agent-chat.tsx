@@ -281,7 +281,7 @@ export function AgentChat({
           : "w-full max-w-5xl mx-auto bg-transparent",
       )}
     >
-      {/* Floating Header */}
+      {/* Floating Header — Offset to sit below AppShell Header */}
       <div className="absolute top-0 left-0 right-0 z-[60] w-full px-2 sm:px-4 pt-2 sm:pt-4 pointer-events-none">
         <div className="flex items-center justify-between px-3 sm:px-4 py-1.5 sm:py-2 bg-card/50 backdrop-blur-xl border border-primary/10 shadow-lg rounded-xl sm:rounded-2xl pointer-events-auto w-full max-w-full">
           <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 pr-2">
@@ -739,10 +739,8 @@ export function AgentChat({
           <div
             key={currentSessionId || "new"}
             className={cn(
-              "max-w-3xl mx-auto w-full pt-20 sm:pt-24 pb-0 sm:pb-8 flex flex-col min-h-full transition-all duration-300 animate-in fade-in fill-mode-both",
-              compact 
-                ? "px-1 sm:px-1.5" 
-                : "px-3 sm:px-6 md:px-8 lg:px-10",
+              "max-w-3xl mx-auto w-full pt-32 sm:pt-40 pb-0 sm:pb-8 flex flex-col min-h-full transition-all duration-300 animate-in fade-in fill-mode-both",
+              compact ? "px-1 sm:px-1.5" : "px-3 sm:px-6 md:px-8 lg:px-10",
             )}
           >
             {!currentSessionId ? (

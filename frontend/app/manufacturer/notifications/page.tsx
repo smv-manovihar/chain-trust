@@ -307,7 +307,7 @@ function NotificationCard({
             )}>
               {notification.title}
             </h3>
-            <div className="flex items-center gap-3 text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="flex items-center gap-3 text-[10px] sm:text-xs font-medium text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
                 {format(new Date(notification.createdAt), "MMM dd, yyyy · HH:mm")}

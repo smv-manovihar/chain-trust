@@ -109,7 +109,7 @@ export function UploadScanner({
             variant="outline"
             className="rounded-full bg-background font-bold shadow-sm sm:ml-auto w-full sm:w-auto active:scale-95 transition-all"
           >
-            <Camera className="h-4 w-4 mr-2" />
+            <Camera className="h-4 w-4 mr-2" aria-hidden="true" />
             Use device camera
           </Button>
         )}
@@ -117,10 +117,19 @@ export function UploadScanner({
 
       {/* Main Drop/Tap Zone */}
       <motion.div
+        role="button"
+        tabIndex={0}
+        aria-label="Upload QR image"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => !loading && fileInputRef.current?.click()}
+        onKeyDown={(e) => {
+          if ((e.key === "Enter" || e.key === " ") && !loading) {
+            e.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
         animate={{
           scale: dragActive ? 0.98 : 1,
         }}
@@ -149,21 +158,21 @@ export function UploadScanner({
               {loading ? (
                 <>
                   <div className="relative h-12 w-12 flex items-center justify-center">
-                    <ScanLine className="absolute h-8 w-8 text-primary animate-pulse" />
+                    <ScanLine className="absolute h-8 w-8 text-primary animate-pulse" aria-hidden="true" />
                     <div className="absolute inset-0 border-2 border-primary/20 border-t-primary rounded-xl animate-spin" />
                   </div>
                   <div className="text-center">
                     <p className="text-sm tracking-wide text-foreground">
                       Decoding QR...
                     </p>
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground mt-0.5">
+                    <p className="text-[10px] font-bold text-muted-foreground mt-0.5">
                       Please wait
                     </p>
                   </div>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="h-12 w-12 text-green-500" />
+                  <CheckCircle2 className="h-12 w-12 text-green-500" aria-hidden="true" />
                   <p className="text-sm tracking-wide text-green-600">
                     Scan Complete!
                   </p>
@@ -177,16 +186,16 @@ export function UploadScanner({
             <div className="hidden sm:flex relative items-center justify-center">
               <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl scale-150 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="relative h-24 w-24 bg-background border-2 border-primary/20 rounded-[1.5rem] flex items-center justify-center shadow-xl rotate-3 group-hover:-rotate-3 transition-transform duration-300">
-                <QrCode className="h-12 w-12 text-primary" />
+                <QrCode className="h-12 w-12 text-primary" aria-hidden="true" />
               </div>
               <div className="absolute -bottom-3 -right-3 h-10 w-10 bg-primary rounded-full flex items-center justify-center shadow-lg border-4 border-background group-hover:scale-110 transition-transform duration-300">
-                <UploadCloud className="h-5 w-5 text-primary-foreground" />
+                <UploadCloud className="h-5 w-5 text-primary-foreground" aria-hidden="true" />
               </div>
             </div>
 
             {/* Mobile: Simple QR Icon */}
             <div className="sm:hidden h-16 w-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-2">
-              <QrCode className="h-8 w-8" />
+              <QrCode className="h-8 w-8" aria-hidden="true" />
             </div>
 
             <div className="space-y-1.5">

@@ -1,16 +1,8 @@
 "use client";
+import React, { useState, useEffect } from "react";
 import { BrandLogo } from "@/components/layout/brand-logo";
-import {
-  LayoutDashboard,
-  QrCode,
-  Settings,
-  PanelLeft,
-  Pill,
-  Bot,
-  FileText,
-  Bell,
-} from "lucide-react";
-import { useState } from "react";
+import { PanelLeft, LucideIcon } from "lucide-react";
+import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/contexts/sidebar-context";
 import {
@@ -18,60 +10,15 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { SidebarContent, NavGroup } from "./sidebar-content";
+import { Sling as Hamburger } from "hamburger-react";
+import { useScrollDirection } from "@/hooks/use-scroll-direction";
 
-export const navGroups = [
-  {
-    label: "Main",
-    items: [
-      {
-        label: "Overview",
-        href: "/customer",
-        icon: LayoutDashboard,
-      },
-      {
-        label: "My Medicines",
-        href: "/customer/cabinet",
-        icon: Pill,
-      },
-      {
-        label: "Prescriptions",
-        href: "/customer/prescriptions",
-        icon: FileText,
-      },
-      {
-        label: "AI Agent",
-        href: "/customer/agent",
-        icon: Bot,
-      },
-      {
-        label: "Verify Product",
-        href: "/verify",
-        icon: QrCode,
-      },
-    ],
-  },
-  {
-    label: "Account",
-    items: [
-      {
-        label: "Notifications",
-        href: "/customer/notifications",
-        icon: Bell,
-      },
-      {
-        label: "Settings",
-        href: "/customer/settings",
-        icon: Settings,
-      },
-    ],
-  },
-];
+interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
+  navGroups: NavGroup[];
+}
 
-import { SidebarContent } from "./sidebar-content";
-
-interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
-
-export function CustomerSidebar({ className }: SidebarProps) {
+export function AppSidebar({ className, navGroups }: SidebarProps) {
   const { isCollapsed, toggleSidebar } = useSidebar();
 
   return (
@@ -157,24 +104,29 @@ export function CustomerSidebar({ className }: SidebarProps) {
   );
 }
 
-import { Sling as Hamburger } from "hamburger-react";
-import { useScrollDirection } from "@/hooks/use-scroll-direction";
-import { Button } from "../ui/button";
-
-export function MobileSidebar({
+export function MobileAppSidebar({
   mainRef,
   open: externalOpen,
   onOpenChange,
+  navGroups,
 }: {
   mainRef?: React.RefObject<HTMLDivElement | null>;
   open?: boolean;
   onOpenChange?: React.Dispatch<React.SetStateAction<boolean>>;
+  navGroups: NavGroup[];
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const open = externalOpen ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
 
   const isVisible = useScrollDirection(mainRef);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
 
   return (
     <>

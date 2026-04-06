@@ -328,7 +328,7 @@ export default function CreateBatchWizard() {
       <div className="max-w-md mx-auto mt-20">
         <Card className="p-8 text-center space-y-6">
           <div className="mx-auto h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center relative">
-            <Wallet className="h-10 w-10 text-primary" />
+            <Wallet className="h-10 w-10 text-primary" aria-hidden="true" />
             <div className="absolute top-0 right-0 h-4 w-4 bg-destructive rounded-full" />
           </div>
           <div>
@@ -349,7 +349,7 @@ export default function CreateBatchWizard() {
               {isConnecting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Zap className="h-4 w-4" />
+                <Zap className="h-4 w-4" aria-hidden="true" />
               )}
               Connect Wallet
             </Button>
@@ -367,7 +367,7 @@ export default function CreateBatchWizard() {
       <div className="max-w-md mx-auto mt-20 text-center space-y-6">
         <Card className="p-8 space-y-6 flex flex-col items-center">
           <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center text-green-500">
-            <Check className="h-10 w-10" />
+            <Check className="h-10 w-10" aria-hidden="true" />
           </div>
           <div>
             <h1 className="text-2xl font-bold">Batch Created</h1>
@@ -379,7 +379,7 @@ export default function CreateBatchWizard() {
           <div className="flex flex-col w-full gap-3 pt-4 border-t border-border/40">
             <Button asChild className="w-full gap-2 rounded-full h-11">
               <Link href={`/manufacturer/batches/${successId}`}>
-                <QrCode className="h-4 w-4" /> Print Evidence Sheet
+                <QrCode className="h-4 w-4" aria-hidden="true" /> Print Evidence Sheet
               </Link>
             </Button>
             <Button variant="outline" asChild className="w-full rounded-full h-11">
@@ -402,12 +402,12 @@ export default function CreateBatchWizard() {
           className="rounded-full flex-shrink-0 active:scale-95 transition-all"
         >
           <Link href="/manufacturer/batches">
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </Link>
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            Create new batch
+            Create New Batch
           </h1>
         </div>
         <div className="text-right hidden sm:block">
@@ -420,14 +420,16 @@ export default function CreateBatchWizard() {
 
       <div className="flex gap-2 px-1">
         {[1, 2, 3].map((i) => (
-          <button
+          <Button
             key={i}
+            variant="ghost"
             onClick={() => {
               if (canGoToStep(i)) setStep(i);
               else toast.error("Complete current phase first.");
             }}
+            aria-label={`Go to Step ${i}`}
             className={cn(
-              "h-1.5 flex-1 rounded-full transition-all duration-500",
+              "h-1.5 p-0 flex-1 rounded-full transition-all duration-500 min-w-0 hover:bg-transparent",
               i <= step ? "bg-primary" : "bg-muted",
               canGoToStep(i)
                 ? "cursor-pointer"
@@ -450,14 +452,14 @@ export default function CreateBatchWizard() {
               {step === 1 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-lg font-semibold">Select product</h2>
+                    <h2 className="text-lg font-semibold">Select Product</h2>
                     <p className="text-sm text-muted-foreground">
-                      Choose a template to base this batch on.
+                      Target medical SKU for this production run
                     </p>
                   </div>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                       <Input
                         placeholder="Search products..."
                         value={productSearch}
@@ -476,16 +478,16 @@ export default function CreateBatchWizard() {
                     <div className="p-2 space-y-1">
                       {productsLoading ? (
                         <div className="flex h-32 items-center justify-center">
-                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
                         </div>
                       ) : filteredProducts.length === 0 ? (
                         <div className="p-8 text-center space-y-4">
                           <div className="mx-auto h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                            <Package className="h-6 w-6" />
+                            <Package className="h-6 w-6" aria-hidden="true" />
                           </div>
                           <div className="max-w-[200px] mx-auto">
                             <p className="text-sm font-semibold">
-                              No products found
+                              No Products Found
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
                               You must create a product first before you can
@@ -494,7 +496,7 @@ export default function CreateBatchWizard() {
                           </div>
                           <Button asChild variant="outline" size="sm" className="gap-2 rounded-full active:scale-95 transition-all">
                             <Link href="/manufacturer/products/new">
-                              <Plus className="h-4 w-4" /> Add Product
+                              <Plus className="h-4 w-4" aria-hidden="true" /> Add Product
                             </Link>
                           </Button>
                         </div>
@@ -518,7 +520,7 @@ export default function CreateBatchWizard() {
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
-                                <Package className="w-full h-full p-2 opacity-30" />
+                                <Package className="w-full h-full p-2 opacity-30" aria-hidden="true" />
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
@@ -530,7 +532,7 @@ export default function CreateBatchWizard() {
                               </p>
                             </div>
                             {selectedProduct?._id === p._id && (
-                              <Check className="h-4 w-4 text-primary shrink-0" />
+                              <Check className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
                             )}
                           </div>
                         ))
@@ -543,16 +545,16 @@ export default function CreateBatchWizard() {
                {step === 2 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-lg font-semibold">Batch details</h2>
+                    <h2 className="text-lg font-semibold">Batch Metadata</h2>
                     <p className="text-sm text-muted-foreground">
-                      Specify the production metrics.
+                      Production run identifiers and regulatory dates
                     </p>
                   </div>
                   {selectedProduct && (
                     <div className="flex items-center justify-between p-4 bg-muted/40 rounded-xl border border-border/50">
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">
-                          Target template
+                          Target Template
                         </p>
                         <p className="font-semibold text-sm">
                           {selectedProduct.name}
@@ -565,7 +567,7 @@ export default function CreateBatchWizard() {
                   )}
                   <div className="grid sm:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label>Batch number</Label>
+                      <Label>Batch Number</Label>
                       <Input
                         placeholder="e.g. BATCH-001"
                         value={batchData.batchNumber}
@@ -580,7 +582,7 @@ export default function CreateBatchWizard() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Quantity (units)</Label>
+                      <Label>Quantity (Units)</Label>
                       <Input
                         type="number"
                         placeholder="e.g. 5000"
@@ -597,7 +599,7 @@ export default function CreateBatchWizard() {
 
                     {/* V9 COMPATIBLE MANUFACTURE DATE */}
                     <div className="space-y-2 flex flex-col">
-                      <Label className="mb-1">Manufacture date</Label>
+                      <Label className="mb-1">Manufacture Date</Label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
@@ -608,7 +610,7 @@ export default function CreateBatchWizard() {
                                 "text-muted-foreground",
                             )}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
                             {batchData.manufactureDate ? (
                               format(batchData.manufactureDate, "PPP")
                             ) : (
@@ -639,7 +641,7 @@ export default function CreateBatchWizard() {
 
                     {/* V9 COMPATIBLE EXPIRY DATE */}
                     <div className="space-y-2 flex flex-col">
-                      <Label className="mb-1">Expiry date</Label>
+                      <Label className="mb-1">Expiry Date</Label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
@@ -649,7 +651,7 @@ export default function CreateBatchWizard() {
                               !batchData.expiryDate && "text-muted-foreground",
                             )}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
                             {batchData.expiryDate ? (
                               format(batchData.expiryDate, "PPP")
                             ) : (
@@ -684,9 +686,9 @@ export default function CreateBatchWizard() {
                {step === 3 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-lg font-semibold">Review and submit</h2>
+                    <h2 className="text-lg font-semibold">Blockchain Deployment</h2>
                     <p className="text-sm text-muted-foreground">
-                      Verify the details before committing to the blockchain.
+                      Secure cryptographic enrollment on the public ledger
                     </p>
                   </div>
 
@@ -730,7 +732,7 @@ export default function CreateBatchWizard() {
                   </div>
 
                   <div className="p-4 rounded-lg bg-primary/10 text-primary flex items-start gap-3">
-                    <Boxes className="h-5 w-5 shrink-0 mt-0.5" />
+                    <Boxes className="h-5 w-5 shrink-0 mt-0.5" aria-hidden="true" />
                     <p className="text-sm leading-relaxed">
                       By committing this batch, you authorize the generation of{" "}
                       {batchData.quantity || "0"} unique cryptographic
@@ -771,7 +773,7 @@ export default function CreateBatchWizard() {
 
             {step < 3 ? (
               <Button onClick={nextStep} className="gap-2 rounded-full h-10 px-8 active:scale-95 transition-all">
-                Next <ArrowRight className="h-4 w-4" />
+                Next <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Button>
             ) : (
               <Button
@@ -780,11 +782,11 @@ export default function CreateBatchWizard() {
                 className="gap-2 rounded-full h-10 px-8 active:scale-95 transition-all"
               >
                 {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-4 w-4" aria-hidden="true" />
                 )}
-                {loading ? "Processing..." : "Create batch"}
+                {loading ? "Processing..." : "Create Batch"}
               </Button>
             )}
           </div>

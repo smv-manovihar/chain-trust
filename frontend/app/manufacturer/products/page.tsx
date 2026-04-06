@@ -18,14 +18,18 @@ import {
   ChevronsUpDown,
   Filter,
   Boxes,
+  List,
+  LayoutGrid as GridIcon,
 } from "lucide-react";
+
 import { ProductCard } from "@/components/manufacturer/product-card";
 import { ProductListView } from "@/components/manufacturer/product-list-view";
 import type { Product } from "@/components/manufacturer/product-card";
-import { List, LayoutGrid as GridIcon } from "lucide-react";
 
 import { listProducts } from "@/api/product.api";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/page-header";
+import { DataToolbar } from "@/components/ui/data-toolbar";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { resolveMediaUrl } from "@/lib/media-url";
@@ -128,21 +132,18 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-10 pb-20">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
-        <div className="w-full sm:w-auto">
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-left">
-            Products
-          </h1>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 h-5">
-              <Package className="w-3 h-3 text-primary" />
+      <PageHeader
+        title="Products"
+        stats={
+          <>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 h-5">
+              <Package className="w-3 h-3 text-primary" aria-hidden="true" />
               <span className="text-[10px] font-bold tracking-tight text-primary">
                 {products.length} Assets
               </span>
             </div>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 h-5">
-              <LayoutGrid className="w-3 h-3 text-blue-600" />
+              <LayoutGrid className="w-3 h-3 text-blue-600" aria-hidden="true" />
               <span className="text-[10px] font-bold tracking-tight text-blue-600">
                 {products.length > 0
                   ? [...new Set(products.map((p) => p.category))].length
@@ -150,79 +151,67 @@ export default function ProductsPage() {
                 Categories
               </span>
             </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={fetchProducts}
-            className="h-10 w-10 border-primary/20 hover:bg-primary/5 transition-all shadow-sm shrink-0 rounded-full"
-          >
-            <RefreshCw
-              className={cn("h-4 w-4 text-primary", loading && "animate-spin")}
-            />
-          </Button>
-          
-          <div className="hidden sm:flex bg-muted/30 p-1 rounded-full border border-border/40">
+          </>
+        }
+        actions={
+          <>
             <Button
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              variant="outline"
               size="icon"
-              onClick={() => setViewMode("grid")}
-              className={cn("h-8 w-8 rounded-full", viewMode === "grid" && "shadow-sm")}
+              onClick={fetchProducts}
+              className="h-10 w-10 border-primary/20 hover:bg-primary/5 transition-all shadow-sm shrink-0 rounded-full"
+              aria-label="Refresh Catalogue"
             >
-              <GridIcon className="h-4 w-4" />
+              <RefreshCw
+                className={cn("h-4 w-4 text-primary", loading && "animate-spin")}
+                aria-hidden="true"
+              />
             </Button>
-            <Button
-              variant={viewMode === "list" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("list")}
-              className={cn("h-8 w-8 rounded-full", viewMode === "list" && "shadow-sm")}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
+            
 
-          <div className="flex-1 sm:flex-none flex items-center gap-2">
-            <CategoryManagementDialog onCategoriesChange={fetchProducts} />
-            <Button
-              asChild
-              className="flex-1 sm:flex-none h-10 px-4 sm:px-6 rounded-full gap-2 font-bold shadow-lg shadow-primary/20"
-            >
-              <Link href="/manufacturer/products/new">
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add Product</span>
-                <span className="sm:hidden">Add</span>
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </div>
+            <div className="flex-1 sm:flex-none flex items-center gap-2">
+              <CategoryManagementDialog onCategoriesChange={fetchProducts} />
+              <Button
+                asChild
+                className="flex-1 sm:flex-none h-10 px-4 sm:px-6 rounded-full gap-2 font-bold shadow-lg shadow-primary/20"
+              >
+                <Link href="/manufacturer/products/new">
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">Add Product</span>
+                  <span className="sm:hidden">Add</span>
+                </Link>
+              </Button>
+            </div>
+          </>
+        }
+      />
 
-      <div className="flex items-center gap-3 px-1 sticky top-4 z-30">
-        <div className="relative flex-1">
-          <Input
-            placeholder="Search by name or ID..."
-            className="pl-12 h-11 text-sm bg-background/80 backdrop-blur-3xl border-border/40 rounded-full focus-visible:ring-primary/20 shadow-sm"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+      <DataToolbar
+        search={{
+          value: searchQuery,
+          onChange: setSearchQuery,
+          placeholder: "Search by name or ID...",
+        }}
+        filters={
+          <CategoryFilter
+            selectedCategories={selectedCategories}
+            onCategoryChange={setSelectedCategories}
+            canManage={true}
+            onCategoriesChange={fetchProducts}
+            className="rounded-full h-11 sm:h-12 px-4 sm:px-6 border-border/40 bg-background/50 shadow-sm"
           />
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-        </div>
-        <CategoryFilter
-          selectedCategories={selectedCategories}
-          onCategoryChange={setSelectedCategories}
-          canManage={true}
-          onCategoriesChange={fetchProducts}
-          className="rounded-full h-11 px-4 sm:px-6 border-border/40 bg-background/80 backdrop-blur-3xl shadow-sm"
-        />
-      </div>
+        }
+        viewToggle={{
+          mode: viewMode,
+          onChange: setViewMode,
+        }}
+      />
 
       {/* Inventory Grid */}
       <div className="px-1 pt-4">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground font-medium gap-4">
-            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden="true" />
             <p className="tracking-tight text-xs font-bold">
               Syncing Catalogue...
             </p>
@@ -250,6 +239,7 @@ export default function ProductsPage() {
         ) : (
           <EmptyState
             icon={Package}
+            aria-hidden="true"
             title="No Products Found"
             description="Your inventory is currently empty. Start by initializing your first digital asset on the blockchain secure catalogue."
             action={{

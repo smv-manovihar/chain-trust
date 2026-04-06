@@ -197,13 +197,15 @@ export function VideoScanner({
 
       {/* Close button - now available on all platforms if onClose is provided */}
       {onClose && (
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onClose}
-          className="absolute top-6 right-6 z-50 h-10 w-10 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 active:bg-white/20 hover:bg-white/10 transition-all active:scale-95"
+          className="absolute top-6 right-6 z-50 h-10 w-10 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 active:bg-white/20 hover:bg-white/10 hover:text-white transition-all active:scale-95"
           aria-label="Close scanner"
         >
           <X className="h-5 w-5 text-white" />
-        </button>
+        </Button>
       )}
 
       {/* Status overlays */}
@@ -264,21 +266,27 @@ export function VideoScanner({
       {/* Bottom Floating Controls */}
       <div className="absolute bottom-10 inset-x-0 z-30 flex items-center justify-center gap-6 pointer-events-none">
         {onSwitchToUpload && (
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={onSwitchToUpload}
-            className="pointer-events-auto h-14 w-14 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/20 active:bg-white/20 transition-all shadow-lg active:scale-95"
+            aria-label="Switch to upload"
+            className="pointer-events-auto h-14 w-14 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/20 active:bg-white/20 hover:bg-white/10 hover:text-white transition-all shadow-lg active:scale-95"
           >
             <ImageIcon className="h-6 w-6 text-white" />
-          </button>
+          </Button>
         )}
 
         {(isMobileDevice || cameras.length > 1) && (
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={handleFlipCamera}
-            className="pointer-events-auto h-14 w-14 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/20 active:bg-white/20 transition-all shadow-lg active:scale-95"
+            aria-label="Flip camera"
+            className="pointer-events-auto h-14 w-14 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/20 active:bg-white/20 hover:bg-white/10 hover:text-white transition-all shadow-lg active:scale-95"
           >
             <SwitchCamera className="h-6 w-6 text-white" />
-          </button>
+          </Button>
         )}
       </div>
     </div>

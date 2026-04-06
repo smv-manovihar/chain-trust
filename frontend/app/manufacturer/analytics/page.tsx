@@ -63,6 +63,7 @@ import {
   getThreatAnalytics,
 } from "@/api/analytics.api";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   XAxis,
   YAxis,
@@ -272,7 +273,7 @@ export default function AnalyticsPage() {
   if (isInitialLoading && topBatches.length === 0) {
     return (
       <div className="h-[60vh] flex flex-col items-center justify-center gap-4 text-muted-foreground font-medium">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
         <p>Loading analytics workspace...</p>
       </div>
     );
@@ -280,115 +281,114 @@ export default function AnalyticsPage() {
 
   return (
     <div className="flex flex-col min-h-full gap-8 pb-12 pr-1 custom-scrollbar">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 py-4 transition-all px-1">
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tighter text-foreground leading-none">
-          Analytics
-        </h1>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-          {/* Date Range Picker */}
-          {isMobile ? (
-            <Drawer>
-              <DrawerTrigger asChild>
-                <Button
-                  id="date"
-                  variant={"outline"}
-                  className={cn(
-                    "w-full justify-start text-left font-normal h-11 rounded-full active:scale-95 transition-all",
-                    !dateRange && "text-muted-foreground",
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  <span className="truncate">
-                    {dateRange?.from ? (
-                      dateRange.to ? (
-                        <>
-                          {format(dateRange.from, "LLL dd, y")} -{" "}
-                          {format(dateRange.to, "LLL dd, y")}
-                        </>
-                      ) : (
-                        format(dateRange.from, "LLL dd, y")
-                      )
-                    ) : (
-                      <span>Pick a date</span>
+      <PageHeader
+        title="Analytics"
+        actions={
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+            {/* Date Range Picker */}
+            {isMobile ? (
+              <Drawer>
+                <DrawerTrigger asChild>
+                  <Button
+                    id="date"
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal h-11 rounded-full active:scale-95 transition-all",
+                      !dateRange && "text-muted-foreground",
                     )}
-                  </span>
-                </Button>
-              </DrawerTrigger>
-              <DrawerContent>
-                <DrawerHeader className="text-left">
-                  <DrawerTitle>Select date range</DrawerTitle>
-                  <DrawerDescription>
-                    Analyze data within a specific timeframe.
-                  </DrawerDescription>
-                </DrawerHeader>
-                <div className="p-4 pb-10 flex justify-center">
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <span className="truncate">
+                      {dateRange?.from ? (
+                        dateRange.to ? (
+                          <>
+                            {format(dateRange.from, "LLL dd, y")} -{" "}
+                            {format(dateRange.to, "LLL dd, y")}
+                          </>
+                        ) : (
+                          format(dateRange.from, "LLL dd, y")
+                        )
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </span>
+                  </Button>
+                </DrawerTrigger>
+                <DrawerContent>
+                  <DrawerHeader className="text-left">
+                    <DrawerTitle>Select date range</DrawerTitle>
+                    <DrawerDescription>
+                      Analyze data within a specific timeframe.
+                    </DrawerDescription>
+                  </DrawerHeader>
+                  <div className="p-4 pb-10 flex justify-center">
+                    <Calendar
+                      mode="range"
+                      defaultMonth={dateRange?.from}
+                      selected={dateRange}
+                      onSelect={setDateRange}
+                      numberOfMonths={1}
+                      className="rounded-md border shadow-none bg-transparent"
+                    />
+                  </div>
+                </DrawerContent>
+              </Drawer>
+            ) : (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="date"
+                    variant={"outline"}
+                    className={cn(
+                      "w-[260px] justify-start text-left font-normal h-10 rounded-full active:scale-95 transition-all text-xs",
+                      !dateRange && "text-muted-foreground",
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <span className="truncate">
+                      {dateRange?.from ? (
+                        dateRange.to ? (
+                          <>
+                            {format(dateRange.from, "LLL dd, y")} -{" "}
+                            {format(dateRange.to, "LLL dd, y")}
+                          </>
+                        ) : (
+                          format(dateRange.from, "LLL dd, y")
+                        )
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
                   <Calendar
                     mode="range"
                     defaultMonth={dateRange?.from}
                     selected={dateRange}
                     onSelect={setDateRange}
-                    numberOfMonths={1}
-                    className="rounded-md border shadow-none bg-transparent"
+                    numberOfMonths={2}
                   />
-                </div>
-              </DrawerContent>
-            </Drawer>
-          ) : (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  id="date"
-                  variant={"outline"}
-                  className={cn(
-                    "w-[260px] justify-start text-left font-normal h-10 rounded-full active:scale-95 transition-all",
-                    !dateRange && "text-muted-foreground",
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  <span className="truncate">
-                    {dateRange?.from ? (
-                      dateRange.to ? (
-                        <>
-                          {format(dateRange.from, "LLL dd, y")} -{" "}
-                          {format(dateRange.to, "LLL dd, y")}
-                        </>
-                      ) : (
-                        format(dateRange.from, "LLL dd, y")
-                      )
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                  </span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="range"
-                  defaultMonth={dateRange?.from}
-                  selected={dateRange}
-                  onSelect={setDateRange}
-                  numberOfMonths={2}
-                />
-              </PopoverContent>
-            </Popover>
-          )}
+                </PopoverContent>
+              </Popover>
+            )}
 
-          <Link
-            href="/manufacturer/analytics/scans"
-            className="w-full sm:w-auto"
-          >
-            <Button
-              variant="default"
-              className="w-full sm:w-auto gap-2 shadow-sm font-semibold group h-11 sm:h-10 rounded-full active:scale-95 transition-all"
+            <Link
+              href="/manufacturer/analytics/scans"
+              className="w-full sm:w-auto"
             >
-              <Activity className="h-4 w-4" />
-              Scan details
-              <ArrowRight className="h-4 w-4 opacity-70 group-hover:translate-x-1 transition-transform sm:inline hidden" />
-            </Button>
-          </Link>
-        </div>
-      </div>
+              <Button
+                variant="default"
+                className="w-full sm:w-auto gap-2 shadow-sm font-semibold group h-11 sm:h-10 rounded-full active:scale-95 transition-all text-xs"
+              >
+                <Activity className="h-4 w-4" aria-hidden="true" />
+                Scan Details
+                <ArrowRight className="h-4 w-4 opacity-70 group-hover:translate-x-1 transition-transform sm:inline hidden" aria-hidden="true" />
+              </Button>
+            </Link>
+          </div>
+        }
+      />
 
       {/* Row 1: Velocity (2/3) & Summary (1/3) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 shrink-0">
@@ -397,7 +397,7 @@ export default function AnalyticsPage() {
           <CardHeader className="flex flex-col items-stretch border-b p-0 sm:flex-row">
             <div className="flex flex-1 flex-col justify-center gap-1 px-6 py-4">
               <CardTitle className="text-lg font-black tracking-tight leading-none">
-                Scan volume
+                Scan Volume
               </CardTitle>
               <CardDescription>
                 Detailed verification activity and scan trends
@@ -405,18 +405,21 @@ export default function AnalyticsPage() {
             </div>
             <div className="flex flex-wrap border-t sm:border-t-0 sm:border-l">
               {[
-                { id: "all", label: "Total scans", total: entityTotals.all },
+                { id: "all", label: "Total Scans", total: entityTotals.all },
                 {
                   id: "product",
-                  label: "By products",
+                  label: "By Products",
                   total: entityTotals.all,
                 },
-                { id: "batch", label: "By batches", total: entityTotals.all },
+                { id: "batch", label: "By Batches", total: entityTotals.all },
               ].map((tab) => (
-                <button
+                <Button
                   key={tab.id}
-                  data-active={activeTab === tab.id}
-                  className="flex flex-1 min-w-[100px] flex-col justify-center gap-1 px-4 py-3 sm:px-6 sm:py-4 text-left data-[active=true]:bg-muted/50 transition-all border-r last:border-r-0 active:scale-95"
+                  variant="ghost"
+                  className={cn(
+                    "flex flex-1 min-w-[100px] flex-col justify-center gap-1 px-4 py-3 sm:px-6 sm:py-4 text-left rounded-none h-auto transition-all border-r last:border-r-0 active:scale-95",
+                    activeTab === tab.id && "bg-muted/50"
+                  )}
                   onClick={() => setActiveTab(tab.id)}
                 >
                   <span className="text-[10px] tracking-wider text-muted-foreground font-bold leading-none">
@@ -427,7 +430,7 @@ export default function AnalyticsPage() {
                       ? `${(tab.total / 1000).toFixed(1)}k`
                       : tab.total}
                   </span>
-                </button>
+                </Button>
               ))}
             </div>
           </CardHeader>
@@ -507,7 +510,7 @@ export default function AnalyticsPage() {
               </ChartContainer>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2 bg-muted/20 rounded-lg border border-dashed">
-                <Activity className="h-8 w-8 opacity-50" />
+                <Activity className="h-8 w-8 opacity-50" aria-hidden="true" />
                 <p className="text-sm font-medium">No activity detected</p>
               </div>
             )}
@@ -518,7 +521,7 @@ export default function AnalyticsPage() {
         <Card className="lg:col-span-1 rounded-xl shadow-sm flex flex-col min-h-[320px] overflow-hidden">
           <CardHeader className="border-b">
             <CardTitle className="text-xl font-black tracking-tight">
-              Executive summary
+              Executive Summary
             </CardTitle>
             <CardDescription>Product and batch performance</CardDescription>
           </CardHeader>
@@ -526,27 +529,27 @@ export default function AnalyticsPage() {
             <div className="space-y-6">
               <div className="flex items-center justify-between group">
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-muted-foreground uppercase opacity-60">PRODUCTS</p>
+                  <p className="text-xs font-bold text-muted-foreground opacity-60">Products</p>
                   <p className="text-2xl font-black tracking-tight">{stats.products}</p>
                 </div>
                 <div className="p-2.5 bg-blue-500/10 rounded-xl">
-                  <Package className="h-5 w-5 text-blue-500" />
+                  <Package className="h-5 w-5 text-blue-500" aria-hidden="true" />
                 </div>
               </div>
 
               <div className="flex items-center justify-between group">
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-muted-foreground uppercase opacity-60">ACTIVE BATCHES</p>
+                  <p className="text-xs font-bold text-muted-foreground opacity-60">Active Batches</p>
                   <p className="text-2xl font-black tracking-tight">{stats.batches}</p>
                 </div>
                 <div className="p-2.5 bg-primary/10 rounded-xl">
-                  <Boxes className="h-5 w-5 text-primary" />
+                  <Boxes className="h-5 w-5 text-primary" aria-hidden="true" />
                 </div>
               </div>
 
               <div className="flex items-center justify-between group">
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-muted-foreground uppercase opacity-60">TOTAL SCANS</p>
+                  <p className="text-xs font-bold text-muted-foreground opacity-60">Total Scans</p>
                   <p className="text-2xl font-black tracking-tight">
                     {stats.totalScans >= 1000
                       ? `${(stats.totalScans / 1000).toFixed(1)}k`
@@ -554,13 +557,13 @@ export default function AnalyticsPage() {
                   </p>
                 </div>
                 <div className="p-2.5 bg-emerald-500/10 rounded-xl">
-                  <ShieldCheck className="h-5 w-5 text-emerald-500" />
+                  <ShieldCheck className="h-5 w-5 text-emerald-500" aria-hidden="true" />
                 </div>
               </div>
 
               <div className="flex items-center justify-between group">
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-muted-foreground uppercase opacity-60">INCIDENTS</p>
+                  <p className="text-xs font-bold text-muted-foreground opacity-60">Incidents</p>
                   <p
                     className={cn(
                       "text-2xl font-black tracking-tight",
@@ -583,6 +586,7 @@ export default function AnalyticsPage() {
                         ? "text-red-500"
                         : "text-muted-foreground",
                     )}
+                    aria-hidden="true"
                   />
                 </div>
               </div>
@@ -597,7 +601,7 @@ export default function AnalyticsPage() {
         <Card className="lg:col-span-2 rounded-xl shadow-sm flex flex-col min-h-[300px] overflow-hidden">
           <CardHeader className="border-b">
             <CardTitle className="text-xl font-black tracking-tight">
-              Regional scans
+              Regional Scans
             </CardTitle>
             <CardDescription>
               Geographic distribution of verifications
@@ -651,7 +655,7 @@ export default function AnalyticsPage() {
                       dataKey="city"
                       position="insideLeft"
                       offset={12}
-                      className="fill-white font-bold text-[10px] uppercase tracking-tight"
+                      className="fill-white font-bold text-[10px]"
                     />
                     <LabelList
                       dataKey="count"
@@ -665,7 +669,7 @@ export default function AnalyticsPage() {
               </ChartContainer>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground bg-muted/20 rounded-lg border border-dashed">
-                <Globe className="h-8 w-8 mb-2 opacity-50" />
+                <Globe className="h-8 w-8 mb-2 opacity-50" aria-hidden="true" />
                 <p className="text-sm font-medium">Awaiting telemetry...</p>
               </div>
             )}
@@ -676,7 +680,7 @@ export default function AnalyticsPage() {
         <Card className="lg:col-span-1 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-[400px]">
           <CardHeader className="border-b gap-0.5">
             <CardTitle className="text-xl font-black tracking-tight">
-              Batch performance
+              Batch Performance
             </CardTitle>
             <CardDescription className="text-xs">
               Engagement volume by production run
@@ -690,7 +694,7 @@ export default function AnalyticsPage() {
                     Batch ID
                   </th>
                   <th className="px-4 sm:px-6 py-3 text-[10px] font-bold text-muted-foreground text-right">
-                    Scan index
+                    Scan Index
                   </th>
                 </tr>
               </thead>
@@ -711,7 +715,7 @@ export default function AnalyticsPage() {
                             }}
                           />
                           {batch.batchNumber}
-                          <ArrowRight className="h-3 w-3 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all sm:inline hidden" />
+                          <ArrowRight className="h-3 w-3 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all sm:inline hidden" aria-hidden="true" />
                         </div>
                         <p className="text-[9px] sm:text-[10px] text-muted-foreground font-medium truncate max-w-[80px] sm:max-w-none">
                           {batch.productName}
@@ -747,7 +751,7 @@ export default function AnalyticsPage() {
                                   size="icon"
                                   className="h-8 w-8 text-muted-foreground hover:text-primary transition-all active:scale-95 shrink-0"
                                 >
-                                  <ExternalLink className="h-3.5 w-3.5" />
+                                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                                 </Button>
                               </Link>
                             </TooltipTrigger>
@@ -755,7 +759,7 @@ export default function AnalyticsPage() {
                               side="top"
                               className="text-[10px] font-bold bg-primary text-primary-foreground border-none px-3 py-1.5"
                             >
-                              Open profile
+                              Open Profile
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -769,7 +773,7 @@ export default function AnalyticsPage() {
           <div className="px-6 py-4 border-t bg-muted/5">
             <Link href="/manufacturer/analytics/scans">
               <Button variant="ghost" className="w-full text-xs font-bold hover:bg-muted rounded-xl h-10 active:scale-95 transition-all">
-                View detailed scans <ArrowRight className="ml-2 h-4 w-4" />
+                View Detailed Scans <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
               </Button>
             </Link>
           </div>

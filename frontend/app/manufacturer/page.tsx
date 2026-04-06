@@ -28,6 +28,7 @@ import { getNotifications, Notification } from "@/api/notification.api";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default function ManufacturerDashboard() {
   const { user } = useAuth();
@@ -127,20 +128,17 @@ export default function ManufacturerDashboard() {
 
   return (
     <div className="space-y-8 lg:space-y-10 pb-12">
-      {/* Header / Welcome Banner */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <h1 className="text-2xl sm:text-4xl font-black tracking-tighter text-foreground leading-none">
+      <PageHeader
+        title={
+          <>
             Welcome,{" "}
             <span className="text-primary">
               {user?.name?.split(" ")[0] || "Manufacturer"}
             </span>
-          </h1>
-          <p className="text-muted-foreground text-sm sm:text-base font-medium mt-2">
-            Here's what's happening across your company today.
-          </p>
-        </div>
-      </div>
+          </>
+        }
+        description="Here's what's happening across your company today."
+      />
 
       {/* Bento KPI Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">

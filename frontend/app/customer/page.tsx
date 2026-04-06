@@ -38,6 +38,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/ui/page-header";
 import { Progress } from "@/components/ui/progress";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 
@@ -125,26 +126,27 @@ export default function CustomerDashboard() {
 
   return (
     <div className="space-y-8 lg:space-y-12 pb-12">
-      {/* Welcome Banner */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 px-2 pt-2">
-        <div>
-          <h1 className="text-2xl sm:text-4xl font-black tracking-tighter text-foreground leading-none">
+      <PageHeader
+        title={
+          <>
             Welcome,{" "}
             <span className="text-primary">
               {user?.name?.split(" ")[0] || "User"}
             </span>
-          </h1>
-        </div>
-        <Button
-          className="rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 px-8 font-bold h-12"
-          asChild
-        >
-          <Link href="/verify">
-            <QrCode className="mr-2 h-5 w-5" />
-            Verify New Medicine
-          </Link>
-        </Button>
-      </div>
+          </>
+        }
+        actions={
+          <Button
+            className="rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 px-8 font-bold h-12 w-full sm:w-auto"
+            asChild
+          >
+            <Link href="/verify">
+              <QrCode className="mr-2 h-5 w-5" />
+              Verify New Medicine
+            </Link>
+          </Button>
+        }
+      />
 
       {/* TOP ROW (3-Col Grid): Safety Profile (2) & My Medicines List (1) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

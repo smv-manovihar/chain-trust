@@ -1,10 +1,8 @@
 "use client";
 
 import { AppShell } from "@/components/layout/app-shell";
-import {
-  CustomerSidebar,
-  MobileSidebar,
-} from "@/components/layout/customer-sidebar";
+import { AppSidebar, MobileAppSidebar } from "@/components/layout/app-sidebar";
+import { CUSTOMER_NAV_GROUPS } from "@/lib/constants/navigation";
 
 export default function CustomerLayout({
   children,
@@ -13,8 +11,10 @@ export default function CustomerLayout({
 }) {
   return (
     <AppShell
-      sidebar={<CustomerSidebar />}
-      mobileSidebar={(props) => <MobileSidebar {...props} />}
+      sidebar={<AppSidebar navGroups={CUSTOMER_NAV_GROUPS} />}
+      mobileSidebar={(props) => (
+        <MobileAppSidebar {...props} navGroups={CUSTOMER_NAV_GROUPS} />
+      )}
     >
       {children}
     </AppShell>

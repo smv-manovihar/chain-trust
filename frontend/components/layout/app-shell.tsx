@@ -82,13 +82,16 @@ export function AppShell({ children, sidebar, mobileSidebar }: AppShellProps) {
           {/* Native scrollable div for better scroll tracking with useScrollDirection */}
           <div
             ref={mainRef}
-            className="h-full w-full overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/20"
+            className="h-full w-full overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-muted-foreground/20"
           >
             <AnimatePresence mode="wait">
               <motion.div
                 key={pathname}
                 variants={{
-                  initial: { opacity: 0, y: 10 },
+                  initial: {
+                    opacity: 0,
+                    y: pathname.includes("/agent") ? 0 : 10,
+                  },
                   animate: { opacity: 1, y: 0 },
                 }}
                 initial="initial"
@@ -97,7 +100,12 @@ export function AppShell({ children, sidebar, mobileSidebar }: AppShellProps) {
                   duration: 0.25,
                   ease: "easeInOut",
                 }}
-                className="mx-auto max-w-7xl w-full p-4 lg:p-8 pt-20 lg:pt-8"
+                className={cn(
+                  "mx-auto w-full",
+                  pathname.includes("/agent")
+                    ? "h-full"
+                    : "max-w-7xl p-4 lg:p-8 pt-20 lg:pt-8",
+                )}
               >
                 {children}
               </motion.div>

@@ -15,7 +15,7 @@ export default function CustomerAgentPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-64px)] -m-4 lg:-m-8">
+    <div className="h-full">
       <AgentChat initialSessionId={sessionId} currentContext={currentContext} />
     </div>
   );

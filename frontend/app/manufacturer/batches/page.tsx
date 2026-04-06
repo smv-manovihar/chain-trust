@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Search,
   RefreshCw,
   Boxes,
   Plus,
@@ -11,9 +10,10 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { DataToolbar } from "@/components/ui/data-toolbar";
 import {
   Table,
   TableBody,
@@ -159,74 +159,72 @@ export default function BatchesPage() {
 
   return (
     <div className="space-y-6 pb-10">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Batches</h1>
-          <div className="flex flex-wrap items-center gap-2 mt-1 sm:mt-2">
-            <Badge variant="secondary" className="font-normal border-primary/20 bg-primary/10 text-primary h-5 text-[10px]">
-              <Boxes className="w-3 h-3 mr-1.5 inline-block" />
-              {batches.filter((b) => !b.isRecalled).length} Active
-            </Badge>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={fetchBatches}
-            className="flex-shrink-0"
-            disabled={isRefreshing}
-          >
-            <RefreshCw
-              className={cn("h-4 w-4", isRefreshing && "animate-spin")}
-            />
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportCSV}
-            className="gap-2 hidden md:flex rounded-full"
-          >
-            <FileSpreadsheet className="h-4 w-4" />
-            Export CSV
-          </Button>
-          <Button
-            asChild
-            className="flex-1 sm:flex-none gap-2 rounded-full h-10 px-4"
-          >
-            <Link href="/manufacturer/batches/new">
-              <Plus className="h-4 w-4" />
-              <span className="sm:inline">Create Batch</span>
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Batches"
+        stats={
+          <Badge variant="secondary" className="font-normal border-primary/20 bg-primary/10 text-primary h-5 text-[10px]">
+            <Boxes className="w-3 h-3 mr-1.5 inline-block" aria-hidden="true" />
+            {batches.filter((b) => !b.isRecalled).length} Active
+          </Badge>
+        }
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={fetchBatches}
+              className="flex-shrink-0"
+              aria-label="Refresh Batches"
+              disabled={isRefreshing}
+            >
+              <RefreshCw
+                className={cn("h-4 w-4 text-primary", isRefreshing && "animate-spin")}
+                aria-hidden="true"
+              />
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleExportCSV}
+              className="gap-2 hidden md:flex rounded-full"
+            >
+              <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />
+              Export CSV
+            </Button>
+            <Button
+              asChild
+              className="flex-1 sm:flex-none gap-2 rounded-full h-10 px-4"
+            >
+              <Link href="/manufacturer/batches/new">
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                <span className="sm:inline">Create Batch</span>
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
 
-      <div className="flex gap-4 px-1 sticky top-4 z-30">
-        <div className="relative flex-1">
-          <Input
-            placeholder="Search batches or products..."
-            className="pl-10 bg-background/80 backdrop-blur-md rounded-full"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+      <DataToolbar
+        search={{
+          value: searchTerm,
+          onChange: setSearchTerm,
+          placeholder: "Search batches or products...",
+        }}
+        filters={
+          <CategoryFilter
+            selectedCategories={selectedCategories}
+            onCategoryChange={setSelectedCategories}
+            className="rounded-full h-11 sm:h-12 px-4 sm:px-6 border-border/40 bg-background/50 shadow-sm"
           />
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-        </div>
-
-        <CategoryFilter
-          selectedCategories={selectedCategories}
-          onCategoryChange={setSelectedCategories}
-          className="rounded-md h-10 px-4 border-border/40 bg-background/80 backdrop-blur-md shadow-sm"
-        />
-      </div>
+        }
+      />
 
       {/* Main Content Area */}
       <div className="px-1">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
-            <Loader2 className="h-8 w-8 animate-spin" />
-            <p className="text-sm">Loading batches...</p>
+            <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" aria-hidden="true" />
+            <p className="text-sm font-bold">Synchronizing Batches...</p>
           </div>
         ) : (
           <>
@@ -280,7 +278,7 @@ export default function BatchesPage() {
                         {batch.totalScans.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <ChevronRight className="h-5 w-5 text-muted-foreground opacity-50 ml-auto" />
+                        <ChevronRight className="h-5 w-5 text-muted-foreground opacity-50 ml-auto" aria-hidden="true" />
                       </TableCell>
                     </TableRow>
                   ))}

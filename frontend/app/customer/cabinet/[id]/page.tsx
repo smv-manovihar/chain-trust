@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   Loader2,
-  ArrowLeft,
   Pill,
   Clock,
   Calendar,
@@ -41,6 +40,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { uploadImages } from "@/api/upload.api";
+import { PageHeader } from "@/components/ui/page-header";
 
 import Link from "next/link";
 import { format } from "date-fns";
@@ -59,7 +59,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PrescriptionSelector } from "@/components/cabinet/prescription-selector";
+import { PrescriptionSelector } from "@/components/prescriptions/prescription-selector";
 import { DocumentViewerDialog } from "@/components/common/document-viewer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { resolveMediaUrl } from "@/lib/media-url";
@@ -447,115 +447,85 @@ export default function MedicineDetailPage() {
 
   return (
     <div className="flex-1 min-h-0 h-full flex flex-col space-y-4 sm:space-y-6">
-      {/* Mobile-Responsive Header Component */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 px-2 sm:px-0">
-        <div className="flex items-center gap-4 min-w-0">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => router.back()}
-            className="rounded-full h-10 w-10 sm:h-9 sm:w-9 border-border/50 hover:bg-muted shrink-0 hidden sm:flex transition-all active:scale-95"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => router.back()}
-                className="rounded-full h-10 w-10 border-border/50 hover:bg-muted shrink-0 sm:hidden transition-all active:scale-95"
+      <PageHeader
+        title={medicine.name}
+        description={
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-bold">{medicine.brand}</span>
+            {!medicine.isUserAdded && (
+              <>
+                <span className="text-muted-foreground/30 hidden sm:inline">•</span>
+                <Badge
+                  variant="outline"
+                  className="font-mono text-[10px] border-primary/20 bg-primary/5 text-primary/70 rounded-full h-5 px-2"
+                >
+                  Batch: #{medicine.batchNumber}
+                </Badge>
+              </>
+            )}
+            {formData.notes && (
+              <>
+                <span className="text-muted-foreground/30 hidden sm:inline">•</span>
+                <p className="font-medium italic opacity-70 truncate max-w-md">
+                  Note: {formData.notes.length > 60 ? formData.notes.substring(0, 60) + "..." : formData.notes}
+                </p>
+              </>
+            )}
+          </div>
+        }
+        stats={
+          <div className="flex items-center gap-2">
+            {!medicine.isUserAdded && (
+              <Badge className="bg-emerald-500/10 text-emerald-600 border-none font-bold text-[10px] shrink-0">
+                Authentic
+              </Badge>
+            )}
+            {medicine.status === "inactive" && (
+              <Badge
+                variant="secondary"
+                className="bg-muted text-muted-foreground border-none font-bold text-[10px] shrink-0"
               >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight truncate max-w-[200px] sm:max-w-none">
-                  {medicine.name}
-                </h1>
-                <div className="flex items-center gap-2">
-                  {!medicine.isUserAdded && (
-                    <Badge className="bg-emerald-500/10 text-emerald-600 border-none font-bold text-[10px] shrink-0">
-                      Authentic
-                    </Badge>
-                  )}
-                  {medicine.status === "inactive" && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-muted text-muted-foreground border-none font-bold text-[10px] shrink-0"
-                    >
-                      Inactive
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
+                Inactive
+              </Badge>
+            )}
+          </div>
+        }
+        backHref="/customer/cabinet"
+        actions={
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+            <Button
+              onClick={handleTakeDose}
+              className="flex-1 sm:flex-none rounded-full px-5 bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20 gap-2 h-11 sm:h-10 font-bold transition-all text-xs sm:text-sm active:scale-95"
+            >
+              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+              Mark as taken
+            </Button>
 
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 sm:ml-0 ml-13 min-w-0">
-              <p className="text-muted-foreground font-bold text-xs sm:text-sm truncate">
-                {medicine.brand}
-              </p>
-              <span className="text-muted-foreground/30 hidden sm:inline">
-                •
-              </span>
-              {!medicine.isUserAdded && (
+            <Button
+              variant="outline"
+              onClick={handleToggleStatus}
+              className={cn(
+                "rounded-full px-4 h-11 sm:h-10 font-bold text-[10px] sm:text-xs transition-all active:scale-95 gap-2",
+                medicine.status === "inactive"
+                  ? "border-primary/20 bg-primary/5 text-primary hover:bg-primary/10"
+                  : "border-border/50 hover:bg-muted text-muted-foreground",
+              )}
+            >
+              {medicine.status === "inactive" ? (
                 <>
-                  <Badge
-                    variant="outline"
-                    className="font-mono text-[10px] border-primary/20 bg-primary/5 text-primary/70 rounded-full h-5 px-2"
-                  >
-                    Batch: #{medicine.batchNumber}
-                  </Badge>
-                  <span className="text-muted-foreground/30 hidden sm:inline">
-                    •
-                  </span>
+                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  Activate
+                </>
+              ) : (
+                <>
+                  <Power className="h-3.5 w-3.5" aria-hidden="true" />
+                  Deactivate
                 </>
               )}
-              {formData.notes && (
-                <p className="text-muted-foreground font-medium text-xs sm:text-sm truncate italic max-w-md opacity-70">
-                  Note:{" "}
-                  {formData.notes.length > 60
-                    ? formData.notes.substring(0, 60) + "..."
-                    : formData.notes}
-                </p>
-              )}
-            </div>
+            </Button>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-          <Button
-            onClick={handleTakeDose}
-            className="flex-1 sm:flex-none rounded-full px-5 bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20 gap-2 h-11 sm:h-10 font-bold transition-all text-xs sm:text-sm active:scale-95"
-          >
-            <CheckCircle2 className="h-4 w-4" />
-            Mark as taken
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={handleToggleStatus}
-            className={cn(
-              "rounded-full px-4 h-11 sm:h-10 font-bold text-[10px] sm:text-xs transition-all active:scale-95 gap-2",
-              medicine.status === "inactive"
-                ? "border-primary/20 bg-primary/5 text-primary hover:bg-primary/10"
-                : "border-border/50 hover:bg-muted text-muted-foreground",
-            )}
-          >
-            {medicine.status === "inactive" ? (
-              <>
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Activate
-              </>
-            ) : (
-              <>
-                <Power className="h-3.5 w-3.5" />
-                Deactivate
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 overflow-hidden pb-4 sm:pb-0">
         {/* Main Action & Details Column */}
@@ -563,7 +533,7 @@ export default function MedicineDetailPage() {
           <Card className="p-4 sm:p-6 lg:p-8 rounded-[1.5rem] sm:rounded-[2rem] border-border/50 bg-card/50 shadow-sm relative overflow-hidden">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 sm:mb-8 relative z-10">
               <h2 className="text-xl font-bold flex items-center gap-3">
-                <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-primary" aria-hidden="true" />
                 Dose management
               </h2>
             </div>
@@ -595,7 +565,7 @@ export default function MedicineDetailPage() {
                         Standard dosage
                       </Label>
                       <div className="relative">
-                        <Pill className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Pill className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                         <Input
                           placeholder="e.g. 1 Tablet (500mg)"
                           className="pl-10 h-12 sm:h-10 rounded-full border-border bg-muted/30 focus-visible:ring-primary/20 font-medium"
@@ -719,7 +689,7 @@ export default function MedicineDetailPage() {
                               !formData.expiryDate && "text-muted-foreground",
                             )}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
+                            <CalendarIcon className="mr-2 h-4 w-4 text-primary" aria-hidden="true" />
                             {formData.expiryDate ? (
                               format(formData.expiryDate, "PPP")
                             ) : (
@@ -776,7 +746,7 @@ export default function MedicineDetailPage() {
                         onClick={addReminder}
                         className="h-8 text-xs font-bold hover:bg-primary/5 text-primary rounded-full px-3"
                       >
-                        <Plus className="h-3 w-3 mr-1" /> Add reminder
+                        <Plus className="h-3 w-3 mr-1" aria-hidden="true" /> Add reminder
                       </Button>
                     </div>
 
@@ -787,7 +757,7 @@ export default function MedicineDetailPage() {
                           className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 rounded-2xl bg-muted/20 border border-border/50 group/item transition-all hover:border-primary/20"
                         >
                           <div className="relative flex-1">
-                            <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                            <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
                             <Input
                               type="time"
                               value={r.time}
@@ -828,6 +798,7 @@ export default function MedicineDetailPage() {
                             size="icon"
                             onClick={() => removeReminder(idx)}
                             className="h-11 w-11 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive shrink-0"
+                            aria-label="Remove reminder"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -862,7 +833,7 @@ export default function MedicineDetailPage() {
                       Prescribing doctor
                     </Label>
                     <div className="relative">
-                      <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                       <Input
                         placeholder="e.g. Dr. Jane Doe"
                         className="pl-10 h-11 rounded-full border-border bg-background font-medium"
@@ -909,7 +880,7 @@ export default function MedicineDetailPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-primary" />
+                      <FileText className="h-4 w-4 text-primary" aria-hidden="true" />
                       <span>Prescriptions</span>
                     </label>
 
@@ -918,7 +889,7 @@ export default function MedicineDetailPage() {
                       onClick={() => setIsPrescriptionDialogOpen(true)}
                       className="h-10 sm:h-9 rounded-full gap-2 text-sm sm:text-xs border-dashed border-primary/30 hover:border-primary/50 hover:bg-primary/5 transition-colors font-medium px-4"
                     >
-                      <Plus className="h-4 w-4 sm:h-3 sm:w-3" />
+                      <Plus className="h-4 w-4 sm:h-3 sm:w-3" aria-hidden="true" />
                       <span>
                         {(formData.prescriptionIds?.length ?? 0) > 0
                           ? "Manage attachments"
@@ -943,7 +914,7 @@ export default function MedicineDetailPage() {
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="h-10 w-10 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                            <FileText className="h-4 w-4" />
+                            <FileText className="h-4 w-4" aria-hidden="true" />
                           </div>
                           <div className="min-w-0">
                             <p className="text-sm font-semibold truncate">
@@ -961,19 +932,21 @@ export default function MedicineDetailPage() {
                             variant="ghost"
                             size="icon"
                             className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg sm:rounded-full hover:bg-primary/10 text-primary"
+                            aria-label="View document"
                             onClick={() =>
                               setPreviewDoc({ url: p.url, label: p.label })
                             }
                           >
-                            <Eye className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                            <Eye className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => removePrescription(p.url)}
                             className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg sm:rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            aria-label="Remove prescription"
                           >
-                            <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                            <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
                           </Button>
                         </div>
                       </div>
@@ -999,7 +972,7 @@ export default function MedicineDetailPage() {
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                     <div className="space-y-1">
                       <h3 className="text-base font-semibold flex items-center gap-2 text-foreground">
-                        <ImageIcon className="h-4 w-4 text-primary" />
+                        <ImageIcon className="h-4 w-4 text-primary" aria-hidden="true" />
                         Images
                       </h3>
                       <p className="text-xs text-muted-foreground font-medium">
@@ -1015,7 +988,7 @@ export default function MedicineDetailPage() {
                       {isUploadingImage ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
-                        <Plus className="h-3.5 w-3.5" />
+                        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                       )}
                       Capture photo
                     </Button>
@@ -1045,23 +1018,25 @@ export default function MedicineDetailPage() {
                               })
                             }
                             className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg bg-white/20 backdrop-blur-md text-white hover:bg-white/40 border border-white/10"
+                            aria-label="View image"
                           >
-                            <Eye className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                            <Eye className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => removeImage(img)}
                             className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg bg-destructive/20 backdrop-blur-md text-white hover:bg-destructive/80 border border-white/10"
+                            aria-label="Remove image"
                           >
-                            <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                            <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
                           </Button>
                         </div>
                       </div>
                     ))}
                     {(!medicine.images || medicine.images.length === 0) && (
                       <div className="col-span-full py-8 sm:py-12 flex flex-col items-center justify-center text-center bg-muted/30 rounded-2xl border border-dashed border-border">
-                        <ImageIcon className="h-8 w-8 mb-2 text-muted-foreground/50" />
+                        <ImageIcon className="h-8 w-8 mb-2 text-muted-foreground/50" aria-hidden="true" />
                         <p className="text-xs font-semibold text-muted-foreground">
                           No Images added yet.
                         </p>
@@ -1073,10 +1048,10 @@ export default function MedicineDetailPage() {
                 <div className="mt-8 pt-8 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-6 px-2">
                   <div className="flex items-center gap-4">
                     <div className="h-12 w-12 rounded-2xl bg-muted/50 flex items-center justify-center text-muted-foreground shadow-inner border border-border/50">
-                      <Clock className="h-5 w-5" />
+                      <Clock className="h-5 w-5" aria-hidden="true" />
                     </div>
                     <div>
-                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60 mb-0.5">
+                      <p className="text-[10px] font-black text-muted-foreground opacity-60 mb-0.5">
                         Added to library
                       </p>
                       <p className="text-sm font-bold">
@@ -1089,7 +1064,7 @@ export default function MedicineDetailPage() {
 
                   {!medicine.isUserAdded && medicine.salt && (
                     <div className="flex flex-col sm:items-end gap-2 w-full sm:w-auto">
-                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60 text-left sm:text-right">
+                      <p className="text-[10px] font-black text-muted-foreground opacity-60 text-left sm:text-right">
                         Blockchain verification
                       </p>
                       <Button
@@ -1118,7 +1093,7 @@ export default function MedicineDetailPage() {
                 {isSaving ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
                 ) : (
-                  <Save className="h-5 w-5" />
+                  <Save className="h-5 w-5" aria-hidden="true" />
                 )}
                 Save changes
               </Button>

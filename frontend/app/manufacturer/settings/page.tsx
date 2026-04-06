@@ -43,6 +43,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { PageHeader } from "@/components/ui/page-header";
 
 const profileSchema = z.object({
   companyName: z.string().min(2, "Company name is required"),
@@ -130,15 +131,10 @@ export default function ManufacturerSettingsPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
-      <div className="px-1">
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tighter leading-none text-foreground">
-          My Account
-        </h1>
-        <p className="text-muted-foreground text-xs sm:text-sm font-medium mt-1.5 sm:mt-2 italic px-1">
-          Configure your corporate identity, security protocols, and blockchain
-          connectivity.
-        </p>
-      </div>
+      <PageHeader
+        title="My Account"
+        description="Configure your corporate identity, security protocols, and blockchain connectivity."
+      />
 
       <Tabs defaultValue="general" className="w-full">
         <TabsList className="mb-8 bg-muted/50 p-1.5 rounded-2xl border border-border/50 h-auto w-full flex justify-start sm:w-auto sm:inline-flex overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">

@@ -18,9 +18,6 @@ import {
   TrendingUp,
   BarChart3,
   ExternalLink,
-  ArrowLeft,
-  Download,
-  Info,
   ShieldCheck,
   ShieldAlert,
   ScanLine,
@@ -32,6 +29,8 @@ import {
   Settings2,
   Wallet,
   Zap,
+  Info,
+  Download,
 } from "lucide-react";
 import QrDisplay from "@/components/manufacturer/qr-display";
 import { Input } from "@/components/ui/input";
@@ -41,6 +40,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useWeb3 } from "@/contexts/web3-context";
+import { PageHeader } from "@/components/ui/page-header";
 import { updateProduct } from "@/api/product.api";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -255,7 +255,10 @@ export default function BatchDetailPage() {
   if (loading && !batch) {
     return (
       <div className="flex flex-col items-center justify-center p-20 text-muted-foreground font-medium">
-        <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+        <Loader2
+          className="h-10 w-10 animate-spin text-primary mb-4"
+          aria-hidden="true"
+        />
         <p>Synchronizing blockchain states...</p>
       </div>
     );
@@ -288,78 +291,64 @@ export default function BatchDetailPage() {
 
   return (
     <div className="flex flex-col h-full min-h-0 max-w-7xl mx-auto w-full gap-4 sm:gap-6 pb-6">
-      {/* Header */}
-      <div className="flex-none flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-4 w-full sm:w-auto">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => router.back()}
-            className="rounded-full h-10 w-10 sm:h-12 sm:w-12 border-primary/20 hover:border-primary/50 shrink-0"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="min-w-0 pr-1">
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-              <h1 className="text-lg sm:text-2xl font-black tracking-tight flex items-center gap-2 truncate max-w-full">
-                <span className="truncate">{batch.productName}</span>
-                {batch.isRecalled && (
-                  <Badge
-                    variant="destructive"
-                    className="animate-pulse bg-destructive/10 text-destructive border-destructive/20 px-3 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold"
+      <PageHeader
+        title={batch.productName}
+        description={`Batch: ${batch.batchNumber} • Units: ${batch.quantity}`}
+        stats={
+          <div className="flex items-center gap-2">
+            {batch.isRecalled && (
+              <Badge
+                variant="destructive"
+                className="animate-pulse bg-destructive/10 text-destructive border-destructive/20 px-3 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold"
+              >
+                Recalled
+              </Badge>
+            )}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 rounded-full text-muted-foreground hover:text-primary"
+                    aria-label="Blockchain info"
                   >
-                    Recalled
-                  </Badge>
-                )}
-              </h1>
-
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 rounded-full text-muted-foreground hover:text-primary"
-                    >
-                      <Info className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    className="max-w-[calc(100vw-48px)] p-4 glass-card border-primary/20 shadow-2xl"
-                    side="top"
-                  >
-                    <div className="space-y-3">
-                      <p className="text-xs font-bold text-primary flex items-center gap-1.5">
-                        <ShieldCheck className="h-3.5 w-3.5" /> Immutable
-                        blockchain source
+                    <Info className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent
+                  className="max-w-[calc(100vw-48px)] p-4 glass-card border-primary/20 shadow-2xl"
+                  side="top"
+                >
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold text-primary flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />{" "}
+                      Immutable blockchain source
+                    </p>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold opacity-50">
+                        Batch salt (Root)
                       </p>
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-bold opacity-50">
-                          Batch salt (Root)
-                        </p>
-                        <p className="text-[10px] font-mono break-all bg-muted/50 p-2 rounded-lg leading-tight border border-border/40">
-                          {batch.batchSalt}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-bold opacity-50">
-                          SKU / Product ID
-                        </p>
-                        <p className="text-[10px] font-mono break-all bg-muted/50 p-2 rounded-lg leading-tight border border-border/40">
-                          {batch.productId}
-                        </p>
-                      </div>
+                      <p className="text-[10px] font-mono break-all bg-muted/50 p-2 rounded-lg leading-tight border border-border/40">
+                        {batch.batchSalt}
+                      </p>
                     </div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <p className="text-muted-foreground font-mono text-xs sm:text-sm mt-0.5 opacity-70 truncate">
-              Batch: {batch.batchNumber} • Units: {batch.quantity}
-            </p>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold opacity-50">
+                        SKU / Product ID
+                      </p>
+                      <p className="text-[10px] font-mono break-all bg-muted/50 p-2 rounded-lg leading-tight border border-border/40">
+                        {batch.productId}
+                      </p>
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
-        </div>
-        <div className="flex gap-2 w-full sm:w-auto">
+        }
+        backHref="/manufacturer/batches"
+        actions={
           <Button
             onClick={handleDownloadPDF}
             disabled={isDownloading}
@@ -369,13 +358,13 @@ export default function BatchDetailPage() {
             {isDownloading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Download className="h-4 w-4" />
+              <Download className="h-4 w-4" aria-hidden="true" />
             )}
             <span className="hidden sm:inline">QR Labels PDF</span>
             <span className="sm:hidden text-xs">QR Labels PDF</span>
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <Tabs
         value={activeTab}
@@ -387,15 +376,15 @@ export default function BatchDetailPage() {
             value="info"
             className="rounded-xl gap-2 h-10 data-[state=active]:shadow-xl data-[state=active]:bg-background font-bold transition-all text-xs sm:text-sm"
           >
-            <Info className="h-4 w-4 text-primary" />
+            <Info className="h-4 w-4 text-primary" aria-hidden="true" />
             <span>Info</span>
           </TabsTrigger>
           <TabsTrigger
             value="labels"
             className="rounded-xl gap-2 h-10 data-[state=active]:shadow-xl data-[state=active]:bg-background font-bold transition-all text-xs sm:text-sm"
           >
-            <ScanLine className="h-4 w-4 text-primary" />
-            <span>Batch units</span>
+            <ScanLine className="h-4 w-4 text-primary" aria-hidden="true" />
+            <span>Batch Units</span>
           </TabsTrigger>
         </TabsList>
 
@@ -407,8 +396,11 @@ export default function BatchDetailPage() {
             >
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <h2 className="text-lg sm:text-xl font-black flex items-center gap-2 tracking-tight">
-                  <ScanLine className="h-5 w-5 text-primary" />
-                  Unit identification list
+                  <ScanLine
+                    className="h-5 w-5 text-primary"
+                    aria-hidden="true"
+                  />
+                  Unit Identification List
                 </h2>
 
                 <div className="flex items-center gap-2">
@@ -423,7 +415,7 @@ export default function BatchDetailPage() {
                         className="rounded-full h-9 gap-2 border-primary/20 hover:bg-primary/5 hover:border-primary/40 font-bold"
                         onClick={() => setPendingSettings({ ...qrSettings })}
                       >
-                        <Settings2 className="h-3.5 w-3.5" />
+                        <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>Settings</span>
                       </Button>
                     </ResponsiveDialogTrigger>
@@ -468,7 +460,10 @@ export default function BatchDetailPage() {
                             <div className="space-y-4">
                               <div className="flex items-center justify-between">
                                 <Label className="text-xs font-bold opacity-60 flex items-center gap-2">
-                                  <ScanLine className="h-3 w-3" />
+                                  <ScanLine
+                                    className="h-3 w-3"
+                                    aria-hidden="true"
+                                  />
                                   QR code size (mm)
                                 </Label>
                                 <span className="text-xs font-mono font-bold bg-primary/10 text-primary px-3 py-1 rounded-full">
@@ -495,8 +490,11 @@ export default function BatchDetailPage() {
                             </div>
 
                             <div className="space-y-4">
-                              <Label className="text-xs font-black uppercase opacity-60 flex items-center gap-2">
-                                <ShieldCheck className="h-3 w-3" />
+                              <Label className="text-xs font-black opacity-60 flex items-center gap-2">
+                                <ShieldCheck
+                                  className="h-3 w-3"
+                                  aria-hidden="true"
+                                />
                                 Visibility Options
                               </Label>
                               <div className="grid grid-cols-1 gap-3">
@@ -613,7 +611,7 @@ export default function BatchDetailPage() {
                     variant="outline"
                     className="rounded-full px-4 py-1 bg-primary/5 text-primary border-primary/20 font-bold text-[10px]"
                   >
-                    Batch units
+                    Batch Units
                   </Badge>
                 </div>
               </div>
@@ -648,7 +646,10 @@ export default function BatchDetailPage() {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-50 pointer-events-none z-10" />
+                  <Search
+                    className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-50 pointer-events-none z-10"
+                    aria-hidden="true"
+                  />
                 </div>
               </div>
 
@@ -699,7 +700,7 @@ export default function BatchDetailPage() {
                   ))
                 ) : (
                   <div className="col-span-full flex flex-col items-center justify-center py-24 text-muted-foreground opacity-30 grayscale">
-                    <Search className="h-12 w-12 mb-4" />
+                    <Search className="h-12 w-12 mb-4" aria-hidden="true" />
                     <p className="font-bold text-lg">No units found</p>
                     <p className="text-sm text-center">
                       Try adjusting your search criteria or unit index.
@@ -717,11 +718,14 @@ export default function BatchDetailPage() {
               <Card className="p-5 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] bg-primary/5 border-primary/20 shadow-2xl shadow-primary/5 flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-8 group hover:bg-primary/[0.08] transition-all duration-500 border-2">
                 <div className="flex items-center gap-4 sm:gap-6 w-full lg:w-auto">
                   <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-2xl sm:rounded-3xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20 shrink-0">
-                    <BarChart3 className="h-7 w-7 sm:h-10 sm:w-10" />
+                    <BarChart3
+                      className="h-7 w-7 sm:h-10 sm:w-10"
+                      aria-hidden="true"
+                    />
                   </div>
                   <div>
                     <h3 className="text-lg sm:text-xl font-black tracking-tight mb-1">
-                      Scan analytics
+                      Scan Analytics
                     </h3>
                     <p className="text-[11px] sm:text-sm text-muted-foreground font-medium max-w-md leading-snug">
                       Visualize unit trajectories, geographic demand, and
@@ -737,8 +741,8 @@ export default function BatchDetailPage() {
                   <Link
                     href={`/manufacturer/analytics/scans?batchNumber=${batch.batchNumber}`}
                   >
-                    Open analytics suite{" "}
-                    <ExternalLink className="ml-2 h-4 w-4" />
+                    Open Analytics Suite{" "}
+                    <ExternalLink className="ml-2 h-4 w-4" aria-hidden="true" />
                   </Link>
                 </Button>
               </Card>
@@ -755,7 +759,10 @@ export default function BatchDetailPage() {
                     </h4>
                   </div>
                   <div className="h-14 w-14 sm:h-20 sm:w-20 bg-primary/10 rounded-2xl sm:rounded-3xl flex items-center justify-center border border-primary/10 shrink-0">
-                    <TrendingUp className="h-7 w-7 sm:h-10 sm:w-10 text-primary" />
+                    <TrendingUp
+                      className="h-7 w-7 sm:h-10 sm:w-10 text-primary"
+                      aria-hidden="true"
+                    />
                   </div>
                 </Card>
 
@@ -795,6 +802,7 @@ export default function BatchDetailPage() {
                           ? "text-destructive"
                           : "text-muted-foreground",
                       )}
+                      aria-hidden="true"
                     />
                   </div>
                 </Card>

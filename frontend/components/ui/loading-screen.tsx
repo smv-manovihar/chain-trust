@@ -20,7 +20,7 @@ export function LoadingScreen({ message = "Loading...", className }: LoadingScre
         <Loader2 className="h-10 w-10 animate-spin text-primary/80" />
         <div className="absolute h-10 w-10 rounded-full border-4 border-primary/10" />
       </div>
-      <p className="text-sm font-bold tracking-tight opacity-50 uppercase">
+      <p className="text-sm font-bold tracking-tight opacity-50">
         {message}
       </p>
     </div>

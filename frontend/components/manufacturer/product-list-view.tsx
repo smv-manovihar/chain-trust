@@ -74,9 +74,16 @@ export function ProductListView({ products, onDelete }: ProductListViewProps) {
             return (
               <TableRow 
                 key={product._id} 
-                className="group hover:bg-muted/30 transition-colors cursor-pointer"
+                className="group hover:bg-muted/30 transition-colors cursor-pointer focus-visible:bg-muted/30 outline-none"
+                tabIndex={0}
                 onClick={() => {
                   router.push(isPending ? `/manufacturer/products/new?id=${product._id}` : `/manufacturer/products/${product.productId}`);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    router.push(isPending ? `/manufacturer/products/new?id=${product._id}` : `/manufacturer/products/${product.productId}`);
+                  }
                 }}
               >
                 <TableCell>
@@ -121,7 +128,7 @@ export function ProductListView({ products, onDelete }: ProductListViewProps) {
                           </TooltipTrigger>
                           <TooltipContent className="bg-popover/95 backdrop-blur-md border border-border/50 p-2 shadow-xl rounded-xl">
                             <div className="flex flex-col gap-1">
-                              <p className="text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-widest">Additional Categories</p>
+                              <p className="text-[10px] font-bold text-muted-foreground mb-1">Additional Categories</p>
                               <div className="flex flex-wrap gap-1 max-w-[200px]">
                                 {product.categories?.slice(1).map((cat) => (
                                   <Badge key={cat} variant="secondary" className="text-[10px] font-medium py-0 h-5">
@@ -165,9 +172,7 @@ export function ProductListView({ products, onDelete }: ProductListViewProps) {
                       Draft
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="bg-green-500/5 text-green-600 border-green-500/20 text-[10px] font-bold h-6">
-                      Active
-                    </Badge>
+                    <span className="text-xs text-muted-foreground">—</span>
                   )}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">

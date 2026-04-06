@@ -7,28 +7,48 @@ import {
   Plus,
   Loader2,
   ArrowLeft,
-  Calendar,
-  User,
-  Trash2,
+  LayoutGrid,
+  List as ListIcon,
   Eye,
-  AlertCircle,
+  Trash2,
+  Package,
+  Calendar as CalendarIcon,
+  User as UserIcon,
   ChevronRight,
+  Smartphone,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
+import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { DataToolbar } from "@/components/ui/data-toolbar";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { format } from "date-fns";
 import { useAuth } from "@/contexts/auth-context";
+import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 import { getPrescriptions, deletePrescription } from "@/api/customer.api";
-import { LinkedMedications } from "@/components/cabinet/linked-medications";
-import { PrescriptionUploadDialog } from "@/components/cabinet/prescription-upload-dialog";
+import { PrescriptionCard } from "@/components/prescriptions/prescription-card";
+import { PrescriptionUploadDialog } from "@/components/prescriptions/prescription-upload-dialog";
 import { DocumentViewerDialog } from "@/components/common/document-viewer";
+import { LinkedMedications } from "@/components/prescriptions/linked-medications";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +59,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 import { useDebounce } from "@/hooks/use-debounce";
 
@@ -59,32 +87,27 @@ export default function PrescriptionExplorerPage() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
+  
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [skip, setSkip] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [searchTerm, setSearchTerm] = useState(
-    searchParams.get("search") || "",
-  );
-  const [previewDoc, setPreviewDoc] = useState<{
-    url: string;
-    label: string;
-  } | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; label: string } | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmLabel, setDeleteConfirmLabel] = useState<string>("");
+  const [activeLinkedMeds, setActiveLinkedMeds] = useState<{ open: boolean; meds: any[] }>({ open: false, meds: [] });
 
   const debouncedSearch = useDebounce(searchTerm, 500);
 
   // Sync state to URL
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
-    if (searchTerm) {
-      params.set("search", searchTerm);
-    } else {
-      params.delete("search");
-    }
+    if (searchTerm) params.set("search", searchTerm);
+    else params.delete("search");
 
     const queryString = params.toString();
     if (queryString !== searchParams.toString()) {
@@ -107,23 +130,17 @@ export default function PrescriptionExplorerPage() {
 
       if (node) observer.current.observe(node);
     },
-    [loading, loadingMore, hasMore],
+    [loading, loadingMore, hasMore]
   );
 
-  const fetchPrescriptions = async (
-    skipCount: number,
-    isInitial: boolean = false,
-  ) => {
+  const fetchPrescriptions = async (skipCount: number, isInitial: boolean = false) => {
     if (isInitial) setLoading(true);
     else setLoadingMore(true);
 
     try {
-      const data = await getPrescriptions(skipCount, 10, debouncedSearch);
-      if (isInitial) {
-        setPrescriptions(data.prescriptions);
-      } else {
-        setPrescriptions((prev) => [...prev, ...data.prescriptions]);
-      }
+      const data = await getPrescriptions(skipCount, 12, debouncedSearch);
+      if (isInitial) setPrescriptions(data.prescriptions);
+      else setPrescriptions((prev) => [...prev, ...data.prescriptions]);
       setHasMore(data.pagination.hasMore);
     } catch (error) {
       console.error("Failed to fetch prescriptions:", error);
@@ -134,17 +151,13 @@ export default function PrescriptionExplorerPage() {
     }
   };
 
-  // Reset and fetch when search query changes
   useEffect(() => {
     setSkip(0);
     fetchPrescriptions(0, true);
   }, [debouncedSearch]);
 
-  // Load more data when skip changes (and it's not the initial fetch which is handled by debouncedSearch effect)
   useEffect(() => {
-    if (skip > 0) {
-      fetchPrescriptions(skip);
-    }
+    if (skip > 0) fetchPrescriptions(skip);
   }, [skip]);
 
   const handleDelete = (id: string, label: string) => {
@@ -165,43 +178,24 @@ export default function PrescriptionExplorerPage() {
     }
   };
 
+  const isMobile = useIsMobile();
+
   return (
-    <div className="max-w-[1600px] mx-auto pb-20 space-y-2 lg:space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-2 sm:py-4 relative">
-        <div>
-          <h1 className="font-black tracking-tight text-foreground text-xl sm:text-3xl lg:text-4xl flex items-center gap-2">
-            My Prescriptions
-          </h1>
-          <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">
-            Manage your medical documents and history,{" "}
-            {user?.name?.split(" ")[0] || "User"}.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+    <div className="max-w-[1600px] mx-auto pb-32 space-y-4 lg:space-y-6">
+      <PageHeader
+        title="My Prescriptions"
+        description={`Manage your secure medical history, ${user?.name?.split(" ")[0] || "User"}.`}
+        backHref="/customer/cabinet"
+        actions={
           <Button
-            variant="ghost"
-            size="sm"
-            asChild
-            className="hidden sm:flex text-[10px] font-bold text-muted-foreground hover:text-primary transition-all active:scale-95 h-10 rounded-full px-4"
-          >
-            <Link
-              href="/customer/cabinet"
-              className="flex items-center gap-1.5 font-black"
-            >
-              Go to my medicines <ArrowLeft className="h-3 w-3" />
-            </Link>
-          </Button>
-
-          <Button
-            className="flex-1 sm:flex-none rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 font-bold h-10 sm:h-12 px-4 sm:px-6 gap-2 transition-all active:scale-95"
+            className="rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 font-bold h-12 px-8 gap-2 transition-all active:scale-95 text-[11px] hidden sm:flex"
             onClick={() => setIsUploadOpen(true)}
           >
-            <Plus className="h-4 w-4" />
-            <span>Upload new</span>
+            <Plus className="h-5 w-5" />
+            <span>Upload New Document</span>
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <PrescriptionUploadDialog
         open={isUploadOpen}
@@ -212,196 +206,225 @@ export default function PrescriptionExplorerPage() {
         }}
       />
 
-      {/* Static Search row */}
-      <div className="-mx-4 px-4 lg:-mx-8 lg:px-8 py-2">
-        <div className="flex-1 max-w-md mx-auto sm:mx-0 w-full">
-          <div className="relative w-full">
-            <Input
-              placeholder="Search by label or doctor..."
-              className="pl-11 rounded-full shadow-sm focus-visible:ring-primary/20 h-10 sm:h-12 border-primary/10 transition-all w-full bg-card/60 backdrop-blur-md"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50 pointer-events-none z-10" />
-          </div>
-        </div>
-      </div>
-      {/* Main Content */}
-      <div className="px-1 pt-0">
-        <div className="flex flex-col gap-4 sm:gap-6 pt-0">
-          {loading && skip === 0 ? (
-            Array.from({ length: 4 }).map((_, i) => (
+      <DataToolbar
+        search={{
+          value: searchTerm,
+          onChange: setSearchTerm,
+          placeholder: "Search by label or doctor...",
+        }}
+        viewToggle={{
+          mode: viewMode,
+          onChange: setViewMode,
+        }}
+        actions={
+          <Button
+            className="rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 font-bold h-11 px-6 gap-2 transition-all active:scale-95 text-[11px] sm:hidden flex w-full"
+            onClick={() => setIsUploadOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            <span>Upload New</span>
+          </Button>
+        }
+      />
+
+      {/* Main Content Area */}
+      <div className="px-1">
+        {loading && skip === 0 ? (
+          <div className={cn(
+            "grid gap-4 sm:gap-6",
+            viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"
+          )}>
+            {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
-                className="h-64 rounded-[2.5rem] bg-muted animate-pulse"
-              />
-            ))
-          ) : prescriptions.length === 0 ? (
-            <div className="md:col-span-2 py-8">
-              <EmptyState
-                icon={FileText}
-                title="No prescriptions found"
-                description="Start by uploading your first prescription to the pool to link medical history to your medications."
-                action={{
-                  label: "Upload New",
-                  onClick: () => setIsUploadOpen(true),
-                }}
-              />
-            </div>
-          ) : (
-            prescriptions.map((p) => (
-              <Card
-                key={p._id}
-                className="group p-5 sm:p-6 rounded-[2rem] sm:rounded-[2.5rem] border-primary/5 bg-card/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:shadow-primary/5 transition-all duration-500 overflow-hidden relative flex flex-col md:flex-row md:items-center gap-4 sm:gap-6"
-              >
-                {/* Background Art */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-primary/10 transition-colors pointer-events-none" />
-
-                <div className="flex justify-between items-start md:items-center w-full md:w-auto flex-1 min-w-0">
-                  <div className="flex gap-4 items-center">
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 shrink-0 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
-                      <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
-                    </div>
-                    <div className="min-w-0 flex flex-col">
-                      <h3 className="font-bold text-base sm:text-lg truncate group-hover:text-primary transition-colors">
-                        {p.label}
-                      </h3>
-                      <div className="flex items-center gap-3 mt-0.5">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground opacity-70">
-                          <User className="h-3 w-3" />
-                          <span className="truncate max-w-[80px] sm:max-w-[120px]">
-                            {p.doctorName || "Unknown doctor"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground opacity-70">
-                          <Calendar className="h-3 w-3" />
-                          <span>
-                            {p.issuedDate
-                              ? format(new Date(p.issuedDate), "MMM d, yyyy")
-                              : "No date"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Mobile Actions - hidden on desktop, pushed to end on desktop but shown here for layout order primarily */}
-                  <div className="flex items-center gap-1 md:hidden">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 rounded-xl hover:bg-primary/10 text-primary transition-all active:scale-95"
-                      onClick={() =>
-                        setPreviewDoc({ url: p.url, label: p.label })
-                      }
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 rounded-xl hover:bg-red-50 text-red-500 transition-all active:scale-95"
-                      onClick={() => handleDelete(p._id, p.label)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Linked Medications Component */}
-                <div className="w-full md:w-64 shrink-0 -mt-2 md:mt-0">
-                  <div className="hidden md:flex justify-between items-center px-1 mb-2">
-                    <h4 className="text-[10px] font-bold text-muted-foreground opacity-60">
-                      Linked medications
-                    </h4>
-                    <Badge
-                      variant="secondary"
-                      className="text-[9px] font-bold px-2 py-0 h-4 bg-primary/5 text-primary border-none"
-                    >
-                      {p.itemCount} items
-                    </Badge>
-                  </div>
-                  <LinkedMedications medications={p.linkedMedications} />
-                </div>
-
-                {p.notes && (
-                  <div className="w-full md:w-48 shrink-0 p-3 bg-muted/20 rounded-2xl border border-primary/5 text-[10px] text-muted-foreground italic flex gap-2 -mt-2 md:mt-0">
-                    <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
-                    <p className="line-clamp-2">{p.notes}</p>
-                  </div>
+                className={cn(
+                  "rounded-[2.5rem] bg-muted/40 animate-pulse",
+                  viewMode === "grid" ? "aspect-[4/5]" : "h-24 w-full"
                 )}
-
-                {/* Desktop Actions */}
-                <div className="hidden md:flex items-center gap-1 shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-10 w-10 rounded-xl hover:bg-primary/10 text-primary transition-all active:scale-95"
-                    onClick={() =>
-                      setPreviewDoc({ url: p.url, label: p.label })
-                    }
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="h-10 w-10 rounded-xl transition-all opacity-0 group-hover:opacity-100 active:scale-95"
-                    onClick={() => handleDelete(p._id, p.label)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+              />
+            ))}
+          </div>
+        ) : prescriptions.length === 0 ? (
+          <div className="py-20">
+            <EmptyState
+              compact={false}
+              icon={FileText}
+              title="No prescriptions found"
+              description="Your storage vault is currently empty. Start by uploading a medical document."
+              action={{
+                label: "Upload Document",
+                onClick: () => setIsUploadOpen(true),
+              }}
+            />
+          </div>
+        ) : (
+          <>
+            {viewMode === "grid" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                {prescriptions.map((p) => (
+                  <PrescriptionCard
+                    key={p._id}
+                    prescription={p}
+                    variant="grid"
+                    onView={() => setPreviewDoc({ url: p.url, label: p.label })}
+                    onDelete={() => handleDelete(p._id, p.label)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <>
+                {/* Desktop List Mode (Table based like Batches/Products) */}
+                <div className="hidden lg:block border rounded-[2rem] bg-card/40 backdrop-blur-xl border-primary/5 overflow-hidden shadow-xl shadow-primary/5">
+                  <Table>
+                    <TableHeader className="bg-primary/5">
+                      <TableRow className="hover:bg-transparent border-primary/5">
+                        <TableHead className="w-[300px] font-black text-xs text-primary/70">PRESCRIPTION LABEL</TableHead>
+                        <TableHead className="font-black text-xs text-primary/70">DOCTOR / PROVIDER</TableHead>
+                        <TableHead className="font-black text-xs text-primary/70 text-right">ISSUED DATE</TableHead>
+                        <TableHead className="font-black text-xs text-primary/70 text-center">MEDICINES</TableHead>
+                        <TableHead className="w-[100px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {prescriptions.map((p) => (
+                        <TableRow key={p._id} className="hover:bg-primary/5 border-primary/5 transition-colors group">
+                          <TableCell className="py-5">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                                <FileText className="h-5 w-5" />
+                              </div>
+                              <span className="font-black tracking-tight text-foreground">{p.label}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+                              <UserIcon className="h-3.5 w-3.5" />
+                              {p.doctorName || "Unknown Doctor"}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                             <div className="flex items-center justify-end gap-2 text-xs font-bold text-muted-foreground">
+                              <CalendarIcon className="h-3.5 w-3.5" />
+                              {p.issuedDate ? format(new Date(p.issuedDate), "MMM d, yyyy") : "N/A"}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                             <div className="flex justify-center">
+                               {p.itemCount > 0 ? (
+                                 <Button 
+                                    variant="outline" 
+                                    onClick={() => setActiveLinkedMeds({ open: true, meds: p.linkedMedications })}
+                                    className="h-9 px-4 rounded-full border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary font-black text-[10px] gap-2 transition-all active:scale-95"
+                                 >
+                                    <Package className="h-3.5 w-3.5" />
+                                    Show ({p.itemCount})
+                                 </Button>
+                               ) : (
+                                 <Badge variant="outline" className="h-7 px-3 rounded-full border-primary/5 bg-muted/20 text-muted-foreground font-bold text-[9px]">
+                                    0 Medicines
+                                 </Badge>
+                               )}
+                             </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                               <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-10 w-10 rounded-xl hover:bg-primary/10 text-primary transition-all active:scale-95"
+                                  onClick={() => setPreviewDoc({ url: p.url, label: p.label })}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-10 w-10 rounded-xl hover:bg-red-50 text-red-500 transition-all active:scale-95"
+                                  onClick={() => handleDelete(p._id, p.label)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                             </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
-              </Card>
-            ))
-          )}
-        </div>
 
-        {/* Observer Sentinel */}
-        <div ref={lastElementRef} className="h-4 w-full" />
+                {/* Mobile/Tablet List Mode (Card based) */}
+                <div className="lg:hidden flex flex-col gap-4">
+                  {prescriptions.map((p) => (
+                    <PrescriptionCard
+                      key={p._id}
+                      prescription={p}
+                      variant="list"
+                      onView={() => setPreviewDoc({ url: p.url, label: p.label })}
+                      onDelete={() => handleDelete(p._id, p.label)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {/* Sentinel for Infinite Scroll */}
+        <div ref={lastElementRef} className="h-20 w-full" />
 
         {loadingMore && (
           <div className="flex justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         )}
       </div>
 
-      {/* Preview Dialog */}
+      {/* Mobile Sticky CTA */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-sm px-6 sm:hidden z-50">
+        <Button
+          className="w-full rounded-full shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 font-black h-14 gap-3 transition-all active:scale-95 text-base"
+          onClick={() => setIsUploadOpen(true)}
+        >
+          <Plus className="h-6 w-6" />
+          Upload New Document
+        </Button>
+      </div>
+
+      {/* Global Dialogs */}
       <DocumentViewerDialog
         open={!!previewDoc}
         onOpenChange={(open) => !open && setPreviewDoc(null)}
         document={previewDoc}
       />
 
-      {/* Delete Confirmation Dialog */}
+      <LinkedMedications 
+        medications={activeLinkedMeds.meds} 
+        open={activeLinkedMeds.open}
+        onOpenChange={(open) => setActiveLinkedMeds(prev => ({ ...prev, open }))}
+      />
+
       <AlertDialog
         open={!!deleteConfirmId}
         onOpenChange={(open) => !open && setDeleteConfirmId(null)}
       >
-        <AlertDialogContent className="rounded-[2rem] border-primary/10 shadow-2xl backdrop-blur-3xl bg-card/90">
+        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 shadow-2xl backdrop-blur-3xl bg-card/90 max-w-[90vw] sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black">
-              Delete Prescription?
+            <AlertDialogTitle className="text-2xl font-black tracking-tight">
+              Delete Document?
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium">
-              Are you sure you want to delete{" "}
-              <span className="text-foreground font-bold">
-                "{deleteConfirmLabel}"
-              </span>
-              ? This will permanently unlink it from all medications in your
-              vault.
+            <AlertDialogDescription className="text-sm font-bold opacity-70">
+              Permanently remove <span className="text-foreground font-black">"{deleteConfirmLabel}"</span> from your vault? This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-0">
-            <AlertDialogCancel className="rounded-full font-bold transition-all active:scale-95">
+          <AlertDialogFooter className="gap-3 mt-4">
+            <AlertDialogCancel className="rounded-full font-black h-12 transition-all active:scale-95 border-primary/10">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-500 hover:bg-red-600 rounded-full font-bold transition-all active:scale-95"
+              className="bg-red-500 hover:bg-red-600 rounded-full font-black h-12 transition-all active:scale-95 shadow-lg shadow-red-500/20"
               onClick={onConfirmDelete}
             >
-              Delete doc
+              Confirm Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

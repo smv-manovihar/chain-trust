@@ -279,7 +279,7 @@ export default function NewProductWizard() {
       <div className="max-w-md mx-auto mt-20 flex-1 min-h-0">
         <Card className="p-8 text-center space-y-6">
           <div className="mx-auto h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center relative">
-            <Wallet className="h-10 w-10 text-primary" />
+            <Wallet className="h-10 w-10 text-primary" aria-hidden="true" />
             <div className="absolute top-0 right-0 h-4 w-4 bg-destructive rounded-full" />
           </div>
           <div>
@@ -300,7 +300,7 @@ export default function NewProductWizard() {
               {isConnecting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Zap className="h-4 w-4" />
+                <Zap className="h-4 w-4" aria-hidden="true" />
               )}
               Connect Wallet
             </Button>
@@ -328,12 +328,12 @@ export default function NewProductWizard() {
           className="rounded-full flex-shrink-0"
         >
           <Link href="/manufacturer/products">
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </Link>
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            Add new product
+            Add New Product
           </h1>
         </div>
         <div className="text-right hidden sm:block">
@@ -346,14 +346,16 @@ export default function NewProductWizard() {
 
       <div className="flex gap-2 px-1">
         {[1, 2, 3].map((i) => (
-          <button
+          <Button
             key={i}
+            variant="ghost"
             onClick={() => {
               if (canGoToStep(i)) setStep(i);
               else toast.error("Complete current phase first.");
             }}
+            aria-label={`Go to Step ${i}`}
             className={cn(
-              "h-1.5 flex-1 rounded-full transition-all duration-500",
+              "h-1.5 p-0 flex-1 rounded-full transition-all duration-500 min-w-0 hover:bg-transparent",
               i <= step ? "bg-primary" : "bg-muted",
               canGoToStep(i)
                 ? "cursor-pointer"
@@ -378,12 +380,12 @@ export default function NewProductWizard() {
                   <div>
                     <h2 className="text-lg font-semibold">Basic Details</h2>
                     <p className="text-sm text-muted-foreground">
-                      Product identity and categorization
+                      Product Identity and Categorization
                     </p>
                   </div>
                   <div className="grid sm:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label>Product name</Label>
+                      <Label>Product Name</Label>
                       <Input
                         placeholder="e.g. Amoxicillin 500mg"
                         value={form.name}
@@ -398,13 +400,13 @@ export default function NewProductWizard() {
                         placeholder="e.g. NDC-12345"
                         value={form.productId}
                         onChange={(e) =>
-                          updateForm({ productId: e.target.value })
+                          updateForm({ productId: e.target.value.toUpperCase() })
                         }
-                        className="rounded-full h-11"
+                        className="rounded-full h-11 font-mono"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Composition / active ingredients</Label>
+                      <Label>Composition / Active Ingredients</Label>
                       <Input
                         placeholder="e.g. Paracetamol 500mg"
                         value={form.composition}
@@ -521,8 +523,9 @@ export default function NewProductWizard() {
                         <button
                           onClick={() => removeImage(idx)}
                           className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-white hover:bg-destructive"
+                          aria-label="Remove image"
                         >
-                          <X className="h-4 w-4" />
+                          <X className="h-4 w-4" aria-hidden="true" />
                         </button>
                         <button
                           onClick={() => {
@@ -549,9 +552,9 @@ export default function NewProductWizard() {
                           }
                         >
                           {form.customerVisibleImages.includes(idx) ? (
-                            <Check className="h-4 w-4" />
+                            <Check className="h-4 w-4" aria-hidden="true" />
                           ) : (
-                            <ShieldAlert className="h-4 w-4" />
+                            <ShieldAlert className="h-4 w-4" aria-hidden="true" />
                           )}
                         </button>
                       </div>
@@ -564,9 +567,9 @@ export default function NewProductWizard() {
                       )}
                     >
                       {uploading ? (
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden="true" />
                       ) : (
-                        <Plus className="h-6 w-6 text-muted-foreground" />
+                        <Plus className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
                       )}
                       <span className="text-xs text-muted-foreground mt-2 font-medium">
                         Upload
@@ -586,7 +589,7 @@ export default function NewProductWizard() {
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div>
                         <Label className="text-sm font-bold">
-                          Image access level
+                          Image Access Level
                         </Label>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Control who can view these product images
@@ -609,7 +612,7 @@ export default function NewProductWizard() {
                                 : "text-muted-foreground hover:text-foreground",
                             )}
                           >
-                            {level.replace("_", " ")}
+                            {level.replace("_", " ").split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}
                           </button>
                         ))}
                       </div>
@@ -617,7 +620,7 @@ export default function NewProductWizard() {
                   </div>
 
                   <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/40 text-muted-foreground">
-                    <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" />
+                    <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
                     <p className="text-sm">
                       Provide high-quality images. Consumers use these
                       specifically to verify physical authenticity against real
@@ -648,7 +651,7 @@ export default function NewProductWizard() {
                 onClick={nextStep}
                 className="gap-2 rounded-full h-10 px-8"
               >
-                Next <ArrowRight className="h-4 w-4" />
+                Next <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Button>
             ) : (
               <Button
@@ -657,9 +660,9 @@ export default function NewProductWizard() {
                 className="gap-2 rounded-full h-10 px-8"
               >
                 {saving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
-                  <Save className="h-4 w-4" />
+                  <Save className="h-4 w-4" aria-hidden="true" />
                 )}
                 {saving ? "Saving..." : "Create Product"}
               </Button>

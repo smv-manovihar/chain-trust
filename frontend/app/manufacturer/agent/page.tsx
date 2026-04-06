@@ -6,7 +6,7 @@ import { useSearchParams, usePathname } from "next/navigation";
 export default function ManufacturerAgentPage() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const sessionId = searchParams.get("s") || undefined;
+  const sessionId = searchParams.get("session") || undefined;
 
   // Build situational context
   const currentContext = {
@@ -15,8 +15,8 @@ export default function ManufacturerAgentPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-64px)] -m-4 lg:-m-8">
-      <div className="flex-1 min-h-0 w-full max-w-5xl mx-auto">
+    <div className="h-full">
+      <div className="h-full w-full max-w-5xl mx-auto">
         <AgentChat
           initialSessionId={sessionId}
           currentContext={currentContext}

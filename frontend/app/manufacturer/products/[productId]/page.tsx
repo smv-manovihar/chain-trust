@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Loader2,
   ImageIcon,
-  ArrowLeft,
   Save,
   Trash2,
   Package,
@@ -32,6 +31,7 @@ import {
   Maximize2,
   Globe,
   EyeOff,
+  ChevronDown,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -50,6 +50,7 @@ import { Switch } from "@/components/ui/switch";
 import { getProduct, updateProduct, deleteProduct } from "@/api/product.api";
 import { uploadImages } from "@/api/upload.api";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/page-header";
 import { resolveMediaUrl } from "@/lib/media-url";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -337,90 +338,74 @@ export default function ProductDetailsPage() {
         document={viewerDoc}
       />
       <div className="flex flex-col h-full min-h-0 max-w-7xl mx-auto w-full gap-6">
-        {/* Header Section */}
-        <div className="flex-none flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
-          <div className="flex items-center gap-3">
-            <Button
+        <PageHeader
+          title={product.name}
+          description={`Product profile • ${product.brand}`}
+          stats={
+            <Badge
               variant="outline"
-              size="icon"
-              asChild
-              className="rounded-full h-10 w-10 sm:h-12 sm:w-12 border-primary/20 hover:border-primary/50 transition-all active:scale-95 shrink-0"
+              className="font-bold text-[9px] px-2 py-0 bg-primary/5 border-primary/20 text-primary shrink-0 rounded-full"
             >
-              <Link href="/manufacturer/products">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-            </Button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground truncate">
-                  {product.name}
-                </h1>
-                <Badge
-                  variant="outline"
-                  className="font-bold text-[9px] px-2 py-0 bg-primary/5 border-primary/20 text-primary uppercase shrink-0 rounded-full"
-                >
-                  {product.productId}
-                </Badge>
-              </div>
-              <p className="text-muted-foreground font-medium text-[10px] sm:text-sm mt-0.5 opacity-70 truncate">
-                Product profile • {product.brand}
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:flex items-center gap-3 w-full sm:w-auto">
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="destructive"
-                  size="lg"
-                  className="flex-1 sm:flex-none gap-2 rounded-full"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span className="hidden sm:inline">Delete product</span>
-                  <span className="sm:hidden text-xs">Delete</span>
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="rounded-[2.5rem] border-primary/20 p-8 max-w-[95vw] sm:max-w-lg">
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="text-2xl font-black">
-                    Delete product?
-                  </AlertDialogTitle>
-                  <AlertDialogDescription className="text-sm font-medium pt-2">
-                    This action cannot be undone. This product will be
-                    permanently removed from your catalogue and any future batch
-                    associations.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter className="gap-4 mt-8">
-                  <AlertDialogCancel className="rounded-full border-none bg-muted h-12 font-bold px-8">
-                    Cancel
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    className="rounded-full bg-destructive text-destructive-foreground shadow-xl shadow-destructive/20 hover:bg-destructive/90 h-12 px-8 font-bold text-sm transition-all active:scale-[0.98]"
+              {product.productId}
+            </Badge>
+          }
+          backHref="/manufacturer/products"
+          actions={
+            <div className="grid grid-cols-2 sm:flex items-center gap-3 w-full sm:w-auto">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="lg"
+                    className="flex-1 sm:flex-none gap-2 rounded-full h-11 sm:h-12"
                   >
-                    Confirm deletion
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          {isDirty && (
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              size="lg"
-              className="flex-1 sm:flex-none gap-2 shadow-xl rounded-full h-11 sm:h-12 font-bold px-6 sm:px-10 order-1 sm:order-2 transition-all active:scale-[0.98] bg-primary shadow-primary/20 animate-in fade-in slide-in-from-right-4 duration-300"
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    <span className="hidden sm:inline">Delete product</span>
+                    <span className="sm:hidden text-xs">Delete</span>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-[2.5rem] border-primary/20 p-8 max-w-[95vw] sm:max-w-lg">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-2xl font-black">
+                      Delete product?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-sm font-medium pt-2">
+                      This action cannot be undone. This product will be
+                      permanently removed from your catalogue and any future batch
+                      associations.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="gap-4 mt-8">
+                    <AlertDialogCancel className="rounded-full border-none bg-muted h-12 font-bold px-8">
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="rounded-full bg-destructive text-destructive-foreground shadow-xl shadow-destructive/20 hover:bg-destructive/90 h-12 px-8 font-bold text-sm transition-all active:scale-[0.98]"
+                    >
+                      Confirm deletion
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              {isDirty && (
+                <Button
+                  onClick={handleSave}
+                  disabled={saving}
+                  size="lg"
+                  className="flex-1 sm:flex-none gap-2 shadow-xl rounded-full h-11 sm:h-12 font-bold px-6 sm:px-10 order-1 sm:order-2 transition-all active:scale-[0.98] bg-primary shadow-primary/20 animate-in fade-in slide-in-from-right-4 duration-300"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  <span>Save changes</span>
+                </Button>
               )}
-              <span>Save changes</span>
-            </Button>
-          )}
-          </div>
-        </div>
+            </div>
+          }
+        />
 
         {/* KPI Stat Cards */}
         <div className="flex-none grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 px-1">
@@ -450,7 +435,7 @@ export default function ProductDetailsPage() {
               className="bg-muted/10 border-border/40 border-2 rounded-[1.5rem] sm:rounded-[2rem] p-5 sm:p-6 flex items-center justify-between group hover:bg-primary/[0.02] transition-all duration-300"
             >
               <div className="space-y-1 sm:space-y-2 min-w-0">
-                <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60 truncate leading-none mb-1">
+                <p className="text-[8px] sm:text-[10px] font-black text-muted-foreground opacity-60 truncate leading-none mb-1">
                   {stat.label}
                 </p>
                 <h4 className="text-lg sm:text-2xl font-black font-mono tracking-tighter truncate">
@@ -479,15 +464,15 @@ export default function ProductDetailsPage() {
               value="info"
               className="rounded-xl gap-2 h-10 data-[state=active]:shadow-xl data-[state=active]:bg-background font-bold transition-all text-xs sm:text-sm"
             >
-              <FileText className="h-4 w-4 text-primary" />
-              <span>General info</span>
+              <FileText className="h-4 w-4 text-primary" aria-hidden="true" />
+              <span>General Info</span>
             </TabsTrigger>
             <TabsTrigger
               value="images"
               className="rounded-xl gap-2 h-10 data-[state=active]:shadow-xl data-[state=active]:bg-background font-bold transition-all text-xs sm:text-sm"
             >
-              <ImageIcon className="h-4 w-4 text-primary" />
-              <span>Media assets</span>
+              <ImageIcon className="h-4 w-4 text-primary" aria-hidden="true" />
+              <span>Media Assets</span>
             </TabsTrigger>
           </TabsList>
 
@@ -503,11 +488,11 @@ export default function ProductDetailsPage() {
                     <Card className="p-5 sm:p-8 rounded-[2rem] border-2 border-border/40 bg-card/40 space-y-8 sm:space-y-12 shadow-sm">
                       <div className="flex items-start gap-4 sm:gap-6 border-b border-border/40 pb-6 sm:pb-8">
                         <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-2xl sm:rounded-3xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20 shrink-0">
-                          <Info className="h-7 w-7 sm:h-10 sm:w-10" />
+                          <Info className="h-7 w-7 sm:h-10 sm:w-10" aria-hidden="true" />
                         </div>
                         <div>
                           <h3 className="text-xl sm:text-2xl font-black tracking-tight mb-1 sm:mb-2 text-foreground">
-                            Catalogue details
+                            Catalogue Details
                           </h3>
                           <p className="text-[11px] sm:text-sm text-muted-foreground font-medium max-w-lg leading-relaxed opacity-70">
                             Update the primary identifiers and commercial
@@ -595,7 +580,7 @@ export default function ProductDetailsPage() {
                                     size="icon"
                                     className="h-4 w-4 rounded-full"
                                   >
-                                    <Info className="h-3 w-3 text-primary/60" />
+                                    <Info className="h-3 w-3 text-primary/60" aria-hidden="true" />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-[200px] p-2 text-[10px]">
@@ -623,7 +608,7 @@ export default function ProductDetailsPage() {
                               onChange={(e) => setFormPrice(e.target.value)}
                               className="h-13 pl-12 pr-5 bg-background/50 rounded-full border-border/60 font-mono text-lg font-bold"
                             />
-                            <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary/40 pointer-events-none z-10" />
+                            <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary/40 pointer-events-none z-10" aria-hidden="true" />
                           </div>
                         </div>
                       </div>
@@ -646,7 +631,7 @@ export default function ProductDetailsPage() {
                     <Card className="p-5 sm:p-8 rounded-[2rem] border-2 border-primary/20 bg-gradient-to-br from-primary/[0.03] to-transparent space-y-8 shadow-xl shadow-primary/5">
                       <div className="space-y-4">
                         <h4 className="font-black text-xs sm:text-sm mb-4 flex items-center gap-2 text-primary">
-                          <Settings2 className="h-4 w-4" /> QR Code Settings
+                          <Settings2 className="h-4 w-4" aria-hidden="true" /> QR Code Settings
                         </h4>
                         <p className="text-[11px] sm:text-xs text-muted-foreground font-medium leading-relaxed opacity-80">
                           These parameters control the generation of holographic
@@ -734,7 +719,7 @@ export default function ProductDetailsPage() {
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 border-b border-border/40 pb-8 sm:pb-10 mb-8 sm:mb-10">
                     <div className="flex items-center gap-4 sm:gap-6">
                       <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-2xl sm:rounded-3xl bg-blue-500/10 flex items-center justify-center text-blue-500 shadow-inner border border-blue-500/20 shrink-0">
-                        <ImageIcon className="h-7 w-7 sm:h-10 sm:w-10" />
+                        <ImageIcon className="h-7 w-7 sm:h-10 sm:w-10" aria-hidden="true" />
                       </div>
                       <div>
                         <h3 className="text-xl sm:text-2xl font-black tracking-tight mb-1 sm:mb-2">
@@ -772,7 +757,7 @@ export default function ProductDetailsPage() {
                             }
                             className="h-8 w-8 sm:h-10 sm:w-10 rounded-full shadow-xl hover:scale-110 transition-transform active:scale-90 bg-background/80 backdrop-blur-md hover:bg-background"
                           >
-                            <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                            <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
                           </Button>
                         </div>
 
@@ -805,7 +790,7 @@ export default function ProductDetailsPage() {
                                 "bg-background/80 backdrop-blur-md hover:bg-background",
                             )}
                           >
-                            <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                            <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
                           </Button>
                           <Button
                             variant="destructive"
@@ -813,7 +798,7 @@ export default function ProductDetailsPage() {
                             onClick={() => removeImage(idx)}
                             className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl shadow-xl hover:scale-110 transition-transform active:scale-90"
                           >
-                            <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                            <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
                           </Button>
                         </div>
                         {formVisibleImages.includes(idx) && (
@@ -836,7 +821,7 @@ export default function ProductDetailsPage() {
                     >
                       {uploading ? (
                         <div className="flex flex-col items-center gap-3">
-                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                          <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
                           <span className="text-[10px] font-bold text-primary animate-pulse">
                             Syncing...
                           </span>
@@ -844,7 +829,7 @@ export default function ProductDetailsPage() {
                       ) : (
                         <>
                           <div className="h-12 w-12 rounded-2xl bg-background shadow-lg flex items-center justify-center group-hover:scale-110 transition-transform border border-border/40">
-                            <Plus className="h-6 w-6 text-primary" />
+                            <Plus className="h-6 w-6 text-primary" aria-hidden="true" />
                           </div>
                           <span className="text-[10px] mt-4 font-bold text-muted-foreground opacity-60">
                             Upload Image
@@ -870,11 +855,11 @@ export default function ProductDetailsPage() {
                     <Card className="p-5 sm:p-8 rounded-[2rem] border-2 border-border/40 bg-card/40 space-y-8 shadow-sm">
                       <div className="flex items-start gap-4 sm:gap-6 border-b border-border/40 pb-6 sm:pb-8">
                         <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl sm:rounded-3xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 shadow-inner border border-emerald-500/20 shrink-0">
-                          <CheckCircle2 className="h-6 w-6 sm:h-8 sm:w-8" />
+                          <CheckCircle2 className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
                         </div>
                         <div>
                           <h4 className="text-sm sm:text-base font-black text-foreground mb-1 leading-none">
-                            Access policies
+                            Access Policies
                           </h4>
                           <p className="text-[10px] text-muted-foreground font-bold opacity-60">
                             Set global visibility for this product
@@ -909,9 +894,10 @@ export default function ProductDetailsPage() {
                           const Icon = policy.icon;
                           const isActive = formAccessLevel === policy.level;
                           return (
-                            <button
+                            <Button
                               key={policy.level}
                               type="button"
+                              variant="ghost"
                               disabled={saving}
                               onClick={async () => {
                                 setFormAccessLevel(policy.level as any);
@@ -927,7 +913,7 @@ export default function ProductDetailsPage() {
                                 }
                               }}
                               className={cn(
-                                "flex items-start gap-4 p-4 rounded-2xl border-2 text-left transition-all group relative overflow-hidden active:scale-[0.98]",
+                                "flex items-start gap-4 p-4 h-auto rounded-2xl border-2 text-left transition-all group relative overflow-hidden active:scale-[0.98]",
                                 isActive
                                   ? `bg-${policy.color}-500/[0.03] border-${policy.color}-500/40 shadow-sm shadow-${policy.color}-500/10`
                                   : "bg-muted/10 border-border/30 text-muted-foreground hover:bg-muted/20 hover:border-border/60",
@@ -941,7 +927,7 @@ export default function ProductDetailsPage() {
                                     : "bg-background/80 border-border/40 text-muted-foreground/60",
                                 )}
                               >
-                                <Icon className="h-5 w-5" />
+                                <Icon className="h-5 w-5" aria-hidden="true" />
                               </div>
                               <div className="flex-1 min-w-0 pr-6">
                                 <p
@@ -965,10 +951,11 @@ export default function ProductDetailsPage() {
                                       "h-4 w-4",
                                       `text-${policy.color}-500`,
                                     )}
+                                    aria-hidden="true"
                                   />
                                 </div>
                               )}
-                            </button>
+                            </Button>
                           );
                         })}
                       </div>

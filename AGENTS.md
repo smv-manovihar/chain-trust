@@ -31,7 +31,47 @@ ChainTrust is a four-tier platform. Know each boundary before touching it.
 
 ---
 
-## 2. Module Boundaries & Import Rules
+## 2. Project Structure & File Guide
+
+ChainTrust is organized into three primary tiers and a set of shared resources. Use this guide to locate logic and state across the codebase.
+
+### 📂 Frontend (`/frontend`)
+The presentation layer, built with Next.js (App Router).
+- `app/` — Root for all routes. Organized by actor: `/customer`, `/manufacturer`, `/verify` (public), and `/auth`.
+- `components/` — Shared UI library.
+    - `ui/` — Low-level shadcn/ui primitives (Button, Input, Dialog).
+    - `layout/` — Persistent shells (AppShell, sidebars).
+    - `chat/` — Agent interaction interface.
+    - `verify/` — QR scanner and verification results cards.
+- `lib/` — Business logic utilities, crypto helpers, and global `types/`.
+- `api/` — Client-side service wrappers. `web3-client.ts` is the sole entry point for blockchain interactions.
+- `hooks/` — Custom React hooks for session management and UI state.
+
+### 📂 Backend (`/backend`)
+The data orchestration layer, built with Node.js and Express.
+- `models/` — Mongoose schemas for MongoDB (Users, Batches, Products, Scans).
+- `routers/` — API endpoint definitions grouped by feature area.
+- `controllers/` — Request handlers implement business logic and database mutations.
+- `middlewares/` — Reusable logic for authentication, RBAC, and request validation.
+- `services/` — Core integrations (S3/MinIO for images, SMTP for notifications).
+- `database/` — Connection pooling and MongoDB initialization.
+
+### 📂 AI Service (`/ai-service`)
+The intelligent agent layer, built with FastAPI and LangChain.
+- `main.py` — API entry point. Manages session life-cycles and streaming outputs.
+- `agent.py` — Agent construction. Defines role-specific system prompts (Customer vs. Manufacturer).
+- `tools.py` — The agent's "eyes and hands". Implements situational awareness via `get_view_data`.
+- `tutorials/` — Markdown manuals that the agent reads to explain UI features to users.
+- `utils/` — OCR engine (Tesseract) and PDF/Image parsing logic.
+
+### 📂 Shared & Root Resources
+- `refs/` — Development resources, including `minio/` data, contract ABIs, and static assets.
+- `setup.py` — Interactive wizard for cross-platform environment initialization.
+- `AGENTS.md` — This file. The authoritative guide for AI-driven development.
+
+---
+
+## 3. Module Boundaries & Import Rules
 
 ### ❌ No Dynamic Imports
 **Never use dynamic `import()` expressions anywhere in the codebase.**
@@ -56,7 +96,7 @@ This applies to `.ts`, `.tsx`, `.js`, `.mjs`, and every Python module in `/ai-se
 
 ---
 
-## 3. AI Service — LangChain Agent
+## 4. AI Service — LangChain Agent
 
 The AI service is powered by a `langchain.agents.create_react_agent` (or equivalent `create_agent`) LLM agent served via FastAPI.
 
@@ -82,7 +122,7 @@ The AI service is powered by a `langchain.agents.create_react_agent` (or equival
 
 ---
 
-## 4. Identification & Data Modeling
+## 5. Identification & Data Modeling
 
 | Rule | Detail |
 |------|--------|
@@ -93,7 +133,7 @@ The AI service is powered by a `langchain.agents.create_react_agent` (or equival
 
 ---
 
-## 5. Design Philosophy — Mobile-First, Then Expand
+## 6. Design Philosophy — Mobile-First, Then Expand
 
 > **Core audience reality:** Consumers (the primary users of `/verify` and `/customer/cabinet`) are on mobile phones. Design every screen for a 375px viewport first. Desktop and laptop layouts are an *enhancement*, not the baseline.
 
@@ -135,7 +175,7 @@ Always verify layouts at these breakpoints before committing:
 
 ---
 
-## 6. UI/UX Rules
+## 7. UI/UX Rules
 
 ### Layout
 - **No-scroll by default.** Pages should fit within `100vh` / `h-screen` whenever possible.
@@ -143,8 +183,8 @@ Always verify layouts at these breakpoints before committing:
 - **Do not add top-level padding to pages.** `AppShell` already provides `p-4 lg:p-8`. Adding your own causes double-spacing.
 
 ### Typography
-- **Sentence case everywhere.** No `uppercase`, `capitalize`, or `tracking-widest` on buttons, tabs, headers, badges, or labels.
-- **Banned Tailwind classes (general UI):** `uppercase`, `capitalize`, `tracking-widest`.
+- **Title Case or Sentence Case.** Use Title Case for primary actions (buttons), tabs, and section headers. Sentence case is preferred for long descriptions and metadata.
+- **Banned Tailwind classes (general UI):** `uppercase`, `tracking-widest`.
 - **Exception:** Stat cards / KPI counters MAY use uppercase labels (e.g., `TOTAL SCANS`).
 
 ### Component Density
@@ -169,7 +209,7 @@ Always verify layouts at these breakpoints before committing:
 
 ---
 
-## 7. Component Selection Guide
+## 8. Component Selection Guide
 
 | Scenario | Component |
 |----------|-----------|
@@ -190,7 +230,7 @@ Always verify layouts at these breakpoints before committing:
 
 ---
 
-## 8. Terminology Standards
+## 9. Terminology Standards
 
 Use **exactly** these terms. Deviations will be rejected.
 
@@ -210,7 +250,7 @@ Use **exactly** these terms. Deviations will be rejected.
 
 ---
 
-## 9. Blockchain Integration
+## 10. Blockchain Integration
 
 - **Blockchain is the root source of truth for product verification.** Always prefer blockchain data over MongoDB for verification logic.
 - MongoDB is used **only** for rich metadata enrichment: high-res images, dynamic scan counts, etc.
@@ -219,7 +259,7 @@ Use **exactly** these terms. Deviations will be rejected.
 
 ---
 
-## 10. Documentation & Tutorials
+## 11. Documentation & Tutorials
 
 When making UI changes to any page or component described in `/ai-service/tutorials`:
 

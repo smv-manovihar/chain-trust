@@ -28,14 +28,14 @@ import { getCabinet, removeFromCabinet, CabinetItem } from "@/api";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
+import { DataToolbar } from "@/components/ui/data-toolbar";
 
 export default function MyMedicinesPage() {
   const searchParams = useSearchParams();
@@ -132,19 +132,44 @@ export default function MyMedicinesPage() {
 
   return (
     <div className="space-y-2 lg:space-y-4 max-w-[1600px] mx-auto pb-20">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-2 sm:py-4 relative">
-        <div className="flex-1 min-w-0">
-          <h1 className="font-black tracking-tight text-foreground text-xl sm:text-3xl lg:text-4xl">
-            My Medicines
-          </h1>
-          <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">
-            Welcome back, {user?.name?.split(" ")[0] || "User"}. Managing{" "}
-            {medications?.length || 0} medications.
-          </p>
-        </div>
+      <PageHeader
+        title="My Medicines"
+        description={`Welcome back, ${user?.name?.split(" ")[0] || "User"}. Managing ${medications?.length || 0} medications.`}
+        actions={
+          <>
+            <Button
+              className="flex-1 sm:flex-none rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 font-bold h-10 sm:h-12 px-4 sm:px-6 gap-2 transition-all active:scale-95"
+              asChild
+            >
+              <Link href="/customer/cabinet/add">
+                <Plus className="h-5 w-5 sm:h-4 sm:w-4" aria-hidden="true" />
+                <span>Add Medicine</span>
+              </Link>
+            </Button>
 
-        <div className="flex items-center gap-4 sm:gap-6 shrink-0 w-full sm:w-auto">
-          <div className="flex items-center space-x-2 bg-muted/30 px-4 h-10 sm:h-12 rounded-full border border-border/50">
+            <Button
+              variant="outline"
+              className="flex-1 sm:flex-none rounded-full border-primary/20 hover:bg-primary/5 font-bold h-10 sm:h-12 px-4 sm:px-6 shadow-md transition-all active:scale-95"
+              asChild
+            >
+              <Link href="/verify">
+                <QrCode className="mr-2 h-4 w-4 text-primary" aria-hidden="true" />
+                <span className="hidden sm:inline text-sm">Verify Medicine</span>
+                <span className="sm:hidden text-xs">Verify</span>
+              </Link>
+            </Button>
+          </>
+        }
+      />
+
+      <DataToolbar
+        search={{
+          value: searchTerm,
+          onChange: setSearchTerm,
+          placeholder: "Search medications...",
+        }}
+        filters={
+          <div className="flex items-center space-x-2 bg-muted/40 px-3 sm:px-4 h-11 sm:h-12 rounded-full border border-border/50 shrink-0">
             <Switch
               id="show-inactive"
               checked={showInactive}
@@ -152,50 +177,13 @@ export default function MyMedicinesPage() {
             />
             <Label
               htmlFor="show-inactive"
-              className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground cursor-pointer select-none"
+              className="text-[10px] sm:text-xs font-bold text-muted-foreground cursor-pointer select-none hidden xs:inline-block"
             >
-              Show Inactive
+              Show inactive
             </Label>
           </div>
-          
-          <Button
-            className="flex-1 sm:flex-none rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 font-bold h-10 sm:h-12 px-4 sm:px-6 gap-2 transition-all active:scale-95"
-            asChild
-          >
-            <Link href="/customer/cabinet/add">
-              <Plus className="h-5 w-5 sm:h-4 sm:w-4" />
-              <span>Add Medicine</span>
-            </Link>
-          </Button>
-
-          <Button
-            variant="outline"
-            className="flex-1 sm:flex-none rounded-full border-primary/20 hover:bg-primary/5 font-bold h-10 sm:h-12 px-4 sm:px-6 shadow-md transition-all active:scale-95"
-            asChild
-          >
-            <Link href="/verify">
-              <QrCode className="mr-2 h-4 w-4 text-primary" />
-              <span className="hidden sm:inline text-sm">Verify Medicine</span>
-              <span className="sm:hidden text-xs">Verify</span>
-            </Link>
-          </Button>
-        </div>
-      </div>
-
-      {/* Static Search row */}
-      <div className="-mx-4 px-4 lg:-mx-8 lg:px-8 py-2">
-        <div className="flex-1 max-w-md mx-auto sm:mx-0 w-full">
-          <div className="relative w-full">
-            <Input
-              placeholder="Search medications..."
-              className="pl-11 rounded-full shadow-sm focus-visible:ring-primary/20 h-10 sm:h-12 border-primary/10 transition-all w-full bg-card/60 backdrop-blur-md"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50 pointer-events-none z-10" />
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Main Content */}
       <div className="px-1 pt-2">
@@ -221,14 +209,19 @@ export default function MyMedicinesPage() {
             </div>
           ) : (
             medications.map((med) => (
-              <Link
-                key={med._id}
-                href={`/customer/cabinet/${med._id}`}
-                className="group block h-full"
-              >
                 <Card
+                  key={med._id}
+                  role="article"
+                  tabIndex={0}
+                  onClick={() => router.push(`/customer/cabinet/${med._id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      router.push(`/customer/cabinet/${med._id}`);
+                    }
+                  }}
                   className={cn(
-                    "p-5 sm:p-6 transition-all duration-500 flex flex-col md:flex-row md:items-center gap-4 sm:gap-6 md:gap-8 rounded-[2rem] sm:rounded-[2.5rem] border-primary/5 shadow-sm hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 relative overflow-hidden",
+                    "p-5 sm:p-6 transition-all duration-500 flex flex-col md:flex-row md:items-center gap-4 sm:gap-6 md:gap-8 rounded-[2rem] sm:rounded-[2.5rem] border-primary/5 shadow-sm hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 relative overflow-hidden cursor-pointer group",
                     med.isUserAdded
                       ? "bg-muted/30"
                       : "bg-card/40 backdrop-blur-md",
@@ -252,9 +245,9 @@ export default function MyMedicinesPage() {
                         )}
                       >
                         {med.isUserAdded ? (
-                          <Pill className="h-5 w-5" />
+                          <Pill className="h-5 w-5" aria-hidden="true" />
                         ) : (
-                          <ShieldCheck className="h-5 w-5" />
+                          <ShieldCheck className="h-5 w-5" aria-hidden="true" />
                         )}
                       </div>
                     )}
@@ -298,7 +291,7 @@ export default function MyMedicinesPage() {
 
                   <div className="grid grid-cols-2 md:flex md:flex-row gap-2 sm:gap-3 relative z-10 w-full md:w-auto mt-2 md:mt-0 shrink-0">
                     <div className="flex items-center gap-2 bg-background/50 border border-border/40 px-3 py-2 sm:py-2.5 rounded-xl text-[10px] font-bold text-muted-foreground overflow-hidden justify-center md:justify-start">
-                      <Clock className="h-3 w-3 shrink-0 text-primary" />
+                      <Clock className="h-3 w-3 shrink-0 text-primary" aria-hidden="true" />
                       <span className="truncate">
                         {med.expiryDate
                           ? format(new Date(med.expiryDate), "MMM yyyy")
@@ -306,7 +299,7 @@ export default function MyMedicinesPage() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2 bg-background/50 border border-border/40 px-3 py-2 sm:py-2.5 rounded-xl text-[10px] font-bold text-muted-foreground overflow-hidden justify-center md:justify-start">
-                      <Archive className="h-3 w-3 shrink-0 text-primary" />
+                      <Archive className="h-3 w-3 shrink-0 text-primary" aria-hidden="true" />
                       <span className="truncate">Code: {med.batchNumber}</span>
                     </div>
                   </div>
@@ -329,14 +322,14 @@ export default function MyMedicinesPage() {
                         handleDelete(med._id, med.name);
                       }}
                       className="h-9 sm:h-10 w-9 sm:w-10 shrink-0 rounded-xl hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-colors border border-transparent hover:border-destructive/20"
+                      aria-label={`Remove ${med.name} from cabinet`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </Card>
-              </Link>
-            ))
-          )}
+              ))
+            )}
         </div>
       </div>
     </div>

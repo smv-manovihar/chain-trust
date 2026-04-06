@@ -150,11 +150,6 @@ export const generateBatchPDF = async (
                         textY += 6;
                     }
 
-                    // Branding Text
-                    doc.fontSize(4).fillColor('#CCCCCC').text('CHAINTRUST VERIFIED', currentX + 2, textY, {
-                        width: labelWidth - 4,
-                        align: 'center'
-                    });
 
                     // 6. Update coordinates for next unit
                     colIndex++;

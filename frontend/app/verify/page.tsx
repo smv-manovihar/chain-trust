@@ -35,8 +35,8 @@ import {
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { AppShell } from "@/components/layout/app-shell";
-import { CustomerSidebar, MobileSidebar as CustomerMobileSidebar } from "@/components/layout/customer-sidebar";
-import { ManufacturerSidebar, MobileSidebar as ManufacturerMobileSidebar } from "@/components/layout/manufacturer-sidebar";
+import { AppSidebar, MobileAppSidebar } from "@/components/layout/app-sidebar";
+import { CUSTOMER_NAV_GROUPS, MANUFACTURER_NAV_GROUPS } from "@/lib/constants/navigation";
 import { VideoScanner } from "@/components/verify/video-scanner";
 import { UploadScanner } from "@/components/verify/upload-scanner";
 import { useDevice } from "@/hooks/use-device";
@@ -130,10 +130,19 @@ function InteractiveResultCard({
     <div style={{ perspective: "1000px" }} className="w-full">
       <div
         ref={cardRef}
+        role="button"
+        tabIndex={0}
+        aria-label="Reset card position"
         onMouseMove={handleCardMouseMove}
         onMouseLeave={handleCardMouseLeave}
         onClick={resetCardPosition}
         onTouchEnd={resetCardPosition}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            resetCardPosition();
+          }
+        }}
         style={{
           transform:
             isHovered && !isMobileDevice
@@ -186,7 +195,7 @@ function InteractiveResultCard({
           ) : scanStats.isSuspicious ? (
             <AlertTriangle className="w-32 h-32 sm:w-48 sm:h-48" />
           ) : (
-            <CheckCircle2 className="w-32 h-32 sm:w-48 sm:h-48" />
+            <CheckCircle2 className="w-32 h-32 sm:w-48 sm:h-48" aria-hidden="true" />
           )}
         </div>
 
@@ -227,7 +236,7 @@ function InteractiveResultCard({
               </p>
               {product?.composition && (
                 <div className="mt-4 flex items-center gap-2 text-xs font-bold text-primary/60 bg-primary/5 w-fit px-3 py-1 rounded-full border border-primary/10">
-                  <ShieldCheck className="h-3 w-3" />
+                  <ShieldCheck className="h-3 w-3" aria-hidden="true" />
                   {product.composition}
                 </div>
               )}
@@ -236,7 +245,7 @@ function InteractiveResultCard({
 
           <div className="mt-8 sm:mt-12 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 overflow-hidden border-t border-border/50 pt-6">
             <div className="flex-1 w-full">
-              <p className="text-muted-foreground text-[10px] font-bold mb-1 uppercase tracking-widest">
+              <p className="text-muted-foreground text-[10px] font-bold mb-1">
                 Batch of medicines
               </p>
               <p className="font-mono text-lg sm:text-xl tracking-[0.2em] font-black break-all">
@@ -248,7 +257,7 @@ function InteractiveResultCard({
               </p>
             </div>
             <div className="text-left sm:text-right shrink-0">
-              <p className="text-muted-foreground text-[10px] font-bold mb-1 uppercase tracking-widest">
+              <p className="text-muted-foreground text-[10px] font-bold mb-1">
                 Exp. date
               </p>
               <p className="font-mono text-sm sm:text-base tracking-wider font-bold">
@@ -266,7 +275,7 @@ function InteractiveResultCard({
           {product?.images && product.images.length > 0 && (
             <div className="mt-8 pt-8 border-t border-border/50 pointer-events-auto">
               <div className="flex items-center justify-between mb-4 px-1">
-                <p className="text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+                <p className="text-muted-foreground text-[10px] font-black">
                   Product media assets
                 </p>
                 <div className="flex gap-1.5">
@@ -526,7 +535,7 @@ function VerifyContent() {
       {!isAuthenticated && !isMobileFullscreenCamera && (
         <header className="h-14 lg:h-16 border-b bg-background/80 backdrop-blur-md flex items-center px-4 lg:px-8 shrink-0 z-20">
           <Link href="/" className="flex items-center gap-2 group">
-            <ChevronLeft className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+            <ChevronLeft className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" aria-hidden="true" />
             <span className="font-bold text-lg tracking-tight text-foreground">
               ChainTrust <span className="text-primary">Verify</span>
             </span>
@@ -586,7 +595,7 @@ function VerifyContent() {
                   </Button>
                   {!isManufacturer && (
                     <Button onClick={handleSaveToCabinet} className="rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 px-6 transition-all duration-300 w-full sm:w-auto h-12 sm:h-10 font-black active:scale-95">
-                      <BookmarkPlus className="mr-2 h-5 w-5 sm:h-4 sm:w-4" />
+                      <BookmarkPlus className="mr-2 h-5 w-5 sm:h-4 sm:w-4" aria-hidden="true" />
                       Save to My Medicines
                     </Button>
                   )}
@@ -608,7 +617,7 @@ function VerifyContent() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                   <Card className={cn("sm:col-span-3 p-6 sm:p-8 border rounded-[2rem] sm:rounded-[2.5rem] flex flex-col md:flex-row items-start md:items-center gap-6 shadow-sm", scanStats.isSuspicious ? "bg-amber-500/5 border-amber-500/30" : (verificationStatus.isInvalid || verificationStatus.isRecalled) ? "bg-destructive/5 border-destructive/30" : "bg-green-500/5 border-green-500/30")}>
                     <div className={cn("h-16 w-16 sm:h-20 sm:w-20 rounded-full flex items-center justify-center shrink-0 shadow-inner", (verificationStatus.isInvalid || verificationStatus.isRecalled) ? "bg-destructive/20" : scanStats.isSuspicious ? "bg-amber-500/20" : "bg-green-500/20")}>
-                      {(verificationStatus.isInvalid || verificationStatus.isRecalled) ? <AlertTriangle className="h-8 w-8 sm:h-10 sm:w-10 text-destructive" /> : scanStats.isSuspicious ? <AlertTriangle className="h-8 w-8 sm:h-10 sm:w-10 text-amber-600" /> : <ShieldCheck className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" />}
+                      {(verificationStatus.isInvalid || verificationStatus.isRecalled) ? <AlertTriangle className="h-8 w-8 sm:h-10 sm:w-10 text-destructive" aria-hidden="true" /> : scanStats.isSuspicious ? <AlertTriangle className="h-8 w-8 sm:h-10 sm:w-10 text-amber-600" aria-hidden="true" /> : <ShieldCheck className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" aria-hidden="true" />}
                     </div>
                     <div className="flex-1 w-full">
                       <div className="mb-2">
@@ -624,31 +633,31 @@ function VerifyContent() {
                       </p>
                     </div>
                     <div className="flex flex-row md:flex-col justify-between items-center bg-background p-4 rounded-3xl border border-border/50 min-w-[120px] shadow-sm">
-                      <p className="text-[10px] font-black text-muted-foreground opacity-60 uppercase tracking-widest">Scans</p>
+                      <p className="text-[10px] font-black text-muted-foreground opacity-60">Scans</p>
                       <p className={cn("text-3xl font-black tabular-nums", scanStats.isSuspicious ? "text-amber-600" : "text-primary")}>{scanStats.count}</p>
                     </div>
                   </Card>
 
                   <Card className="p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border-border/50 bg-card/50 shadow-sm transition-all hover:bg-card">
-                    <p className="text-[10px] font-black text-muted-foreground mb-3 opacity-60 uppercase tracking-widest">Expiration</p>
+                    <p className="text-[10px] font-black text-muted-foreground mb-3 opacity-60">Expiration</p>
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-xl text-primary"><Clock className="h-5 w-5" /></div>
+                      <div className="p-2 bg-primary/10 rounded-xl text-primary"><Clock className="h-5 w-5" aria-hidden="true" /></div>
                       <p className="font-black text-base text-foreground">{product?.expiryDate ? new Date(product.expiryDate).toLocaleDateString() : "N/A"}</p>
                     </div>
                   </Card>
                   
                   <Card className="p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border-border/50 bg-card/50 shadow-sm transition-all hover:bg-card">
-                    <p className="text-[10px] font-black text-muted-foreground mb-3 opacity-60 uppercase tracking-widest">Unit serial</p>
+                    <p className="text-[10px] font-black text-muted-foreground mb-3 opacity-60">Unit serial</p>
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-xl text-primary"><PackageCheck className="h-5 w-5" /></div>
+                      <div className="p-2 bg-primary/10 rounded-xl text-primary"><PackageCheck className="h-5 w-5" aria-hidden="true" /></div>
                       <p className="font-black text-base truncate text-foreground">#{product?.unitNumber}</p>
                     </div>
                   </Card>
 
                   <Card className="p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border-border/50 bg-card/50 shadow-sm transition-all hover:bg-card">
-                    <p className="text-[10px] font-black text-muted-foreground mb-3 opacity-60 uppercase tracking-widest">Provenance</p>
+                    <p className="text-[10px] font-black text-muted-foreground mb-3 opacity-60">Provenance</p>
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-xl text-primary"><Building2 className="h-5 w-5" /></div>
+                      <div className="p-2 bg-primary/10 rounded-xl text-primary"><Building2 className="h-5 w-5" aria-hidden="true" /></div>
                       <p className="font-black text-base truncate text-foreground">Blockchain</p>
                     </div>
                   </Card>
@@ -691,15 +700,13 @@ function VerifyContent() {
 export default function VerifyPage() {
   const { user } = useAuth();
   const isManufacturer = user?.role === "manufacturer";
-
-  const SideNav = isManufacturer ? ManufacturerSidebar : CustomerSidebar;
-  const MobileNav = isManufacturer ? ManufacturerMobileSidebar : CustomerMobileSidebar;
+  const navGroups = isManufacturer ? MANUFACTURER_NAV_GROUPS : CUSTOMER_NAV_GROUPS;
 
   return (
     <Suspense fallback={<LoadingScreen />}>
       <AppShell
-        sidebar={<SideNav />}
-        mobileSidebar={(props) => <MobileNav {...props} />}
+        sidebar={<AppSidebar navGroups={navGroups} />}
+        mobileSidebar={(props) => <MobileAppSidebar {...props} navGroups={navGroups} />}
       >
         <VerifyContent />
       </AppShell>

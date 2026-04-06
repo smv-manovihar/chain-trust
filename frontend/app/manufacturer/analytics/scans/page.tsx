@@ -49,6 +49,7 @@ import {
   getScanDetails,
 } from "@/api/analytics.api";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/page-header";
 import { format, startOfDay, endOfDay, subDays, parseISO } from "date-fns";
 import {
   XAxis,
@@ -243,7 +244,7 @@ function ScanAnalysisContent() {
     return (
       <div className="h-full flex flex-1 flex-col items-center justify-center gap-6 text-center min-h-[50vh]">
         <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-          <Boxes className="h-8 w-8 text-muted-foreground" />
+          <Boxes className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
         </div>
         <div>
           <h2 className="text-2xl tracking-tight font-bold">
@@ -290,7 +291,7 @@ function ScanAnalysisContent() {
   const BatchSelectionList = () => (
     <div className="flex flex-col gap-3">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
         <input
           type="text"
           placeholder="Search batches..."
@@ -302,11 +303,12 @@ function ScanAnalysisContent() {
       <div className="max-h-[400px] overflow-y-auto custom-scrollbar flex flex-col gap-2 pr-1">
         {filteredBatches.length > 0 ? (
           filteredBatches.map((batch) => (
-            <button
+            <Button
               key={batch.batchNumber}
+              variant={selectedBatchNumber === batch.batchNumber ? "secondary" : "outline"}
               onClick={() => handleBatchSelect(batch.batchNumber)}
               className={cn(
-                "w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between group",
+                "w-full text-left p-3 h-auto rounded-xl border transition-all flex items-center justify-between group",
                 selectedBatchNumber === batch.batchNumber
                   ? "bg-primary/10 border-primary/30 text-primary"
                   : "bg-card hover:border-primary/40 hover:bg-card/80",
@@ -321,9 +323,9 @@ function ScanAnalysisContent() {
                 </p>
               </div>
               {selectedBatchNumber === batch.batchNumber && (
-                <CheckCircle2 className="h-4 w-4 text-primary" />
+                <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden="true" />
               )}
-            </button>
+            </Button>
           ))
         ) : (
           <p className="text-sm text-center text-muted-foreground py-4">
@@ -346,7 +348,7 @@ function ScanAnalysisContent() {
         <ResponsiveDialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col overflow-hidden">
           <ResponsiveDialogHeader>
             <ResponsiveDialogTitle>
-              Geographic distribution
+              Geographic Distribution
             </ResponsiveDialogTitle>
           </ResponsiveDialogHeader>
           <div className="overflow-y-auto custom-scrollbar p-1 pb-6 space-y-4">
@@ -389,7 +391,7 @@ function ScanAnalysisContent() {
       >
         <ResponsiveDialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
           <ResponsiveDialogHeader>
-            <ResponsiveDialogTitle>High-risk units</ResponsiveDialogTitle>
+            <ResponsiveDialogTitle>High-Risk Units</ResponsiveDialogTitle>
           </ResponsiveDialogHeader>
           <div className="overflow-y-auto custom-scrollbar p-1 pb-6 space-y-3">
             {suspiciousScans.length > 0 ? (
@@ -440,7 +442,7 @@ function ScanAnalysisContent() {
       >
         <ResponsiveDialogContent className="sm:max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
           <ResponsiveDialogHeader>
-            <ResponsiveDialogTitle>Scan activity log</ResponsiveDialogTitle>
+            <ResponsiveDialogTitle>Scan Activity Log</ResponsiveDialogTitle>
           </ResponsiveDialogHeader>
           <div className="overflow-y-auto custom-scrollbar p-1 pb-6">
             <div className="overflow-x-auto rounded-xl border">
@@ -496,22 +498,10 @@ function ScanAnalysisContent() {
 
       {/* --------------------- MAIN DASHBOARD --------------------- */}
 
-      {/* Header Container */}
-      <div className="flex-none flex flex-col gap-4">
-        <Link
-          href="/manufacturer/analytics"
-          className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-colors group w-fit px-1"
-        >
-          <ArrowLeft className="h-3 w-3 group-hover:-translate-x-1 transition-transform" />
-          Back to analytics
-        </Link>
-
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 px-1">
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-none">
-            Scan analytics
-          </h1>
-
-          {/* Controls: Batch & Date */}
+      <PageHeader
+        title="Scan Analytics"
+        backHref="/manufacturer/analytics"
+        actions={
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
             {/* Batch Selector */}
             {isMobile ? (
@@ -522,13 +512,13 @@ function ScanAnalysisContent() {
                 <DrawerTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-full sm:w-[240px] justify-between rounded-xl h-11 bg-card active:scale-95 transition-all"
+                    className="w-full sm:w-[240px] justify-between rounded-full h-11 bg-card active:scale-95 transition-all"
                   >
                     <span className="truncate flex items-center gap-2 font-medium">
-                      <Boxes className="h-4 w-4 text-muted-foreground" />
+                      <Boxes className="h-4 w-4 text-muted-foreground transition-colors" />
                       {selectedBatchObj?.batchNumber || "Select batch"}
                     </span>
-                    <ChevronDown className="h-4 w-4 opacity-50" />
+                    <ChevronDown className="h-4 w-4 opacity-50 transition-transform" />
                   </Button>
                 </DrawerTrigger>
                 <DrawerContent className="max-h-[85dvh]">
@@ -550,17 +540,17 @@ function ScanAnalysisContent() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-[240px] justify-between rounded-xl h-10 bg-card active:scale-95 transition-all"
+                    className="w-[240px] justify-between rounded-full h-10 bg-card active:scale-95 transition-all"
                   >
                     <span className="truncate flex items-center gap-2 font-medium">
-                      <Boxes className="h-4 w-4 text-muted-foreground" />
+                      <Boxes className="h-4 w-4 text-muted-foreground transition-colors" />
                       {selectedBatchObj?.batchNumber || "Select batch"}
                     </span>
-                    <ChevronDown className="h-4 w-4 opacity-50" />
+                    <ChevronDown className="h-4 w-4 opacity-50 transition-transform" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent
-                  className="w-[300px] p-3 rounded-2xl"
+                  className="w-[300px] p-3 rounded-2xl shadow-xl border-border/50"
                   align="end"
                 >
                   <BatchSelectionList />
@@ -575,11 +565,11 @@ function ScanAnalysisContent() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full sm:w-auto justify-start text-left font-normal h-11 rounded-xl bg-card active:scale-95 transition-all",
+                      "w-full sm:w-auto justify-start text-left font-normal h-11 rounded-full bg-card active:scale-95 transition-all text-xs",
                       !dateRange && "text-muted-foreground",
                     )}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <CalendarIcon className="mr-2 h-4 w-4 transition-colors" />
                     <span className="truncate font-medium">
                       {dateRange?.from ? (
                         dateRange.to ? (
@@ -609,7 +599,7 @@ function ScanAnalysisContent() {
                       selected={dateRange}
                       onSelect={handleDateSelect}
                       numberOfMonths={1}
-                      className="rounded-2xl border"
+                      className="rounded-2xl border border-border/50"
                     />
                   </div>
                 </DrawerContent>
@@ -620,11 +610,11 @@ function ScanAnalysisContent() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-[260px] justify-start text-left font-normal h-10 rounded-xl bg-card active:scale-95 transition-all",
+                      "w-[260px] justify-start text-left font-normal h-10 rounded-full bg-card active:scale-95 transition-all text-[10px]",
                       !dateRange && "text-muted-foreground",
                     )}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <CalendarIcon className="mr-2 h-4 w-4 transition-colors" />
                     <span className="truncate font-medium">
                       {dateRange?.from ? (
                         dateRange.to ? (
@@ -641,7 +631,7 @@ function ScanAnalysisContent() {
                     </span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 rounded-2xl" align="end">
+                <PopoverContent className="w-auto p-0 rounded-2xl shadow-xl border-border/50" align="end">
                   <Calendar
                     mode="range"
                     defaultMonth={dateRange?.from}
@@ -653,8 +643,8 @@ function ScanAnalysisContent() {
               </Popover>
             )}
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Main Workspace */}
       <div className="space-y-6">
@@ -740,10 +730,10 @@ function ScanAnalysisContent() {
                       color: batchColor,
                     }}
                   >
-                    <TrendingUp className="h-4 w-4" />
+                    <TrendingUp className="h-4 w-4" aria-hidden="true" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold">Activity trend</h3>
+                    <h3 className="text-base font-bold">Activity Trend</h3>
                     <p className="text-xs text-muted-foreground">
                       Scan volume over selected period
                     </p>
@@ -755,7 +745,7 @@ function ScanAnalysisContent() {
                   className="text-primary text-xs font-bold rounded-lg h-8 active:scale-95 transition-all"
                   onClick={() => setActiveModal("log")}
                 >
-                  View logs
+                  View Logs
                 </Button>
               </div>
 

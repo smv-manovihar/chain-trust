@@ -38,7 +38,7 @@ export function SidebarContent({
         {navGroups.map((group, index) => (
           <div key={index} className="mb-6 px-3">
             {!isCollapsed && (
-              <h4 className="mb-3 px-4 text-[11px] font-semibold uppercase text-muted-foreground/70 tracking-wider">
+              <h4 className="mb-3 px-4 text-[11px] font-semibold text-muted-foreground/70">
                 {group.label}
               </h4>
             )}
