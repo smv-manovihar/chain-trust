@@ -15,21 +15,31 @@ export interface CabinetItem {
   addedAt?: string;
   createdAt?: string;
   // Dosage & Management
-  dosage?: string;
+  dosage?: number;
   frequency?: string;
   currentQuantity?: number;
   totalQuantity?: number;
   unit?: string;
   doctorName?: string;
   notes?: string;
-  reminderTimes?: string[];
+  reminderTimes?: {
+    time: string;
+    mealContext?: 'before_meal' | 'after_meal' | 'with_meal' | 'no_preference';
+  }[];
   prescriptionIds?: string[];
   prescriptions?: {
     url: string;
     label: string;
     uploadedAt: string;
   }[];
+  lastDoseTaken?: string;
+  notificationOverrides?: {
+    medicine_expiry?: { inApp?: boolean; email?: boolean };
+    batch_recall?: { inApp?: boolean; email?: boolean };
+    dose_reminder?: { inApp?: boolean; email?: boolean };
+  };
   status?: "active" | "inactive";
+  currentStreak?: number;
 }
 
 export const addToCabinet = async (data: Partial<CabinetItem>, signal?: AbortSignal) => {
@@ -66,6 +76,11 @@ export const getDashboardStats = async (signal?: AbortSignal) => {
   return response.data;
 };
 
+export const getUpcomingDoses = async (signal?: AbortSignal) => {
+  const response = await client.get('/cabinet/upcoming', { signal });
+  return response.data.upcoming;
+};
+
 export const getRecentScans = async (signal?: AbortSignal) => {
   const response = await client.get('/cabinet/recent-scans', { signal });
   return response.data.scans;
@@ -73,6 +88,16 @@ export const getRecentScans = async (signal?: AbortSignal) => {
 
 export const markDoseTaken = async (id: string, signal?: AbortSignal) => {
   const response = await client.post(`/cabinet/mark-taken/${id}`, {}, { signal });
+  return response.data;
+};
+
+export const undoDose = async (id: string, signal?: AbortSignal) => {
+  const response = await client.post(`/cabinet/undo-dose/${id}`, {}, { signal });
+  return response.data;
+};
+
+export const getDosageLogs = async (id: string, signal?: AbortSignal) => {
+  const response = await client.get(`/cabinet/logs/${id}`, { signal });
   return response.data;
 };
 

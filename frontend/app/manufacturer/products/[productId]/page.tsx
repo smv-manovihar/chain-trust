@@ -364,7 +364,7 @@ export default function ProductDetailsPage() {
                     <span className="sm:hidden text-xs">Delete</span>
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent className="rounded-[2.5rem] border-primary/20 p-8 max-w-[95vw] sm:max-w-lg">
+                <AlertDialogContent className="rounded-3xl border-primary/20 p-8 max-w-[95vw] sm:max-w-lg">
                   <AlertDialogHeader>
                     <AlertDialogTitle className="text-2xl font-black">
                       Delete product?
@@ -432,7 +432,7 @@ export default function ProductDetailsPage() {
           ].map((stat, i) => (
             <Card
               key={i}
-              className="bg-muted/10 border-border/40 border-2 rounded-[1.5rem] sm:rounded-[2rem] p-5 sm:p-6 flex items-center justify-between group hover:bg-primary/[0.02] transition-all duration-300"
+              className="bg-muted/10 border-border/40 border-2 rounded-3xl p-5 sm:p-6 flex items-center justify-between group hover:bg-primary/[0.02] transition-all duration-300"
             >
               <div className="space-y-1 sm:space-y-2 min-w-0">
                 <p className="text-[8px] sm:text-[10px] font-black text-muted-foreground opacity-60 truncate leading-none mb-1">
@@ -485,7 +485,7 @@ export default function ProductDetailsPage() {
               >
                 <div className="grid lg:grid-cols-3 gap-6 sm:gap-8">
                   <div className="lg:col-span-2 space-y-6 sm:space-y-8">
-                    <Card className="p-5 sm:p-8 rounded-[2rem] border-2 border-border/40 bg-card/40 space-y-8 sm:space-y-12 shadow-sm">
+                    <Card className="p-5 sm:p-8 rounded-3xl border-2 border-border/40 bg-card/40 space-y-8 sm:space-y-12 shadow-sm">
                       <div className="flex items-start gap-4 sm:gap-6 border-b border-border/40 pb-6 sm:pb-8">
                         <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-2xl sm:rounded-3xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20 shrink-0">
                           <Info className="h-7 w-7 sm:h-10 sm:w-10" aria-hidden="true" />
@@ -593,7 +593,7 @@ export default function ProductDetailsPage() {
                           <Textarea
                             value={formComposition}
                             onChange={(e) => setFormComposition(e.target.value)}
-                            className="min-h-[80px] bg-background/50 rounded-[1.5rem] border-border/60 px-5 py-3 font-medium resize-none shadow-inner"
+                            className="min-h-[80px] bg-background/50 rounded-2xl border-border/60 px-5 py-3 font-medium resize-none shadow-inner"
                             placeholder="e.g. Paracetamol 500mg, Caffeine 65mg..."
                           />
                         </div>
@@ -620,7 +620,7 @@ export default function ProductDetailsPage() {
                         <Textarea
                           value={formDescription}
                           onChange={(e) => setFormDescription(e.target.value)}
-                          className="min-h-[120px] bg-background/50 border-border/60 rounded-[1.5rem] resize-none p-4 text-sm leading-relaxed font-medium shadow-inner"
+                          className="min-h-[120px] bg-background/50 border-border/60 rounded-2xl resize-none p-4 text-sm leading-relaxed font-medium shadow-inner"
                           placeholder="Detail the use cases, storage rules, and warnings..."
                         />
                       </div>
@@ -628,7 +628,7 @@ export default function ProductDetailsPage() {
                   </div>
 
                   <div className="space-y-6">
-                    <Card className="p-5 sm:p-8 rounded-[2rem] border-2 border-primary/20 bg-gradient-to-br from-primary/[0.03] to-transparent space-y-8 shadow-xl shadow-primary/5">
+                    <Card className="p-5 sm:p-8 rounded-3xl border-2 border-primary/20 bg-gradient-to-br from-primary/[0.03] to-transparent space-y-8 shadow-xl shadow-primary/5">
                       <div className="space-y-4">
                         <h4 className="font-black text-xs sm:text-sm mb-4 flex items-center gap-2 text-primary">
                           <Settings2 className="h-4 w-4" aria-hidden="true" /> QR Code Settings
@@ -715,7 +715,7 @@ export default function ProductDetailsPage() {
                 value="images"
                 className="space-y-6 focus-visible:outline-none m-0 mt-6"
               >
-                <Card className="p-5 sm:p-8 rounded-[2rem] border-2 border-border/40 bg-card/40 shadow-sm">
+                <Card className="p-5 sm:p-8 rounded-3xl border-2 border-border/40 bg-card/40 shadow-sm">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 border-b border-border/40 pb-8 sm:pb-10 mb-8 sm:mb-10">
                     <div className="flex items-center gap-4 sm:gap-6">
                       <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-2xl sm:rounded-3xl bg-blue-500/10 flex items-center justify-center text-blue-500 shadow-inner border border-blue-500/20 shrink-0">
@@ -737,7 +737,7 @@ export default function ProductDetailsPage() {
                     {formImages.map((url, idx) => (
                       <Card
                         key={idx}
-                        className="relative aspect-[4/5] rounded-[1.5rem] sm:rounded-3xl border-2 border-border/40 overflow-hidden group shadow-md transition-all hover:shadow-lg"
+                        className="relative aspect-[4/5] rounded-3xl border-2 border-border/40 overflow-hidden group shadow-md transition-all hover:shadow-lg"
                       >
                         <img
                           src={resolveMediaUrl(url)}
@@ -852,10 +852,10 @@ export default function ProductDetailsPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 mt-6 sm:mt-8">
                   <div className="lg:col-span-2 invisible" />
                   <div className="space-y-6">
-                    <Card className="p-5 sm:p-8 rounded-[2rem] border-2 border-border/40 bg-card/40 space-y-8 shadow-sm">
+                    <Card className="p-5 sm:p-8 rounded-3xl border-2 border-border/40 bg-card/40 space-y-8 shadow-sm">
                       <div className="flex items-start gap-4 sm:gap-6 border-b border-border/40 pb-6 sm:pb-8">
                         <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl sm:rounded-3xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 shadow-inner border border-emerald-500/20 shrink-0">
-                          <CheckCircle2 className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
+                          <ShieldCheck className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
                         </div>
                         <div>
                           <h4 className="text-sm sm:text-base font-black text-foreground mb-1 leading-none">
@@ -871,24 +871,39 @@ export default function ProductDetailsPage() {
                         {[
                           {
                             level: "public",
-                            label: "Public display",
+                            label: "Public Display",
                             desc: "Visible to all consumers and visitors.",
                             icon: Globe,
-                            color: "emerald",
+                            styles: {
+                              active: "bg-emerald-500/[0.03] border-emerald-500/40 shadow-sm shadow-emerald-500/10",
+                              icon: "bg-emerald-500/10 border-emerald-500/30 text-emerald-600",
+                              label: "text-emerald-700",
+                              checked: "text-emerald-500"
+                            }
                           },
                           {
                             level: "verified_only",
-                            label: "Verified only",
+                            label: "Verified Only",
                             desc: "Visible only after a successful scan.",
                             icon: ShieldCheck,
-                            color: "amber",
+                            styles: {
+                              active: "bg-amber-500/[0.03] border-amber-500/40 shadow-sm shadow-amber-500/10",
+                              icon: "bg-amber-500/10 border-amber-500/30 text-amber-600",
+                              label: "text-amber-700",
+                              checked: "text-amber-500"
+                            }
                           },
                           {
                             level: "internal_only",
-                            label: "Internal use",
+                            label: "Internal Use",
                             desc: "Restricted to manufacturer portal.",
                             icon: EyeOff,
-                            color: "slate",
+                            styles: {
+                              active: "bg-slate-500/[0.03] border-slate-500/40 shadow-sm shadow-slate-500/10",
+                              icon: "bg-slate-500/10 border-slate-500/30 text-slate-600",
+                              label: "text-slate-700",
+                              checked: "text-slate-500"
+                            }
                           },
                         ].map((policy) => {
                           const Icon = policy.icon;
@@ -905,39 +920,26 @@ export default function ProductDetailsPage() {
                                   await updateProduct(productId, {
                                     imageAccessLevel: policy.level as any,
                                   });
-                                  toast.success(
-                                    `Access level: ${policy.label}`,
-                                  );
+                                  toast.success(`Access level: ${policy.label}`);
                                 } catch (err) {
                                   toast.error("Failed to sync policy");
                                 }
                               }}
                               className={cn(
                                 "flex items-start gap-4 p-4 h-auto rounded-2xl border-2 text-left transition-all group relative overflow-hidden active:scale-[0.98]",
-                                isActive
-                                  ? `bg-${policy.color}-500/[0.03] border-${policy.color}-500/40 shadow-sm shadow-${policy.color}-500/10`
-                                  : "bg-muted/10 border-border/30 text-muted-foreground hover:bg-muted/20 hover:border-border/60",
+                                isActive ? policy.styles.active : "bg-muted/10 border-border/30 text-muted-foreground hover:bg-muted/20 hover:border-border/60"
                               )}
                             >
                               <div
                                 className={cn(
                                   "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 border transition-all duration-500 group-hover:scale-110",
-                                  isActive
-                                    ? `bg-${policy.color}-500/10 border-${policy.color}-500/30 text-${policy.color}-600`
-                                    : "bg-background/80 border-border/40 text-muted-foreground/60",
+                                  isActive ? policy.styles.icon : "bg-background/80 border-border/40 text-muted-foreground/60"
                                 )}
                               >
                                 <Icon className="h-5 w-5" aria-hidden="true" />
                               </div>
                               <div className="flex-1 min-w-0 pr-6">
-                                <p
-                                  className={cn(
-                                    "text-xs font-black tracking-tight",
-                                    isActive
-                                      ? `text-${policy.color}-700`
-                                      : "text-foreground/80",
-                                  )}
-                                >
+                                <p className={cn("text-xs font-black tracking-tight", isActive ? policy.styles.label : "text-foreground/80")}>
                                   {policy.label}
                                 </p>
                                 <p className="text-[10px] opacity-60 mt-1 font-bold leading-relaxed line-clamp-2">
@@ -946,13 +948,7 @@ export default function ProductDetailsPage() {
                               </div>
                               {isActive && (
                                 <div className="absolute top-4 right-4">
-                                  <CheckCircle2
-                                    className={cn(
-                                      "h-4 w-4",
-                                      `text-${policy.color}-500`,
-                                    )}
-                                    aria-hidden="true"
-                                  />
+                                  <CheckCircle2 className={cn("h-4 w-4", policy.styles.checked)} aria-hidden="true" />
                                 </div>
                               )}
                             </Button>

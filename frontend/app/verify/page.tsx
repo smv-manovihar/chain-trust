@@ -15,7 +15,6 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { verifyScan } from "@/api/batch.api";
-import { addToCabinet } from "@/api/customer.api";
 import { verifyOnBlockchain, deriveUnitHash } from "@/api/web3-client";
 import { getVisitorId } from "@/lib/visitor";
 import { resolveMediaUrl } from "@/lib/media-url";
@@ -154,7 +153,7 @@ function InteractiveResultCard({
           cursor: "pointer",
         }}
         className={cn(
-          "group relative overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-12 shadow-xl border transition-all duration-300 bg-card text-card-foreground",
+          "group relative overflow-hidden rounded-3xl p-6 sm:p-12 shadow-xl border transition-all duration-300 bg-card text-card-foreground",
           isInvalid || isRecalled
             ? "border-destructive/30 shadow-destructive/10"
             : scanStats.isSuspicious
@@ -557,7 +556,7 @@ function VerifyContent() {
               />
             ) : (
               <div className="max-w-3xl mx-auto w-full flex-1 flex flex-col min-h-0 gap-6 justify-center">
-                <div className="flex-1 max-h-[600px] flex flex-col items-center justify-center bg-card/50 rounded-[2rem] border border-border/50 border-dashed p-4 sm:p-8 shadow-sm relative overflow-hidden">
+                <div className="flex-1 max-h-[600px] flex flex-col items-center justify-center bg-card/50 rounded-3xl border border-border/50 border-dashed p-4 sm:p-8 shadow-sm relative overflow-hidden">
                   {scanView === "camera" ? (
                     <VideoScanner 
                       isMobileDevice={false} 
@@ -615,7 +614,7 @@ function VerifyContent() {
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-                  <Card className={cn("sm:col-span-3 p-6 sm:p-8 border rounded-[2rem] sm:rounded-[2.5rem] flex flex-col md:flex-row items-start md:items-center gap-6 shadow-sm", scanStats.isSuspicious ? "bg-amber-500/5 border-amber-500/30" : (verificationStatus.isInvalid || verificationStatus.isRecalled) ? "bg-destructive/5 border-destructive/30" : "bg-green-500/5 border-green-500/30")}>
+                  <Card className={cn("sm:col-span-3 p-6 sm:p-8 border rounded-3xl flex flex-col md:flex-row items-start md:items-center gap-6 shadow-sm", scanStats.isSuspicious ? "bg-amber-500/5 border-amber-500/30" : (verificationStatus.isInvalid || verificationStatus.isRecalled) ? "bg-destructive/5 border-destructive/30" : "bg-green-500/5 border-green-500/30")}>
                     <div className={cn("h-16 w-16 sm:h-20 sm:w-20 rounded-full flex items-center justify-center shrink-0 shadow-inner", (verificationStatus.isInvalid || verificationStatus.isRecalled) ? "bg-destructive/20" : scanStats.isSuspicious ? "bg-amber-500/20" : "bg-green-500/20")}>
                       {(verificationStatus.isInvalid || verificationStatus.isRecalled) ? <AlertTriangle className="h-8 w-8 sm:h-10 sm:w-10 text-destructive" aria-hidden="true" /> : scanStats.isSuspicious ? <AlertTriangle className="h-8 w-8 sm:h-10 sm:w-10 text-amber-600" aria-hidden="true" /> : <ShieldCheck className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" aria-hidden="true" />}
                     </div>
@@ -646,7 +645,7 @@ function VerifyContent() {
                     </div>
                   </Card>
                   
-                  <Card className="p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border-border/50 bg-card/50 shadow-sm transition-all hover:bg-card">
+                  <Card className="p-5 sm:p-6 rounded-3xl border-border/50 bg-card/50 shadow-sm transition-all hover:bg-card">
                     <p className="text-[10px] font-black text-muted-foreground mb-3 opacity-60">Unit serial</p>
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-primary/10 rounded-xl text-primary"><PackageCheck className="h-5 w-5" aria-hidden="true" /></div>
@@ -654,7 +653,7 @@ function VerifyContent() {
                     </div>
                   </Card>
 
-                  <Card className="p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border-border/50 bg-card/50 shadow-sm transition-all hover:bg-card">
+                  <Card className="p-5 sm:p-6 rounded-3xl border-border/50 bg-card/50 shadow-sm transition-all hover:bg-card">
                     <p className="text-[10px] font-black text-muted-foreground mb-3 opacity-60">Provenance</p>
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-primary/10 rounded-xl text-primary"><Building2 className="h-5 w-5" aria-hidden="true" /></div>
@@ -670,7 +669,7 @@ function VerifyContent() {
 
       {showLoginDialog && (
         <AlertDialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
-          <AlertDialogContent className="rounded-[2rem]">
+          <AlertDialogContent className="rounded-3xl">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-2xl font-black">Account required</AlertDialogTitle>
               <AlertDialogDescription className="font-medium">Please log in to save medicines to your personalized list and receive safety alerts if this batch of medicines is ever recalled.</AlertDialogDescription>

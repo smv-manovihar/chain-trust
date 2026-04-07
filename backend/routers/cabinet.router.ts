@@ -2,6 +2,7 @@ import { type Router as RouterType, Router } from 'express';
 import { authenticateJWT as authenticate } from '../middlewares/auth.middleware.js';
 import {
 	getCabinetStats,
+	getUpcomingDoses,
 	getRecentUserScans,
 	getPersonalCabinet,
 	addToCabinet,
@@ -9,6 +10,8 @@ import {
 	updateCabinetItem,
 	removeFromCabinet,
 	markDoseTaken,
+	undoDose,
+	getDosageLogs,
 	getUserPrescriptions,
 	uploadPrescription,
 	deletePrescription
@@ -18,6 +21,7 @@ const router: RouterType = Router();
 
 // Stats & Scans
 router.get('/stats', authenticate, getCabinetStats);
+router.get('/upcoming', authenticate, getUpcomingDoses);
 router.get('/recent-scans', authenticate, getRecentUserScans);
 
 // Cabinet CRUD
@@ -27,6 +31,9 @@ router.get('/:id', authenticate, getCabinetItem);
 router.put('/:id', authenticate, updateCabinetItem);
 router.delete('/:id', authenticate, removeFromCabinet);
 router.post('/mark-taken/:id', authenticate, markDoseTaken);
+router.post('/undo-dose/:id', authenticate, undoDose);
+router.get('/logs/:id', authenticate, getDosageLogs);
+
 
 // Prescription Pool
 router.get('/prescriptions/list', authenticate, getUserPrescriptions);

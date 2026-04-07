@@ -199,7 +199,7 @@ export default function Home() {
                     className="group relative rounded-3xl p-[1px] overflow-hidden transition-all duration-500 hover:shadow-2xl hover:shadow-primary/20 hover:-translate-y-2"
                   >
                     <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-primary/10 opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
-                    <div className="relative h-full bg-background/80 dark:bg-card/80 backdrop-blur-xl p-8 rounded-[23px] border border-white/5 flex flex-col items-start overflow-hidden">
+                    <div className="relative h-full bg-background/80 dark:bg-card/80 backdrop-blur-xl p-8 rounded-3xl border border-white/5 flex flex-col items-start overflow-hidden">
                       <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 rounded-full blur-3xl group-hover:bg-primary/30 transition-all duration-500 opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 pointer-events-none" />
                       <div className="relative z-10 w-full flex flex-col items-start text-left gap-5">
                         <div className="relative h-14 w-14 shrink-0 rounded-2xl flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-500 group-hover:-rotate-6 overflow-hidden">
@@ -236,7 +236,7 @@ export default function Home() {
                     className="group relative rounded-3xl p-[1px] overflow-hidden transition-all duration-500 hover:shadow-2xl hover:shadow-blue-500/20 hover:-translate-y-2"
                   >
                     <div className="absolute inset-0 bg-gradient-to-br from-blue-500/30 via-transparent to-blue-500/10 opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
-                    <div className="relative h-full bg-background/80 dark:bg-card/80 backdrop-blur-xl p-8 rounded-[23px] border border-white/5 flex flex-col items-start overflow-hidden">
+                    <div className="relative h-full bg-background/80 dark:bg-card/80 backdrop-blur-xl p-8 rounded-3xl border border-white/5 flex flex-col items-start overflow-hidden">
                       <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-500/20 rounded-full blur-3xl group-hover:bg-blue-500/30 transition-all duration-500 opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 pointer-events-none" />
                       <div className="relative z-10 w-full flex flex-col items-start text-left gap-5">
                         <div className="relative h-14 w-14 shrink-0 rounded-2xl flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-500 group-hover:-rotate-6 overflow-hidden">

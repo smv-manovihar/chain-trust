@@ -215,7 +215,7 @@ export default function ManufacturerDashboard() {
             ].map((action, i) => (
               <div key={i} className="flex flex-col h-full">
                 <Link href={action.href} className="flex-1">
-                  <Card className="p-5 rounded-[2rem] border-border/40 bg-card/40 backdrop-blur-md hover:bg-muted/40 transition-all group h-full flex flex-col">
+                  <Card className="p-5 rounded-3xl border-border/40 bg-card/40 backdrop-blur-md hover:bg-muted/40 transition-all group h-full flex flex-col">
                     <div
                       className={cn(
                         "h-12 w-12 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110",
@@ -254,7 +254,7 @@ export default function ManufacturerDashboard() {
             </Button>
           </div>
 
-          <Card className="rounded-[2.5rem] border-border/40 bg-card/20 backdrop-blur-sm p-6 overflow-hidden">
+          <Card className="rounded-3xl border-border/40 bg-card/20 backdrop-blur-sm p-6 overflow-hidden">
             <div className="space-y-4">
               {recentNotifications.length > 0 ? (
                 recentNotifications.map((notif, i) => (

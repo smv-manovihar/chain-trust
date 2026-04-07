@@ -35,6 +35,7 @@ import {
   Hash,
   Activity,
   Layers,
+  Clock,
   Stethoscope,
   AlignLeft,
 } from "lucide-react";
@@ -57,12 +58,17 @@ const medicineSchema = z.object({
   composition: z.string().min(2, "Composition / molecules are required"),
   dosage: z.string().optional(),
   frequency: z.string().optional(),
-  quantity: z.coerce.number().min(1, "Quantity must be at least 1").optional(),
+  currentQuantity: z.coerce.number().min(0, "Current quantity cannot be negative").optional(),
+  totalQuantity: z.coerce.number().min(1, "Pack size must be at least 1").optional(),
   unit: z.string().optional(),
   doctorName: z.string().optional(),
   notes: z.string().optional(),
   medicineCode: z.string().optional(),
   expiryDate: z.date().optional(),
+  reminderTimes: z.array(z.object({
+    time: z.date(),
+    mealContext: z.enum(['before_meal', 'after_meal', 'with_meal', 'no_preference'])
+  })).default([]),
 });
 
 type MedicineValues = z.infer<typeof medicineSchema>;
@@ -86,13 +92,15 @@ export default function AddMedicinePage() {
       brand: "",
       composition: "",
       dosage: "",
-      frequency: "",
-      quantity: 30,
+      frequency: "Daily",
+      currentQuantity: 30,
+      totalQuantity: 30,
       unit: "pills",
       doctorName: "",
       notes: "",
       medicineCode: "",
       expiryDate: undefined,
+      reminderTimes: [],
     },
   });
 
@@ -119,9 +127,10 @@ export default function AddMedicinePage() {
 
   const nextStep = async () => {
     let fields: string[] = [];
-    if (step === 1) fields = ["name", "brand", "composition"];
-    else if (step === 2) fields = ["dosage", "frequency", "quantity", "unit"];
-    else if (step === 3) fields = ["medicineCode", "expiryDate", "doctorName", "notes"];
+    if (step === 1) fields = ["reminderTimes"];
+    else if (step === 2) fields = ["name", "brand", "composition"];
+    else if (step === 3) fields = ["currentQuantity", "totalQuantity", "unit", "dosage"];
+    else if (step === 4) fields = ["expiryDate", "doctorName"];
 
     const isValid = await form.trigger(fields as any);
     if (isValid) setStep((s) => s + 1);
@@ -150,11 +159,15 @@ export default function AddMedicinePage() {
         prescriptionIds: selectedPrescriptionIds,
         dosage: data.dosage,
         frequency: data.frequency,
-        currentQuantity: data.quantity || 30,
-        totalQuantity: data.quantity || 30,
+        currentQuantity: data.currentQuantity,
+        totalQuantity: data.totalQuantity,
         unit: data.unit,
         doctorName: data.doctorName,
         notes: data.notes,
+        reminderTimes: data.reminderTimes?.map(r => ({
+          ...r,
+          time: r.time.toISOString()
+        })),
       });
 
       toast.success("Medicine Added", {
@@ -221,10 +234,129 @@ export default function AddMedicinePage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               {step === 1 && (
+                <div className="space-y-8">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-primary/10 rounded-2xl shadow-inner">
+                      <Clock className="h-6 w-6 text-primary" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-black tracking-tight">Schedule & Reminders</h2>
+                      <p className="text-sm text-muted-foreground font-medium opacity-70">
+                        When do you need to take this medicine?
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <FormField
+                      control={form.control}
+                      name="reminderTimes"
+                      render={({ field }) => (
+                        <FormItem className="space-y-4">
+                          <div className="flex items-center justify-between px-1">
+                            <FormLabel className="text-sm font-black text-foreground/80">Daily Doses</FormLabel>
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              size="sm" 
+                              className="rounded-full border-dashed border-primary/30 h-8 px-4 text-[10px] font-black"
+                              onClick={() => {
+                                const newTime = new Date();
+                                newTime.setHours(8, 0, 0, 0);
+                                field.onChange([...field.value, { time: newTime, mealContext: 'no_preference' }]);
+                              }}
+                            >
+                              <Plus className="h-3.5 w-3.5 mr-1" /> Add Time
+                            </Button>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {field.value.length === 0 && (
+                              <div className="col-span-full py-12 px-6 border-2 border-dashed border-primary/5 rounded-[2rem] flex flex-col items-center justify-center text-center bg-muted/5">
+                                <Clock className="h-8 w-8 text-muted-foreground/20 mb-3" />
+                                <p className="text-sm font-bold text-muted-foreground/40">No reminders set.</p>
+                                <Button 
+                                  type="button" 
+                                  variant="link" 
+                                  className="text-xs font-black text-primary mt-2"
+                                  onClick={() => {
+                                    const t1 = new Date(); t1.setHours(8, 0, 0, 0);
+                                    field.onChange([{ time: t1, mealContext: 'no_preference' }]);
+                                  }}
+                                >
+                                  Fast Add: Morning (8:00 AM)
+                                </Button>
+                              </div>
+                            )}
+                            
+                            {field.value.map((reminder, index) => (
+                              <Card key={index} className="p-4 rounded-3xl border-primary/5 bg-background relative group">
+                                <div className="flex gap-4 items-center">
+                                  <div className="flex-1 space-y-3">
+                                    <div className="flex flex-col gap-1.5">
+                                      <Label className="text-[10px] font-black text-muted-foreground/60 px-1">Dose Time</Label>
+                                      <Input 
+                                        type="time" 
+                                        className="h-10 rounded-xl bg-muted/30 border-none font-black text-sm"
+                                        value={format(reminder.time, "HH:mm")}
+                                        onChange={(e) => {
+                                          const [h, m] = e.target.value.split(':');
+                                          const newVal = [...field.value];
+                                          const d = new Date(reminder.time);
+                                          d.setHours(parseInt(h), parseInt(m));
+                                          newVal[index].time = d;
+                                          field.onChange(newVal);
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                      <Label className="text-[10px] font-black text-muted-foreground/60 px-1">Context</Label>
+                                      <select 
+                                        className="h-10 rounded-xl bg-muted/30 border-none font-bold text-xs px-3 focus:ring-1 focus:ring-primary/20 outline-none"
+                                        value={reminder.mealContext}
+                                        onChange={(e) => {
+                                          const newVal = [...field.value];
+                                          newVal[index].mealContext = e.target.value as any;
+                                          field.onChange(newVal);
+                                        }}
+                                      >
+                                        <option value="no_preference">No Preference</option>
+                                        <option value="before_meal">Before Meal</option>
+                                        <option value="after_meal">After Meal</option>
+                                        <option value="with_meal">With Meal</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                  <Button 
+                                    type="button" 
+                                    variant="ghost" 
+                                    size="icon"
+                                    className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10"
+                                    onClick={() => {
+                                      const newVal = [...field.value];
+                                      newVal.splice(index, 1);
+                                      field.onChange(newVal);
+                                    }}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </Card>
+                            ))}
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {step === 2 && (
                 <div className="space-y-6">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-primary/10 rounded-xl">
-                      <Pill className="h-5 w-5 text-primary" aria-hidden="true" />
+                      <Fingerprint className="h-5 w-5 text-primary" aria-hidden="true" />
                     </div>
                     <div>
                       <h2 className="text-xl font-black">Identity</h2>
@@ -308,16 +440,16 @@ export default function AddMedicinePage() {
                 </div>
               )}
 
-              {step === 2 && (
+              {step === 3 && (
                 <div className="space-y-6">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-primary/10 rounded-xl">
                       <Activity className="h-5 w-5 text-primary" aria-hidden="true" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-black">Dosage & Usage</h2>
+                      <h2 className="text-xl font-black">Stocks & Dosage</h2>
                       <p className="text-xs text-muted-foreground font-medium">
-                        How and when you take this
+                        Current supply and dosage amount
                       </p>
                     </div>
                   </div>
@@ -325,58 +457,11 @@ export default function AddMedicinePage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <FormField
                       control={form.control}
-                      name="dosage"
+                      name="currentQuantity"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-xs font-black text-muted-foreground/80 ml-1">
-                            Dosage (e.g. 500mg)
-                          </FormLabel>
-                          <FormControl>
-                            <div className="relative group">
-                              <FlaskConical className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40 group-focus-within:opacity-100 transition-opacity" />
-                              <Input
-                                placeholder="500mg"
-                                className="pl-11 h-12 rounded-full border-primary/10 bg-muted/20 focus-visible:ring-primary/20 font-semibold"
-                                {...field}
-                                autoFocus
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="frequency"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-black text-muted-foreground/80 ml-1">
-                            Frequency
-                          </FormLabel>
-                          <FormControl>
-                            <div className="relative group">
-                              <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40 group-focus-within:opacity-100 transition-opacity" aria-hidden="true" />
-                              <Input
-                                placeholder="e.g. Twice daily"
-                                className="pl-11 h-12 rounded-full border-primary/10 bg-muted/20 focus-visible:ring-primary/20 font-semibold"
-                                {...field}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="quantity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-black text-muted-foreground/80 ml-1">
-                            Quantity
+                            How many do you have now?
                           </FormLabel>
                           <FormControl>
                             <div className="relative group">
@@ -384,9 +469,57 @@ export default function AddMedicinePage() {
                               <Input
                                 type="number"
                                 placeholder="30"
-                                className="pl-11 h-12 rounded-full border-primary/10 bg-muted/20 focus-visible:ring-primary/20 font-semibold"
+                                className="pl-11 h-12 rounded-full border-primary/10 bg-muted/20 focus-visible:ring-primary/20 font-black"
                                 {...field}
                                 onChange={(e) => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="totalQuantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-black text-muted-foreground/80 ml-1">
+                            Standard Pack size
+                          </FormLabel>
+                          <FormControl>
+                            <div className="relative group">
+                              <Package className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40 group-focus-within:opacity-100 transition-opacity" aria-hidden="true" />
+                              <Input
+                                type="number"
+                                placeholder="30"
+                                className="pl-11 h-12 rounded-full border-primary/10 bg-muted/20 focus-visible:ring-primary/20 font-black"
+                                {...field}
+                                onChange={(e) => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="dosage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-black text-muted-foreground/80 ml-1">
+                            Dosage per take (e.g. 1 Tablet)
+                          </FormLabel>
+                          <FormControl>
+                            <div className="relative group">
+                              <FlaskConical className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40 group-focus-within:opacity-100 transition-opacity" />
+                              <Input
+                                placeholder="1 Tablet"
+                                className="pl-11 h-12 rounded-full border-primary/10 bg-muted/20 focus-visible:ring-primary/20 font-semibold"
+                                {...field}
                               />
                             </div>
                           </FormControl>
@@ -401,7 +534,7 @@ export default function AddMedicinePage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-xs font-black text-muted-foreground/80 ml-1">
-                            Unit
+                            Unit Type
                           </FormLabel>
                           <FormControl>
                             <div className="relative group">
@@ -421,45 +554,21 @@ export default function AddMedicinePage() {
                 </div>
               )}
 
-              {step === 3 && (
-                <div className="space-y-6">
+              {step === 4 && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-primary/10 rounded-xl">
-                      <Hash className="h-5 w-5 text-primary" aria-hidden="true" />
+                      <ImageIcon className="h-5 w-5 text-primary" aria-hidden="true" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-black">Tracking & Details</h2>
+                      <h2 className="text-xl font-black">Clinical & Photos</h2>
                       <p className="text-xs text-muted-foreground font-medium">
-                        Expiry, medical info, and codes
+                        Photos, expiry, and prescriptions
                       </p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <FormField
-                      control={form.control}
-                      name="medicineCode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-black text-muted-foreground/80 ml-1">
-                            Medicine code
-                          </FormLabel>
-                          <FormControl>
-                            <div className="relative group">
-                              <Hash className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40 group-focus-within:opacity-100 transition-opacity" aria-hidden="true" />
-                              <Input
-                                placeholder="Code on pack"
-                                className="pl-11 h-12 rounded-full border-primary/10 bg-muted/20 focus-visible:ring-primary/20 font-mono font-bold"
-                                {...field}
-                                autoFocus
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
                     <FormField
                       control={form.control}
                       name="expiryDate"
@@ -534,48 +643,9 @@ export default function AddMedicinePage() {
                         </FormItem>
                       )}
                     />
-
-                    <FormField
-                      control={form.control}
-                      name="notes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-black text-muted-foreground/80 ml-1">
-                            Notes
-                          </FormLabel>
-                          <FormControl>
-                            <div className="relative group">
-                              <AlignLeft className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40 group-focus-within:opacity-100 transition-opacity" aria-hidden="true" />
-                              <Input
-                                placeholder="Any additional notes"
-                                className="pl-11 h-12 rounded-full border-primary/10 bg-muted/20 focus-visible:ring-primary/20 font-semibold"
-                                {...field}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {step === 4 && (
-                <div className="space-y-8">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-primary/10 rounded-xl">
-                      <ImageIcon className="h-5 w-5 text-primary" aria-hidden="true" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-black">Attachments</h2>
-                      <p className="text-xs text-muted-foreground font-medium">
-                        Photos and clinical proof
-                      </p>
-                    </div>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-4 pt-4">
                     <Label className="text-xs font-black text-muted-foreground/80 ml-1">
                       Medicine photos
                     </Label>
@@ -617,7 +687,7 @@ export default function AddMedicinePage() {
                   <div className="pt-6 border-t border-primary/5">
                     <div className="flex items-center justify-between mb-4">
                       <Label className="text-xs font-bold text-muted-foreground/80 ml-1">
-                        Clinical proof
+                        Clinical proof (Prescriptions)
                       </Label>
                       <Button
                         type="button"
@@ -626,7 +696,7 @@ export default function AddMedicinePage() {
                         onClick={() => setIsPrescriptionDialogOpen(true)}
                         className="h-8 rounded-full border-dashed border-primary/30 hover:border-primary/50 text-[10px] font-bold px-3"
                       >
-                        <Plus className="h-3 w-3 mr-1" aria-hidden="true" /> Attach prescription
+                        <Plus className="h-3.5 w-3.5 mr-1" aria-hidden="true" /> Manage
                       </Button>
                     </div>
 
@@ -638,7 +708,7 @@ export default function AddMedicinePage() {
                     />
 
                     {selectedPrescriptionIds.length > 0 && (
-                      <div className="flex flex-wrap gap-2 p-4 bg-primary/5 rounded-[1.5rem] border border-primary/10 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div className="flex flex-wrap gap-2 p-4 bg-primary/5 rounded-[1.5rem] border border-primary/10">
                         {selectedPrescriptionIds.map((id) => (
                           <div
                             key={id}
@@ -646,7 +716,7 @@ export default function AddMedicinePage() {
                           >
                             <Check className="h-3 w-3" aria-hidden="true" />
                             <span>
-                              Prescription ID: {id.slice(-6).toUpperCase()}
+                              ID: {id.slice(-6).toUpperCase()}
                             </span>
                           </div>
                         ))}

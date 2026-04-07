@@ -108,12 +108,15 @@ export default function ManufacturerSettingsPage() {
     }
   };
 
-  const handlePrefToggle = async (key: string, enabled: boolean) => {
+  const handlePrefToggle = async (key: string, channel: 'inApp' | 'email', enabled: boolean) => {
     if (!notificationPrefs) return;
     
     const newPrefs = {
       ...notificationPrefs,
-      [key]: { inApp: enabled, email: enabled }
+      [key]: { 
+        ...notificationPrefs[key],
+        [channel]: enabled 
+      }
     };
     
     setNotificationPrefs(newPrefs);
@@ -315,63 +318,70 @@ export default function ManufacturerSettingsPage() {
           value="notifications"
           className="space-y-6"
         >
-          <Card className="border border-border rounded-[2rem] overflow-hidden">
-            <CardHeader className="bg-muted/10">
+          <Card className="border border-border rounded-[2rem] overflow-hidden shadow-sm">
+            <CardHeader className="bg-muted/30 pb-8">
               <div className="flex items-center gap-2">
-                <Bell className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg font-black">
-                  Alert Preferences
+                <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                  <Bell className="h-5 w-5" />
+                </div>
+                <CardTitle className="text-xl font-black tracking-tight">
+                  Notification Hub
                 </CardTitle>
               </div>
-              <CardDescription>
-                Configure how you want to be notified of critical events.
+              <CardDescription className="text-sm font-medium">
+                Configure institutional alert channels for supply chain monitoring
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-0 divide-y divide-border">
-              <div className="flex items-center justify-between gap-4 py-6">
-                <div className="space-y-1">
-                  <Label className="text-sm font-bold">Email Summaries</Label>
-                  <p className="text-xs text-muted-foreground italic">
-                    Daily breakdown of production batches and scan activity.
-                  </p>
-                </div>
-                <Switch
-                  checked={notificationPrefs?.scan_milestone?.inApp || false}
-                  onCheckedChange={(checked) => handlePrefToggle('scan_milestone', checked)}
-                  disabled={prefsLoading || !notificationPrefs}
-                  className="data-[state=checked]:bg-primary shrink-0"
-                />
-              </div>
-              <div className="flex items-center justify-between gap-4 py-6">
-                <div className="space-y-1">
-                  <Label className="text-sm font-bold">
-                    Inventory Warnings
-                  </Label>
-                  <p className="text-xs text-muted-foreground italic">
-                    Instant alerts when batch unit counts drop below 10%.
-                  </p>
-                </div>
-                <Switch
-                  checked={notificationPrefs?.system?.inApp || false}
-                  onCheckedChange={(checked) => handlePrefToggle('system', checked)}
-                  disabled={prefsLoading || !notificationPrefs}
-                  className="data-[state=checked]:bg-primary shrink-0"
-                />
-              </div>
-              <div className="flex items-center justify-between gap-4 py-6">
-                <div className="space-y-1">
-                  <Label className="text-sm font-bold">Security Alerts</Label>
-                  <p className="text-xs text-muted-foreground italic">
-                    Notifications for unusual scan velocities or geographic
-                    jumps.
-                  </p>
-                </div>
-                <Switch
-                  checked={notificationPrefs?.suspicious_scan?.inApp || false}
-                  onCheckedChange={(checked) => handlePrefToggle('suspicious_scan', checked)}
-                  disabled={prefsLoading || !notificationPrefs}
-                  className="data-[state=checked]:bg-primary shrink-0"
-                />
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-border/50 bg-muted/5">
+                      <th className="text-left py-6 px-8 text-xs font-black uppercase tracking-widest text-muted-foreground/60 w-full">Alert Category</th>
+                      <th className="py-6 px-6 text-xs font-black uppercase tracking-widest text-muted-foreground/60 text-center">In-App</th>
+                      <th className="py-6 px-8 text-xs font-black uppercase tracking-widest text-muted-foreground/60 text-center">Email</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {[
+                      { key: 'suspicious_scan', label: 'Security Alerts', desc: 'Unusual scan velocities or geographic anomalies.' },
+                      { key: 'scan_milestone', label: 'Scan Milestones', desc: 'Alerts for batch reach and consumer engagement levels.' },
+                      { key: 'inventory_warning', label: 'Inventory Alerts', desc: 'Low-stock warnings for enrolled batches.' },
+                      { key: 'system', label: 'System Compliance', desc: 'Platform updates and regulatory requirement changes.' },
+                    ].map((type) => (
+                      <tr key={type.key} className="group hover:bg-muted/5 transition-colors">
+                        <td className="py-6 px-8">
+                          <div className="space-y-1">
+                            <Label className="text-sm font-black">{type.label}</Label>
+                            <p className="text-xs text-muted-foreground/70 font-medium max-w-sm line-clamp-1 group-hover:line-clamp-none transition-all">
+                              {type.desc}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="py-6 px-6">
+                          <div className="flex justify-center">
+                            <Switch 
+                              checked={notificationPrefs?.[type.key]?.inApp || false}
+                              onCheckedChange={(checked) => handlePrefToggle(type.key, 'inApp', checked)}
+                              disabled={prefsLoading || !notificationPrefs}
+                              className="scale-90 data-[state=checked]:bg-primary"
+                            />
+                          </div>
+                        </td>
+                        <td className="py-6 px-8">
+                          <div className="flex justify-center">
+                            <Switch 
+                              checked={notificationPrefs?.[type.key]?.email || false}
+                              onCheckedChange={(checked) => handlePrefToggle(type.key, 'email', checked)}
+                              disabled={prefsLoading || !notificationPrefs}
+                              className="scale-90 data-[state=checked]:bg-primary"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>

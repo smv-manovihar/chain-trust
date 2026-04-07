@@ -95,12 +95,15 @@ export default function CustomerSettingsPage() {
     fetchPrefs();
   }, []);
 
-  const handlePrefToggle = async (key: string, enabled: boolean) => {
+  const handlePrefToggle = async (key: string, channel: 'inApp' | 'email', enabled: boolean) => {
     if (!notificationPrefs) return;
     
     const newPrefs = {
       ...notificationPrefs,
-      [key]: { inApp: enabled, email: enabled }
+      [key]: { 
+        ...notificationPrefs[key],
+        [channel]: enabled 
+      }
     };
     
     setNotificationPrefs(newPrefs);
@@ -376,62 +379,71 @@ export default function CustomerSettingsPage() {
           value="notifications"
           className="space-y-6"
         >
-          <Card className="border border-border rounded-[2rem] overflow-hidden">
-            <CardHeader className="bg-muted/10">
+          <Card className="border border-border rounded-[2rem] overflow-hidden shadow-sm">
+            <CardHeader className="bg-muted/30 pb-8">
               <div className="flex items-center gap-2">
-                <Bell className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg font-black">
-                  Alert Preferences
+                <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                  <Bell className="h-5 w-5" />
+                </div>
+                <CardTitle className="text-xl font-black tracking-tight">
+                  Notification Hub
                 </CardTitle>
               </div>
-              <CardDescription>
-                Configure how you want to stay updated on your medication
-                safety.
+              <CardDescription className="text-sm font-medium">
+                Customize how and where you receive critical medicine alerts
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-0 divide-y divide-border">
-              <div className="flex items-center justify-between gap-4 py-6">
-                <div className="space-y-1">
-                  <Label className="text-sm font-bold">Safety Recalls</Label>
-                  <p className="text-xs text-muted-foreground italic">
-                    Critical alerts if any of your verified medicines are
-                    recalled.
-                  </p>
-                </div>
-                <Switch
-                  checked={notificationPrefs?.batch_recall?.inApp || false}
-                  onCheckedChange={(checked) => handlePrefToggle('batch_recall', checked)}
-                  disabled={prefsLoading || !notificationPrefs}
-                  className="data-[state=checked]:bg-primary shrink-0"
-                />
-              </div>
-              <div className="flex items-center justify-between gap-4 py-6">
-                <div className="space-y-1">
-                  <Label className="text-sm font-bold">Health Insights</Label>
-                  <p className="text-xs text-muted-foreground italic">
-                    Monthly reports on your tracking habits and medicine safety.
-                  </p>
-                </div>
-                <Switch 
-                  checked={notificationPrefs?.medicine_expiry?.inApp || false}
-                  onCheckedChange={(checked) => handlePrefToggle('medicine_expiry', checked)}
-                  disabled={prefsLoading || !notificationPrefs}
-                  className="data-[state=checked]:bg-primary shrink-0" 
-                />
-              </div>
-              <div className="flex items-center justify-between gap-4 py-6">
-                <div className="space-y-1">
-                  <Label className="text-sm font-bold">Product Updates</Label>
-                  <p className="text-xs text-muted-foreground italic">
-                    News about new verification features and brand partnerships.
-                  </p>
-                </div>
-                <Switch 
-                  checked={notificationPrefs?.system?.inApp || false}
-                  onCheckedChange={(checked) => handlePrefToggle('system', checked)}
-                  disabled={prefsLoading || !notificationPrefs}
-                  className="data-[state=checked]:bg-primary shrink-0" 
-                />
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-border/50 bg-muted/5">
+                      <th className="text-left py-6 px-8 text-xs font-black uppercase tracking-widest text-muted-foreground/60 w-full">Alert Type</th>
+                      <th className="py-6 px-6 text-xs font-black uppercase tracking-widest text-muted-foreground/60 text-center">In-App</th>
+                      <th className="py-6 px-8 text-xs font-black uppercase tracking-widest text-muted-foreground/60 text-center">Email</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {[
+                      { key: 'batch_recall', label: 'Safety Recalls', desc: 'Immediate alerts if a medicine is recalled.' },
+                      { key: 'medicine_expiry', label: 'Expiry Alerts', desc: 'Notifications before your medicine expires.' },
+                      { key: 'dose_reminder', label: 'Dose Reminders', desc: 'Daily schedule tracking reminders.' },
+                      { key: 'low_stock', label: 'Low Stock', desc: 'Alerts when your stock drops below threshold.' },
+                      { key: 'system', label: 'System Updates', desc: 'New features and security improvements.' },
+                    ].map((type) => (
+                      <tr key={type.key} className="group hover:bg-muted/5 transition-colors">
+                        <td className="py-6 px-8">
+                          <div className="space-y-1">
+                            <Label className="text-sm font-black">{type.label}</Label>
+                            <p className="text-xs text-muted-foreground/70 font-medium max-w-sm line-clamp-1 group-hover:line-clamp-none transition-all">
+                              {type.desc}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="py-6 px-6">
+                          <div className="flex justify-center">
+                            <Switch 
+                              checked={notificationPrefs?.[type.key]?.inApp || false}
+                              onCheckedChange={(checked) => handlePrefToggle(type.key, 'inApp', checked)}
+                              disabled={prefsLoading || !notificationPrefs}
+                              className="scale-90 data-[state=checked]:bg-primary"
+                            />
+                          </div>
+                        </td>
+                        <td className="py-6 px-8">
+                          <div className="flex justify-center">
+                            <Switch 
+                              checked={notificationPrefs?.[type.key]?.email || false}
+                              onCheckedChange={(checked) => handlePrefToggle(type.key, 'email', checked)}
+                              disabled={prefsLoading || !notificationPrefs}
+                              className="scale-90 data-[state=checked]:bg-primary"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>

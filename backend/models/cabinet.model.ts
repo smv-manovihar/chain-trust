@@ -34,7 +34,7 @@ export interface ICabinetItem extends Document {
 	images?: string[];
 
 	// 4. Dose & Usage
-	dosage?: string;
+	dosage?: number;
 	frequency?: string;
 	currentQuantity?: number;
 	totalQuantity?: number;
@@ -45,9 +45,12 @@ export interface ICabinetItem extends Document {
 	// 5. Notifications & Reminders
 	reminderTimes?: IReminderTime[];
 	notificationOverrides?: INotificationOverride;
+	lastDoseTaken?: Date; // Timestamp of the most recent recorded dose
 
 	// 6. Lifecycle Status
 	status: 'active' | 'inactive';
+	currentStreak: number;
+	lastStreakUpdate?: Date;
 
 	createdAt: Date;
 	updatedAt: Date;
@@ -76,10 +79,10 @@ const cabinetItemSchema = new Schema<ICabinetItem>(
 		images: { type: [String], default: [] },
 
 		// 4. Dose & Usage
-		dosage: { type: String, trim: true },
+		dosage: { type: Number, default: 1, min: 0 },
 		frequency: { type: String, trim: true },
-		currentQuantity: { type: Number, default: 30 },
-		totalQuantity: { type: Number, default: 30 },
+		currentQuantity: { type: Number, default: 30, min: 0 },
+		totalQuantity: { type: Number, default: 30, min: 0 },
 		unit: { type: String, default: 'pills' },
 		doctorName: { type: String, trim: true },
 		notes: { type: String, trim: true },
@@ -109,11 +112,14 @@ const cabinetItemSchema = new Schema<ICabinetItem>(
 				email: { type: Boolean },
 			},
 		},
+		lastDoseTaken: { type: Date },
 		status: {
 			type: String,
 			enum: ['active', 'inactive'],
 			default: 'active',
 		},
+		currentStreak: { type: Number, default: 0 },
+		lastStreakUpdate: { type: Date },
 	},
 	{
 		timestamps: true,

@@ -24,41 +24,40 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <div className={cn("flex flex-col gap-4 pb-6 sm:pb-8 relative", className)}>
+    <div className={cn("flex flex-col gap-4 pb-4 relative", className)}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex-1 min-w-0 space-y-1">
-          <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-3 sm:gap-4">
             {backHref && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 rounded-full -ml-2 shrink-0 hover:bg-primary/10 hover:text-primary transition-all active:scale-95"
+                className="h-8 w-8 sm:h-10 sm:w-10 rounded-full -ml-2 shrink-0 hover:bg-primary/10 hover:text-primary transition-all active:scale-95 mt-0.5"
                 asChild
               >
                 <Link href={backHref}>
-                  <ChevronLeft className="h-5 w-5" />
+                  <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
                 </Link>
               </Button>
             )}
-            <h1 className="font-black tracking-tight text-foreground text-xl sm:text-3xl lg:text-4xl truncate">
-              {title}
-            </h1>
-          </div>
-          
-          {(description || stats) && (
-            <div className="flex flex-col gap-2">
+            <div className="flex-1 min-w-0 space-y-1">
+              <h1 className="font-black tracking-tight text-foreground text-xl sm:text-3xl lg:text-4xl truncate">
+                {title}
+              </h1>
+              
               {description && (
-                <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
+                <div className="text-muted-foreground text-xs sm:text-sm leading-relaxed font-medium">
                   {description}
-                </p>
+                </div>
               )}
+              
               {stats && (
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 mt-1">
                   {stats}
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
 
         {actions && (

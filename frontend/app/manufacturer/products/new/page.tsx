@@ -365,7 +365,7 @@ export default function NewProductWizard() {
         ))}
       </div>
 
-      <Card className="overflow-hidden border-border/40 shadow-sm">
+      <Card className="overflow-hidden border-border/40 shadow-sm rounded-3xl">
         <div className="p-6 md:p-8">
           <AnimatePresence mode="wait">
             <motion.div
@@ -490,7 +490,7 @@ export default function NewProductWizard() {
                         onChange={(e) =>
                           updateForm({ description: e.target.value })
                         }
-                        className="min-h-[160px] resize-none rounded-[1.5rem] p-4 shadow-inner"
+                        className="min-h-[160px] resize-none rounded-2xl p-4 shadow-inner"
                       />
                     </div>
                   </div>
@@ -510,7 +510,7 @@ export default function NewProductWizard() {
                     {form.images.map((file, idx) => (
                       <div
                         key={idx}
-                        className="relative aspect-square rounded-lg overflow-hidden group border border-border"
+                        className="relative aspect-square rounded-xl overflow-hidden group border border-border"
                       >
                         <img
                           src={
@@ -562,7 +562,7 @@ export default function NewProductWizard() {
                     <Label
                       htmlFor="img-up"
                       className={cn(
-                        "aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors",
+                        "aspect-square rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors",
                         uploading && "opacity-50 pointer-events-none",
                       )}
                     >

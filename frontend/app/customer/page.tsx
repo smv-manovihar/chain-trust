@@ -1,34 +1,27 @@
+// app/customer/dashboard/page.tsx (or equivalent)
 "use client";
 
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Pill,
   Clock,
   AlertTriangle,
   BellRing,
-  Plus,
   ShieldCheck,
-  ChevronRight,
-  PlusCircle,
-  Smartphone,
-  CheckCircle2,
-  FileText,
-  Settings,
-  Package,
   ArrowRight,
   QrCode,
+  RotateCcw,
 } from "lucide-react";
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 import {
   getDashboardStats,
   getCabinet,
-  CabinetItem,
   markDoseTaken,
+  undoDose,
+  CabinetItem,
 } from "@/api/customer.api";
 import {
   getNotifications,
@@ -41,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import { Progress } from "@/components/ui/progress";
 import { LoadingScreen } from "@/components/ui/loading-screen";
+import { UpcomingDoseCarousel } from "@/components/cabinet/upcoming-dose-carousel";
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
@@ -60,7 +54,6 @@ export default function CustomerDashboard() {
     try {
       const cabinetRes = await getCabinet();
       setMedications(cabinetRes || []);
-
       const statsRes = await getDashboardStats();
       setStats(statsRes);
     } catch (err) {
@@ -92,25 +85,29 @@ export default function CustomerDashboard() {
     fetchAlerts();
   }, []);
 
-  const handleMarkAsRead = async (id: string) => {
+  const handleTakeDose = async (id: string, name: string) => {
     try {
-      await markAsRead(id);
-      setAlerts((prev) => prev.filter((a) => a._id !== id));
-      setUnreadAlerts((prev) => Math.max(0, prev - 1));
+      const res = await markDoseTaken(id);
+      const isLate = !res.wasPunctual;
+      toast.success(isLate ? "Dose recorded (Late)" : "Dose recorded!", {
+        description: isLate
+          ? `Recorded outside the 3h window.`
+          : `Your dose has been recorded.`,
+        action: { label: "Undo", onClick: () => handleUndoDose(id, name) },
+      });
+      fetchData();
     } catch (err) {
-      toast.error("Failed to dismiss alert.");
+      toast.error("Failed to record dose");
     }
   };
 
-  const handleTakeDose = async (id: string, name: string) => {
+  const handleUndoDose = async (id: string, name: string) => {
     try {
-      await markDoseTaken(id);
-      toast.success("Dose Recorded", {
-        description: `Your dose for ${name} has been marked as taken.`,
-      });
-      fetchData(); // Refresh to update quantity bars
+      await undoDose(id);
+      toast.success("Dose undone");
+      fetchData();
     } catch (err) {
-      toast.error("Failed to record dose");
+      toast.error("Failed to undo dose");
     }
   };
 
@@ -120,16 +117,15 @@ export default function CustomerDashboard() {
     return qA - qB;
   });
 
-  if (isLoading || alertsLoading) {
-    return <LoadingScreen message="Loading..." />;
-  }
+  if (isLoading || alertsLoading)
+    return <LoadingScreen message="Loading dashboard..." />;
 
   return (
-    <div className="space-y-8 lg:space-y-12 pb-12">
+    <div className="space-y-8 pb-12">
       <PageHeader
         title={
           <>
-            Welcome,{" "}
+            Welcome back,{" "}
             <span className="text-primary">
               {user?.name?.split(" ")[0] || "User"}
             </span>
@@ -137,162 +133,176 @@ export default function CustomerDashboard() {
         }
         actions={
           <Button
-            className="rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 px-8 font-bold h-12 w-full sm:w-auto"
+            size="lg"
+            className="rounded-xl px-6 w-full sm:w-auto font-semibold"
             asChild
           >
             <Link href="/verify">
               <QrCode className="mr-2 h-5 w-5" />
-              Verify New Medicine
+              Scan & Verify New Medicine
             </Link>
           </Button>
         }
       />
 
-      {/* TOP ROW (3-Col Grid): Safety Profile (2) & My Medicines List (1) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Safety Profile Hero (2 Columns) */}
-        <div className="lg:col-span-2">
-          <Card className="p-10 lg:p-16 border-border/40 bg-card/40 backdrop-blur-md rounded-[3rem] shadow-sm flex flex-col justify-center relative overflow-hidden group min-h-[450px] h-full">
-            <div className="absolute top-0 right-0 p-12 opacity-5 rotate-12 pointer-events-none transition-transform duration-1000 group-hover:scale-110">
-              <ShieldCheck className="h-64 w-64 text-primary" />
-            </div>
-            <div className="relative">
-              <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground leading-[1.1]">
-                {unreadAlerts > 0
-                  ? "Review Required"
-                  : "You are all caught up!"}
-              </h2>
-              <p className="text-muted-foreground text-lg font-normal mt-4 max-w-[500px] leading-relaxed opacity-70">
-                Your medical supply is currently verified and secure.
-              </p>
-            </div>
-          </Card>
+      {/* TOP ROW: Hero Carousel & Inventory Sidebar */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Safety Profile Hero */}
+        <div className="lg:col-span-2 flex flex-col">
+          <UpcomingDoseCarousel />
         </div>
 
-        {/* My Medicines Sidebar (1 Column) */}
-        <section className="space-y-6 flex flex-col h-full min-h-[450px]">
-          <div className="flex items-center justify-between px-2">
-            <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
-              <Pill className="h-5 w-5 text-primary" strokeWidth={2.5} /> My
-              Medicines
+        {/* My Medicines Sidebar */}
+        <section className="flex flex-col h-full bg-card rounded-[2rem] border p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold flex items-center gap-2 text-foreground">
+              <Pill className="h-5 w-5 text-primary" /> Inventory
             </h3>
             <Button
               variant="link"
-              className="text-xs text-primary p-0 h-auto font-bold"
+              className="text-sm font-semibold text-primary p-0 h-auto"
               asChild
             >
-              <Link href="/customer/cabinet">
-                See all <ArrowRight className="ml-1 h-3 w-3" />
-              </Link>
+              <Link href="/customer/cabinet">View All</Link>
             </Button>
           </div>
 
-          <div className="space-y-4 flex-1 flex flex-col">
+          <div className="space-y-4 flex-1 flex flex-col overflow-y-auto pr-2">
             {medications.length > 0 ? (
-              sortedMeds.slice(0, 5).map((med) => (
-                <Card
-                  key={med._id}
-                  className="p-6 rounded-[2.5rem] border-border/30 bg-card/40 backdrop-blur-md border-dashed shadow-sm"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-bold text-muted-foreground tracking-tight leading-none mb-1.5">
-                        {med.brand}
-                      </p>
-                      <h4 className="text-base font-bold truncate tracking-tight leading-none">
-                        {med.name}
-                      </h4>
+              sortedMeds.slice(0, 4).map((med) => {
+                const isRecentlyTaken =
+                  !!med.lastDoseTaken &&
+                  Date.now() - new Date(med.lastDoseTaken).getTime() <
+                    5 * 60 * 1000;
+                const percentLeft = Math.round(
+                  ((med.currentQuantity || 0) / (med.totalQuantity || 100)) *
+                    100,
+                );
+
+                return (
+                  <div
+                    key={med._id}
+                    className="p-4 rounded-xl border bg-muted/30 transition-colors hover:bg-muted/50"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h4 className="font-semibold text-sm leading-tight mb-1 text-foreground">
+                          {med.name}
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                          {med.brand}
+                        </p>
+                      </div>
+                      <div className="flex gap-1.5">
+                        {isRecentlyTaken && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleUndoDose(med._id, med.name)}
+                            className="h-7 w-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        <Button
+                          variant={isRecentlyTaken ? "secondary" : "default"}
+                          size="sm"
+                          disabled={isRecentlyTaken}
+                          onClick={() => handleTakeDose(med._id, med.name)}
+                          className={cn(
+                            "h-7 px-3 rounded-md text-xs font-semibold",
+                            isRecentlyTaken && "opacity-50",
+                          )}
+                        >
+                          {isRecentlyTaken ? "Taken" : "Take"}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-[11px] font-medium text-muted-foreground">
+                        <span>Supply Remaining</span>
+                        <span
+                          className={
+                            percentLeft < 20
+                              ? "text-destructive font-bold"
+                              : "text-foreground"
+                          }
+                        >
+                          {med.currentQuantity} / {med.totalQuantity}
+                        </span>
+                      </div>
+                      <Progress
+                        value={percentLeft}
+                        className={cn(
+                          "h-1.5",
+                          percentLeft < 20 && "[&>div]:bg-destructive",
+                        )}
+                      />
                     </div>
                   </div>
-                  <Progress
-                    value={
-                      ((med.currentQuantity || 0) /
-                        (med.totalQuantity || 100)) *
-                      100
-                    }
-                    className="h-1 mb-4"
-                  />
-                  <div className="flex justify-between items-center bg-background/50 p-2 rounded-xl">
-                    <span className="text-[10px] font-black text-primary">
-                      {med.currentQuantity} Left
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleTakeDose(med._id, med.name)}
-                      className="h-8 px-4 rounded-xl text-[10px] font-black hover:bg-primary hover:text-white transition-all border-primary/20"
-                    >
-                      Taken
-                    </Button>
-                  </div>
-                </Card>
-              ))
+                );
+              })
             ) : (
-              <Card className="flex-1 min-h-[300px] lg:min-h-0 flex flex-col items-center justify-center text-center opacity-40 border-2 border-dashed rounded-[2.5rem] bg-muted/5 h-full">
-                <Pill className="h-8 w-8 mx-auto mb-3 opacity-20" />
-                <p className="text-[10px] font-bold text-muted-foreground">
-                  Your list is empty
-                </p>
-              </Card>
+              <div className="flex-1 flex flex-col items-center justify-center text-center opacity-60 bg-muted/20 rounded-xl border border-dashed py-8">
+                <Pill className="h-8 w-8 mb-2 opacity-40" />
+                <p className="text-sm font-medium">Cabinet is empty</p>
+              </div>
             )}
           </div>
         </section>
       </div>
 
-      {/* MIDDLE ROW: Safety Alerts (2/3 width) */}
-      <div className="grid lg:grid-cols-2 gap-8 pt-4">
+      {/* MIDDLE ROW: Quick Actions & Alerts */}
+      <div className="grid lg:grid-cols-2 gap-6">
         {/* Quick Actions */}
-        <section className="space-y-6">
-          <h2 className="text-xl font-bold tracking-tight px-2">
-            Quick Actions
-          </h2>
+        <section className="space-y-4">
+          <h2 className="text-lg font-bold px-1">Quick Actions</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
               {
                 title: "My Medicines",
-                desc: "Track inventory, doses, and expiry dates",
+                desc: "Manage your inventory & doses",
                 icon: Pill,
                 href: "/customer/cabinet",
-                color: "bg-primary/10 text-primary",
+                color: "text-primary bg-primary/10",
               },
               {
                 title: "Verify Medicine",
-                desc: "Perform a live blockchain security scan",
+                desc: "Scan a blockchain QR code",
                 icon: QrCode,
                 href: "/verify",
-                color: "bg-emerald-500/10 text-emerald-600",
+                color: "text-emerald-600 bg-emerald-500/10",
               },
               {
                 title: "Security Vault",
-                desc: "Digital prescriptions and lab reports",
+                desc: "Access reports & prescriptions",
                 icon: ShieldCheck,
                 href: "/customer/cabinet",
-                color: "bg-blue-500/10 text-blue-600",
+                color: "text-blue-600 bg-blue-500/10",
               },
               {
                 title: "Treatment Plans",
-                desc: "Manage reminders and dose schedules",
+                desc: "Adjust your schedule",
                 icon: Clock,
                 href: "/customer/settings",
-                color: "bg-amber-500/10 text-amber-600",
+                color: "text-amber-600 bg-amber-500/10",
               },
             ].map((action, i) => (
-              <Link key={i} href={action.href} className="group">
-                <Card className="p-6 rounded-[2rem] border-border/40 bg-card/40 backdrop-blur-md hover:bg-muted/40 transition-all h-full flex flex-col justify-start">
+              <Link key={i} href={action.href}>
+                <Card className="p-5 rounded-2xl border hover:border-primary/30 hover:shadow-md transition-all h-full group bg-card">
                   <div
                     className={cn(
-                      "h-12 w-12 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110",
+                      "h-10 w-10 rounded-xl flex items-center justify-center mb-3",
                       action.color,
                     )}
                   >
-                    <action.icon className="h-6 w-6" />
+                    <action.icon className="h-5 w-5" />
                   </div>
-                  <h4 className="font-bold text-base mb-1 group-hover:text-primary transition-colors">
+                  <h4 className="font-semibold text-sm mb-1 group-hover:text-primary transition-colors">
                     {action.title}
                   </h4>
-                  <p className="text-[13px] text-muted-foreground font-medium leading-relaxed">
-                    {action.desc}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{action.desc}</p>
                 </Card>
               </Link>
             ))}
@@ -300,26 +310,21 @@ export default function CustomerDashboard() {
         </section>
 
         {/* Safety Feed */}
-        <section className="space-y-6 flex flex-col h-full">
-          <h2 className="text-xl font-bold tracking-tight flex items-center gap-2 px-2">
-            <BellRing className="h-5 w-5 text-primary" strokeWidth={2.5} />{" "}
-            Safety Alerts
+        <section className="space-y-4 flex flex-col">
+          <h2 className="text-lg font-bold flex items-center gap-2 px-1">
+            <BellRing className="h-5 w-5 text-foreground" /> Safety Alerts
           </h2>
-          <Card className="rounded-[2.5rem] border-border/40 bg-card/20 backdrop-blur-sm p-6 overflow-hidden flex-1 flex flex-col min-h-[300px]">
-            <div className="space-y-5 flex-1 flex flex-col">
-              {alertsLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="p-4 h-[80px] animate-pulse rounded-[1.5rem] bg-muted/40"
-                  />
-                ))
-              ) : alerts.length > 0 ? (
+          <Card className="rounded-2xl border p-2 flex-1 flex flex-col bg-card shadow-sm">
+            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+              {alerts.length > 0 ? (
                 alerts.map((alert) => (
-                  <div key={alert._id} className="flex gap-4 items-start group">
+                  <div
+                    key={alert._id}
+                    className="flex gap-4 p-4 rounded-xl hover:bg-muted/40 transition-colors border border-transparent hover:border-border/60"
+                  >
                     <div
                       className={cn(
-                        "h-10 w-10 shrink-0 rounded-2xl flex items-center justify-center transition-colors",
+                        "h-10 w-10 shrink-0 rounded-full flex items-center justify-center",
                         alert.type === "batch_recall"
                           ? "bg-red-500/10 text-red-600"
                           : alert.type === "medicine_expiry"
@@ -328,44 +333,44 @@ export default function CustomerDashboard() {
                       )}
                     >
                       {alert.type === "batch_recall" ? (
-                        <AlertTriangle className="h-5 w-5" />
+                        <AlertTriangle className="h-4 w-4" />
                       ) : (
-                        <BellRing className="h-5 w-5" />
+                        <BellRing className="h-4 w-4" />
                       )}
                     </div>
-                    <div className="flex-1 min-w-0 border-b border-border/20 pb-4 last:border-0 last:pb-0">
-                      <div className="flex justify-between items-start mb-0.5 gap-2">
-                        <p className="text-sm font-bold truncate group-hover:text-primary transition-colors tracking-tight">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-baseline mb-1">
+                        <p className="text-sm font-semibold text-foreground truncate pr-4">
                           {alert.title}
                         </p>
-                        <span className="text-[11px] text-muted-foreground font-bold shrink-0">
+                        <span className="text-[10px] font-medium text-muted-foreground shrink-0">
                           {formatDistanceToNow(new Date(alert.createdAt), {
                             addSuffix: true,
                           })}
                         </span>
                       </div>
-                      <p className="text-[13px] text-muted-foreground line-clamp-2 font-medium leading-relaxed mb-3">
+                      <p className="text-xs text-muted-foreground line-clamp-2 mb-2 leading-relaxed">
                         {alert.message}
                       </p>
                       {alert.link && (
                         <Link
                           href={alert.link}
-                          className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+                          className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1"
                         >
-                          View Details <ArrowRight className="h-3 w-3" />
+                          View details <ArrowRight className="h-3 w-3" />
                         </Link>
                       )}
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="flex flex-col items-center justify-center text-center opacity-40 h-full py-20 lg:py-0">
-                  <ShieldCheck
-                    className="h-10 w-10 mb-3 text-primary"
-                    strokeWidth={1.5}
-                  />
-                  <p className="text-xs font-bold text-muted-foreground/60">
-                    Your supply is secure
+                <div className="flex flex-col items-center justify-center text-center opacity-60 h-full py-12">
+                  <div className="h-12 w-12 rounded-full bg-emerald-500/10 flex items-center justify-center mb-3">
+                    <ShieldCheck className="h-6 w-6 text-emerald-600" />
+                  </div>
+                  <p className="text-sm font-medium">No alerts at this time</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Your supply is secure and verified.
                   </p>
                 </div>
               )}

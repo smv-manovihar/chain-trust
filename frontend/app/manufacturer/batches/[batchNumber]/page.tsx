@@ -663,7 +663,7 @@ export default function BatchDetailPage() {
                   filteredUnits.map((unit: any) => (
                     <Card
                       key={unit.unitIndex}
-                      className="relative overflow-hidden group border-primary/10 bg-gradient-to-br from-background to-muted/30 flex flex-col items-center justify-center rounded-[2rem] transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5 hover:border-primary/40 p-4 sm:p-6 border-2"
+                      className="relative overflow-hidden group border-primary/10 bg-gradient-to-br from-background to-muted/30 flex flex-col items-center justify-center rounded-3xl transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5 hover:border-primary/40 p-4 sm:p-6 border-2"
                     >
                       <div className="relative">
                         <QrDisplay
@@ -715,7 +715,7 @@ export default function BatchDetailPage() {
               className="space-y-6 focus-visible:outline-none m-0 mt-6"
             >
               {/* Scan Analytics Suite Link */}
-              <Card className="p-5 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] bg-primary/5 border-primary/20 shadow-2xl shadow-primary/5 flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-8 group hover:bg-primary/[0.08] transition-all duration-500 border-2">
+              <Card className="p-5 sm:p-8 rounded-3xl bg-primary/5 border-primary/20 shadow-2xl shadow-primary/5 flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-8 group hover:bg-primary/[0.08] transition-all duration-500 border-2">
                 <div className="flex items-center gap-4 sm:gap-6 w-full lg:w-auto">
                   <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-2xl sm:rounded-3xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20 shrink-0">
                     <BarChart3
@@ -749,7 +749,7 @@ export default function BatchDetailPage() {
 
               {/* Stat Cards - Adjusted text sizes for mobile */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                <Card className="p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] bg-muted/10 border-border/40 flex items-center justify-between group hover:bg-primary/[0.02] transition-all h-32 sm:h-40 border-2">
+                <Card className="p-6 sm:p-8 rounded-3xl bg-muted/10 border-border/40 flex items-center justify-between group hover:bg-primary/[0.02] transition-all h-32 sm:h-40 border-2">
                   <div className="space-y-1 sm:space-y-2">
                     <p className="text-[9px] sm:text-xs font-bold text-muted-foreground uppercase opacity-60">
                       TOTAL SCANS
@@ -768,7 +768,7 @@ export default function BatchDetailPage() {
 
                 <Card
                   className={cn(
-                    "p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border-border/40 flex items-center justify-between group transition-all h-32 sm:h-40 border-2",
+                    "p-6 sm:p-8 rounded-3xl border-border/40 flex items-center justify-between group transition-all h-32 sm:h-40 border-2",
                     flaggedUnitsCount > 0
                       ? "bg-destructive/[0.03] hover:bg-destructive/[0.05] border-destructive/30"
                       : "bg-muted/10 hover:bg-muted/20",

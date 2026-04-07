@@ -6,6 +6,8 @@ import {
   getCabinetItem,
   updateCabinetItem,
   markDoseTaken,
+  undoDose,
+  getDosageLogs,
   CabinetItem,
 } from "@/api/customer.api";
 import { Button } from "@/components/ui/button";
@@ -21,11 +23,14 @@ import {
   Save,
   Trash2,
   Bell,
+  ChevronDown,
+  ChevronUp,
   CheckCircle2,
   FileText,
   Plus,
   Image as ImageIcon,
   Eye,
+  EyeOff,
   Stethoscope,
   Package,
   Box,
@@ -33,7 +38,17 @@ import {
   CircleSlash,
   Calendar as CalendarIcon,
   Activity,
+  BellRing,
+  Smartphone,
+  Mail,
+  AlertCircle,
+  History,
+  Undo2,
+  Trash,
+  RotateCcw,
+  Zap,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,7 +58,14 @@ import { uploadImages } from "@/api/upload.api";
 import { PageHeader } from "@/components/ui/page-header";
 
 import Link from "next/link";
-import { format } from "date-fns";
+import {
+  format,
+  isAfter,
+  isBefore,
+  addDays,
+  differenceInMinutes,
+  differenceInHours,
+} from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import {
@@ -51,6 +73,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -61,6 +88,14 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PrescriptionSelector } from "@/components/prescriptions/prescription-selector";
 import { DocumentViewerDialog } from "@/components/common/document-viewer";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogFooter,
+  ResponsiveDialogBody,
+} from "@/components/ui/responsive-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { resolveMediaUrl } from "@/lib/media-url";
 
@@ -77,7 +112,7 @@ export default function MedicineDetailPage() {
     composition: "",
     medicineCode: "",
     expiryDate: undefined as Date | undefined,
-    dosage: "",
+    dosage: 0,
     frequency: "",
     notes: "",
     doctorName: "",
@@ -87,7 +122,15 @@ export default function MedicineDetailPage() {
     reminderTimes: [] as { time: string; mealContext: string }[],
     prescriptions: [] as { url: string; label: string; uploadedAt: string }[],
     prescriptionIds: [] as string[],
+    notificationOverrides: {
+      medicine_expiry: { inApp: true, email: true },
+      batch_recall: { inApp: true, email: true },
+      dose_reminder: { inApp: true, email: false },
+    } as any,
   });
+  const [dosageLogs, setDosageLogs] = useState<any[]>([]);
+  const [isRefillDialogOpen, setIsRefillDialogOpen] = useState(false);
+  const [refillValue, setRefillValue] = useState(0);
   const [isPrescriptionDialogOpen, setIsPrescriptionDialogOpen] =
     useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -146,7 +189,9 @@ export default function MedicineDetailPage() {
           medicine.prescriptionIds?.map((p: any) =>
             typeof p === "string" ? p : p._id,
           ) || [],
-        )
+        ) ||
+      JSON.stringify(formData.notificationOverrides) !==
+        JSON.stringify(medicine.notificationOverrides || {})
     );
   }, [medicine, formData]);
 
@@ -204,7 +249,7 @@ export default function MedicineDetailPage() {
             item.medicineCode ||
             (item.isUserAdded ? "N/A" : item.batchNumber || "VERIFIED"),
           expiryDate: item.expiryDate ? new Date(item.expiryDate) : undefined,
-          dosage: item.dosage || "",
+          dosage: Number(item.dosage) || 0,
           frequency: item.frequency || "",
           doctorName: item.doctorName || "",
           notes: item.notes || "",
@@ -217,6 +262,11 @@ export default function MedicineDetailPage() {
           })),
           prescriptions: popPrescriptions,
           prescriptionIds: rawIds,
+          notificationOverrides: item.notificationOverrides || {
+            medicine_expiry: { inApp: true, email: true },
+            batch_recall: { inApp: true, email: true },
+            dose_reminder: { inApp: true, email: false },
+          },
         });
       } catch (err: any) {
         if (err.name === "AbortError") return;
@@ -230,7 +280,17 @@ export default function MedicineDetailPage() {
       }
     };
 
+    const loadLogs = async () => {
+      try {
+        const logs = await getDosageLogs(id);
+        setDosageLogs(logs);
+      } catch (err) {
+        console.error("Failed to load logs:", err);
+      }
+    };
+
     loadData();
+    loadLogs();
     return () => fetchAbortRef.current?.abort();
   }, [id, router]);
 
@@ -302,17 +362,160 @@ export default function MedicineDetailPage() {
     if (!id || !medicine) return;
     try {
       const res = await markDoseTaken(id);
+      const isLate = !res.wasPunctual;
+
+      setMedicine((prev) =>
+        prev
+          ? ({
+              ...prev,
+              currentQuantity: res.currentQuantity,
+              lastDoseTaken: res.lastDoseTaken,
+            } as any)
+          : null,
+      );
       setFormData((prev) => ({
         ...prev,
         currentQuantity: res.currentQuantity,
       }));
-      toast.success("Dose recorded", {
-        description: `Remaining: ${res.currentQuantity} ${medicine.unit || "units"}`,
+
+      // Refresh logs
+      const logs = await getDosageLogs(id);
+      setDosageLogs(logs);
+
+      toast.success(isLate ? "Dose recorded (Late)" : "Dose recorded!", {
+        description: isLate
+          ? `Recorded outside the 3h window.`
+          : `Your dose for ${medicine.name} has been recorded.`,
+        action: {
+          label: "Undo",
+          onClick: () => handleUndoDose(),
+        },
       });
-    } catch (err) {
-      toast.error("Failed to record dose");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to record dose");
     }
   };
+
+  const handleUndoDose = async () => {
+    if (!id || !medicine) return;
+    try {
+      const res = await undoDose(id);
+      setMedicine((prev) =>
+        prev
+          ? ({
+              ...prev,
+              currentQuantity: res.currentQuantity,
+              lastDoseTaken: res.lastDoseTaken,
+            } as any)
+          : null,
+      );
+      setFormData((prev) => ({
+        ...prev,
+        currentQuantity: res.currentQuantity,
+      }));
+
+      // Refresh logs
+      const logs = await getDosageLogs(id);
+      setDosageLogs(logs);
+
+      toast.success("Dose undone", {
+        description: `Inventory restored to ${res.currentQuantity}`,
+      });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to undo dose");
+    }
+  };
+
+  const isDoseRecentlyTaken = useMemo(() => {
+    if (!medicine?.lastDoseTaken) return false;
+    const lastTaken = new Date(medicine.lastDoseTaken).getTime();
+    const now = new Date().getTime();
+    const window = 4 * 60 * 60 * 1000; // 4 hour status persistence
+    return now - lastTaken < window;
+  }, [medicine?.lastDoseTaken]);
+
+  const lastTakenText = useMemo(() => {
+    if (!medicine?.lastDoseTaken) return null;
+    const lastTaken = new Date(medicine.lastDoseTaken);
+    const now = new Date();
+    const diffMs = now.getTime() - lastTaken.getTime();
+    const diffMins = Math.floor(diffMs / 1000 / 60);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return format(lastTaken, "MMM d");
+  }, [medicine?.lastDoseTaken]);
+
+  const nextDoseInfo = useMemo(() => {
+    if (!medicine?.reminderTimes || medicine.reminderTimes.length === 0) {
+      return null;
+    }
+
+    const now = new Date();
+
+    // Convert all reminders to their next occurrence (today or tomorrow)
+    const occurrences = medicine.reminderTimes
+      .map((r) => {
+        const reminderDate = new Date(r.time);
+        if (isNaN(reminderDate.getTime())) return null;
+
+        let occurrence = new Date(now);
+        occurrence.setHours(
+          reminderDate.getHours(),
+          reminderDate.getMinutes(),
+          0,
+          0,
+        );
+
+        // If the time has already passed today, scheduled it for tomorrow
+        if (isBefore(occurrence, now)) {
+          occurrence = addDays(occurrence, 1);
+        }
+
+        return {
+          date: occurrence,
+          mealContext: r.mealContext || "no_preference",
+        };
+      })
+      .filter((occ): occ is NonNullable<typeof occ> => occ !== null);
+
+    if (occurrences.length === 0) return null;
+
+    // Sort to find the nearest upcoming dose
+    const sorted = [...occurrences].sort(
+      (a, b) => a.date.getTime() - b.date.getTime(),
+    );
+    const next = sorted[0];
+
+    const diffMins = differenceInMinutes(next.date, now);
+    const diffHours = differenceInHours(next.date, now);
+
+    let remainingText = "";
+    if (diffHours > 0) {
+      remainingText = `In ${diffHours}h ${diffMins % 60}m`;
+    } else {
+      remainingText = `In ${diffMins}m`;
+    }
+
+    const isToday =
+      format(next.date, "yyyy-MM-dd") === format(now, "yyyy-MM-dd");
+
+    return {
+      time: format(next.date, "p"), // e.g. 8:00 AM
+      dayText: isToday ? "Today" : "Tomorrow",
+      remainingText,
+      mealContext:
+        next.mealContext === "no_preference"
+          ? "No meal preference"
+          : next.mealContext
+              .replace("_", " ")
+              .split(" ")
+              .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+              .join(" "),
+    };
+  }, [medicine?.reminderTimes]);
 
   const handlePrescriptionChange = async (
     newIds: string[],
@@ -415,6 +618,24 @@ export default function MedicineDetailPage() {
     }));
   };
 
+  const handleRefill = async (newTotal: number, updatePackSize?: number) => {
+    if (!id) return;
+    try {
+      const payload: any = { currentQuantity: newTotal };
+      if (updatePackSize) payload.totalQuantity = updatePackSize;
+
+      await updateCabinetItem(id, payload);
+      setMedicine((prev) => (prev ? { ...prev, ...payload } : null));
+      setFormData((prev) => ({ ...prev, ...payload }));
+      setIsRefillDialogOpen(false);
+      toast.success("Inventory refilled!", {
+        description: `New stock: ${newTotal} ${medicine?.unit || "units"}`,
+      });
+    } catch (err) {
+      toast.error("Failed to update inventory.");
+    }
+  };
+
   const handleToggleStatus = async () => {
     if (!id || !medicine) return;
     const newStatus = medicine.status === "inactive" ? "active" : "inactive";
@@ -454,7 +675,9 @@ export default function MedicineDetailPage() {
             <span className="font-bold">{medicine.brand}</span>
             {!medicine.isUserAdded && (
               <>
-                <span className="text-muted-foreground/30 hidden sm:inline">•</span>
+                <span className="text-muted-foreground/30 hidden sm:inline">
+                  •
+                </span>
                 <Badge
                   variant="outline"
                   className="font-mono text-[10px] border-primary/20 bg-primary/5 text-primary/70 rounded-full h-5 px-2"
@@ -465,9 +688,14 @@ export default function MedicineDetailPage() {
             )}
             {formData.notes && (
               <>
-                <span className="text-muted-foreground/30 hidden sm:inline">•</span>
+                <span className="text-muted-foreground/30 hidden sm:inline">
+                  •
+                </span>
                 <p className="font-medium italic opacity-70 truncate max-w-md">
-                  Note: {formData.notes.length > 60 ? formData.notes.substring(0, 60) + "..." : formData.notes}
+                  Note:{" "}
+                  {formData.notes.length > 60
+                    ? formData.notes.substring(0, 60) + "..."
+                    : formData.notes}
                 </p>
               </>
             )}
@@ -492,323 +720,621 @@ export default function MedicineDetailPage() {
         }
         backHref="/customer/cabinet"
         actions={
-          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+          <div className="flex flex-col gap-4 w-full sm:w-[280px]">
+            {/* Secondary Management Row */}
+            <div className="flex items-center justify-end gap-2">
+              {medicine.lastDoseTaken && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleUndoDose}
+                      className="rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-10 w-10 transition-colors shrink-0"
+                    >
+                      <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Undo last dose</TooltipContent>
+                </Tooltip>
+              )}
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setRefillValue(
+                        (medicine?.currentQuantity || 0) +
+                          (medicine?.totalQuantity || 0),
+                      );
+                      setIsRefillDialogOpen(true);
+                    }}
+                    className="rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 h-10 px-4 transition-colors shrink-0 font-black text-xs gap-2"
+                  >
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    <span>Refill</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Refill inventory</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    onClick={handleToggleStatus}
+                    className={cn(
+                      "rounded-full transition-all active:scale-95 shrink-0 px-3 h-10 flex gap-2 border-border/50",
+                      medicine.status === "inactive"
+                        ? "bg-primary/5 text-primary border-primary/20"
+                        : "hover:bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {medicine.status === "inactive" ? (
+                      <>
+                        <Eye className="h-4 w-4" aria-hidden="true" />
+                        <span className="font-bold text-xs">Activate</span>
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="h-4 w-4" aria-hidden="true" />
+                        <span className="font-bold text-xs">Deactivate</span>
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {medicine.status === "inactive"
+                    ? "Show in schedule"
+                    : "Hide from schedule"}
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            {/* Primary Action Row */}
             <Button
               onClick={handleTakeDose}
-              className="flex-1 sm:flex-none rounded-full px-5 bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20 gap-2 h-11 sm:h-10 font-bold transition-all text-xs sm:text-sm active:scale-95"
-            >
-              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-              Mark as taken
-            </Button>
-
-            <Button
-              variant="outline"
-              onClick={handleToggleStatus}
+              disabled={isDoseRecentlyTaken}
               className={cn(
-                "rounded-full px-4 h-11 sm:h-10 font-bold text-[10px] sm:text-xs transition-all active:scale-95 gap-2",
-                medicine.status === "inactive"
-                  ? "border-primary/20 bg-primary/5 text-primary hover:bg-primary/10"
-                  : "border-border/50 hover:bg-muted text-muted-foreground",
+                "w-full rounded-full shadow-lg gap-3 h-12 font-black transition-all text-sm active:scale-[0.98]",
+                isDoseRecentlyTaken
+                  ? "bg-muted text-muted-foreground border-border"
+                  : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20",
               )}
             >
-              {medicine.status === "inactive" ? (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  Activate
-                </>
+              {isDoseRecentlyTaken ? (
+                <Clock className="h-5 w-5" aria-hidden="true" />
               ) : (
-                <>
-                  <Power className="h-3.5 w-3.5" aria-hidden="true" />
-                  Deactivate
-                </>
+                <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
               )}
+              {isDoseRecentlyTaken ? "Dose Recorded" : "Mark as taken"}
             </Button>
           </div>
         }
       />
 
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 overflow-hidden pb-4 sm:pb-0">
-        {/* Main Action & Details Column */}
+        {/* Main Content Column */}
         <div className="lg:col-span-3 space-y-4 sm:space-y-6 overflow-y-auto custom-scrollbar pr-1 pb-16 sm:pb-8">
-          <Card className="p-4 sm:p-6 lg:p-8 rounded-[1.5rem] sm:rounded-[2rem] border-border/50 bg-card/50 shadow-sm relative overflow-hidden">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 sm:mb-8 relative z-10">
-              <h2 className="text-xl font-bold flex items-center gap-3">
-                <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-primary" aria-hidden="true" />
-                Dose management
-              </h2>
+          {/* Adherence Hero */}
+          <Card className="p-6 rounded-3xl border-primary/10 bg-gradient-to-br from-primary/5 via-background to-background shadow-sm relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+              <Zap className="h-32 w-32 text-primary" />
             </div>
 
-            <Tabs defaultValue="schedule" className="w-full relative z-10">
-              <TabsList className="grid w-full grid-cols-2 mb-6 sm:mb-8 bg-muted/50 p-1.5 rounded-full h-[3.5rem] sm:h-[3rem]">
-                <TabsTrigger
-                  value="schedule"
-                  className="rounded-full font-bold text-sm h-full data-[state=active]:shadow-sm data-[state=active]:bg-background"
-                >
-                  Schedule
-                </TabsTrigger>
-                <TabsTrigger
-                  value="details"
-                  className="rounded-full font-bold text-sm h-full data-[state=active]:shadow-sm data-[state=active]:bg-background"
-                >
-                  Details & Media
-                </TabsTrigger>
-              </TabsList>
+            <div className="flex flex-col md:flex-row gap-8 items-center relative z-10">
+              <div className="flex-1 space-y-4 w-full text-center md:text-left">
+                {!nextDoseInfo ? (
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 mb-1">
+                      Dose Schedule
+                    </h3>
+                    <div className="flex items-baseline gap-2 justify-center md:justify-start">
+                      <span className="text-2xl font-black tracking-tight text-muted-foreground/40 italic">
+                        No reminders set
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-primary/60 mb-1">
+                      Next Dosage
+                    </h3>
+                    <div className="flex items-baseline gap-2 justify-center md:justify-start">
+                      <span className="text-4xl font-black tracking-tight">
+                        {nextDoseInfo.dayText}
+                      </span>
+                      <span className="text-2xl font-bold text-muted-foreground">
+                        at
+                      </span>
+                      <span className="text-4xl font-black text-primary">
+                        {nextDoseInfo.time}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                  {nextDoseInfo && (
+                    <>
+                      <Badge
+                        variant="outline"
+                        className="rounded-full bg-background border-primary/10 font-bold px-3 py-1"
+                      >
+                        <Clock className="h-3 w-3 mr-1.5 text-primary" />
+                        {nextDoseInfo.remainingText}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="rounded-full bg-background border-primary/10 font-bold px-3 py-1"
+                      >
+                        <Activity className="h-3 w-3 mr-1.5 text-primary" />
+                        {nextDoseInfo.mealContext}
+                      </Badge>
+                    </>
+                  )}
+                  {medicine.currentStreak !== undefined &&
+                    medicine.currentStreak > 0 && (
+                      <Badge className="rounded-full bg-orange-500/10 text-orange-600 border-orange-200 font-black px-3 py-1 animate-pulse">
+                        <Zap className="h-3 w-3 mr-1.5 fill-current" />
+                        {medicine.currentStreak} Day Streak
+                      </Badge>
+                    )}
+                </div>
+              </div>
+
+              <div className="h-32 w-px bg-primary/10 hidden md:block" />
+
+              <div className="w-full md:w-auto flex flex-col items-center md:items-end gap-2">
+                <div className="text-center md:text-right">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 mb-1">
+                    Current Stock
+                  </h3>
+                  <p
+                    className={cn(
+                      "text-4xl font-black tracking-tighter",
+                      (medicine.currentQuantity || 0) < 5
+                        ? "text-destructive"
+                        : "text-foreground",
+                    )}
+                  >
+                    {medicine.currentQuantity}
+                    <span className="text-sm font-bold text-muted-foreground ml-1">
+                      {medicine.unit || "units"}
+                    </span>
+                  </p>
+                </div>
+                {(medicine.currentQuantity || 0) < 5 && (
+                  <Badge className="bg-destructive/10 text-destructive border-none font-black text-[10px] animate-pulse">
+                    <AlertCircle className="h-3 w-3 mr-1" /> Low Stock
+                  </Badge>
+                )}
+              </div>
+
+              {medicine.lastDoseTaken && (
+                <>
+                  <div className="h-32 w-px bg-primary/10 hidden md:block" />
+                  <div className="w-full md:w-auto flex flex-col items-center md:items-end gap-2">
+                    <div className="text-center md:text-right">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 mb-1">
+                        Last Recorded
+                      </h3>
+                      <p className="text-4xl font-black tracking-tighter text-foreground">
+                        {format(new Date(medicine.lastDoseTaken), "p")}
+                      </p>
+                      <p className="text-[10px] font-bold text-muted-foreground opacity-60 mt-0.5">
+                        {format(
+                          new Date(medicine.lastDoseTaken),
+                          "MMM d, yyyy",
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </Card>
+
+          <Card className="p-4 sm:p-6 lg:p-8 rounded-3xl border-border/50 bg-card/50 shadow-sm relative overflow-hidden">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 sm:mb-8 relative z-10">
+              <h2 className="text-xl font-bold flex items-center gap-3">
+                <Bell
+                  className="h-5 w-5 sm:h-6 sm:w-6 text-primary"
+                  aria-hidden="true"
+                />
+                Dose management
+              </h2>
+              <div className="flex gap-2">
+                {/* Refill button moved to header actions */}
+              </div>
+            </div>
+
+            <Tabs defaultValue="schedule" className="w-full relative z-10 mt-2">
+              <div className="w-full overflow-x-auto overflow-y-hidden mb-6 sm:mb-8 pb-1 custom-scrollbar">
+                <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 bg-muted/30 p-1 rounded-2xl h-12 border border-border/40 gap-1">
+                  <TabsTrigger
+                    value="schedule"
+                    className="rounded-xl font-bold text-xs sm:text-sm h-10 data-[state=active]:shadow-xl data-[state=active]:bg-background gap-2 transition-all whitespace-nowrap px-4"
+                  >
+                    <Clock
+                      className="h-4 w-4 text-primary"
+                      aria-hidden="true"
+                    />
+                    <span className="hidden sm:inline">Schedule</span>
+                    <span className="sm:hidden">Plan</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="history"
+                    className="rounded-xl font-bold text-xs sm:text-sm h-10 data-[state=active]:shadow-xl data-[state=active]:bg-background gap-2 transition-all whitespace-nowrap px-4"
+                  >
+                    <History
+                      className="h-4 w-4 text-primary"
+                      aria-hidden="true"
+                    />
+                    History
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="details"
+                    className="rounded-xl font-bold text-xs sm:text-sm h-10 data-[state=active]:shadow-xl data-[state=active]:bg-background gap-2 transition-all whitespace-nowrap px-4"
+                  >
+                    <FileText
+                      className="h-4 w-4 text-primary"
+                      aria-hidden="true"
+                    />
+                    <span className="hidden sm:inline">Details & Media</span>
+                    <span className="sm:hidden">Media</span>
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+              <TabsContent
+                value="history"
+                className="space-y-4 animate-in fade-in-50 duration-300"
+              >
+                {dosageLogs.length === 0 ? (
+                  <div className="py-12 flex flex-col items-center justify-center text-center bg-muted/5 rounded-3xl border-2 border-dashed border-primary/5">
+                    <History
+                      className="h-8 w-8 text-muted-foreground/20 mb-3"
+                      aria-hidden="true"
+                    />
+                    <p className="text-sm font-bold text-muted-foreground/40">
+                      No dosage history found.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {dosageLogs.slice(0, 20).map((log) => (
+                      <div
+                        key={log._id}
+                        className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 border border-primary/5"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div
+                            className={cn(
+                              "h-10 w-10 rounded-full flex items-center justify-center",
+                              log.wasPunctual
+                                ? "bg-emerald-500/10"
+                                : "bg-amber-500/10",
+                            )}
+                          >
+                            {log.wasPunctual ? (
+                              <CheckCircle2
+                                className="h-5 w-5 text-emerald-500"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              <AlertCircle
+                                className="h-5 w-5 text-amber-600"
+                                aria-hidden="true"
+                              />
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-black text-sm text-foreground">
+                                Dose Recorded
+                              </p>
+                              {!log.wasPunctual && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[8px] font-black h-4 px-1.5 rounded-md border-none bg-amber-500/10 text-amber-600"
+                                >
+                                  Late
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-[10px] font-bold text-muted-foreground opacity-70">
+                              {format(new Date(log.timestamp), "PPPP 'at' p")}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-black rounded-lg border-primary/10 bg-background"
+                          >
+                            -1 {medicine.unit || "unit"}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
 
               <TabsContent
                 value="schedule"
-                className="space-y-6 sm:space-y-8 animate-in fade-in-50 duration-300"
+                className="animate-in fade-in-50 duration-300"
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-semibold text-muted-foreground">
-                        Standard dosage
-                      </Label>
-                      <div className="relative">
-                        <Pill className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                        <Input
-                          placeholder="e.g. 1 Tablet (500mg)"
-                          className="pl-10 h-12 sm:h-10 rounded-full border-border bg-muted/30 focus-visible:ring-primary/20 font-medium"
-                          value={formData.dosage}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              dosage: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      <div className="space-y-1.5 flex-1 w-full sm:w-1/3">
-                        <Label className="text-sm font-semibold text-muted-foreground">
-                          Current quantity
-                        </Label>
-                        <Input
-                          type="number"
-                          placeholder="Remaining"
-                          className="h-12 sm:h-10 rounded-full border-border bg-muted/30 focus-visible:ring-primary/20 font-medium"
-                          value={formData.currentQuantity}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              currentQuantity: Number(e.target.value),
-                            }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-1.5 flex-1 w-full sm:w-1/3">
-                        <Label className="text-sm font-semibold text-muted-foreground">
-                          Total quantity
-                        </Label>
-                        <Input
-                          type="number"
-                          placeholder="Capacity"
-                          className="h-12 sm:h-10 rounded-full border-border bg-muted/30 focus-visible:ring-primary/20 font-medium"
-                          value={formData.totalQuantity}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              totalQuantity: Number(e.target.value),
-                            }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-1.5 flex-1 w-full sm:w-1/3">
-                        <Label className="text-sm font-semibold text-muted-foreground">
-                          Unit
-                        </Label>
-                        <Select
-                          value={formData.unit}
-                          onValueChange={(val) =>
-                            setFormData((prev) => ({ ...prev, unit: val }))
-                          }
-                        >
-                          <SelectTrigger className="h-12 sm:h-10 rounded-full border-border bg-muted/30 focus:ring-primary/20 focus:ring-offset-0 font-medium w-full">
-                            <SelectValue placeholder="Unit" />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-2xl border-border/50">
-                            <SelectItem
-                              value="tablets"
-                              className="rounded-full cursor-pointer"
-                            >
-                              Tablets
-                            </SelectItem>
-                            <SelectItem
-                              value="capsules"
-                              className="rounded-lg cursor-pointer"
-                            >
-                              Capsules
-                            </SelectItem>
-                            <SelectItem
-                              value="pills"
-                              className="rounded-lg cursor-pointer"
-                            >
-                              Pills
-                            </SelectItem>
-                            <SelectItem
-                              value="mg"
-                              className="rounded-lg cursor-pointer"
-                            >
-                              mg
-                            </SelectItem>
-                            <SelectItem
-                              value="ml"
-                              className="rounded-lg cursor-pointer"
-                            >
-                              ml
-                            </SelectItem>
-                            <SelectItem
-                              value="doses"
-                              className="rounded-lg cursor-pointer"
-                            >
-                              Doses
-                            </SelectItem>
-                            <SelectItem
-                              value="units"
-                              className="rounded-lg cursor-pointer"
-                            >
-                              Units
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5 pt-2">
-                      <Label className="text-sm font-semibold text-muted-foreground">
-                        Medication expiry date
-                      </Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-medium h-12 sm:h-10 rounded-full border-border bg-muted/30 focus:ring-primary/20",
-                              !formData.expiryDate && "text-muted-foreground",
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4 text-primary" aria-hidden="true" />
-                            {formData.expiryDate ? (
-                              format(formData.expiryDate, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent
-                          className="w-auto p-0 rounded-2xl border-border shadow-xl"
-                          align="start"
-                        >
-                          <CalendarComponent
-                            mode="single"
-                            selected={formData.expiryDate}
-                            onSelect={(date) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                expiryDate: date,
-                              }))
-                            }
-                            initialFocus
-                            className="rounded-2xl"
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    <div className="space-y-2 pt-2">
-                      <Label className="text-sm font-semibold text-muted-foreground">
-                        Notes & observations
-                      </Label>
-                      <Textarea
-                        placeholder="e.g. Occasional drowsiness, take after meal..."
-                        className="min-h-[100px] rounded-2xl border-border bg-muted/30 focus-visible:ring-primary/20 font-medium resize-none p-4"
-                        value={formData.notes}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            notes: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 pt-2 md:pt-0">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 pb-4">
+                  {/* Left Column: Reminders */}
+                  <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <Label className="text-sm font-semibold text-muted-foreground">
-                        Smart reminders
-                      </Label>
+                      <div className="space-y-1">
+                        <Label className="text-sm font-black text-foreground flex items-center gap-2">
+                          <Bell className="h-4 w-4 text-primary" />
+                          Smart Reminders
+                        </Label>
+                        <p className="text-[10px] font-bold text-muted-foreground opacity-60">
+                          Schedule your daily intake times
+                        </p>
+                      </div>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={addReminder}
                         className="h-8 text-xs font-bold hover:bg-primary/5 text-primary rounded-full px-3"
                       >
-                        <Plus className="h-3 w-3 mr-1" aria-hidden="true" /> Add reminder
+                        <Plus className="h-3 w-3 mr-1" aria-hidden="true" /> Add
                       </Button>
                     </div>
 
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-                      {formData.reminderTimes.map((r, idx) => (
-                        <div
-                          key={idx}
-                          className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 rounded-2xl bg-muted/20 border border-border/50 group/item transition-all hover:border-primary/20"
-                        >
-                          <div className="relative flex-1">
-                            <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-                            <Input
-                              type="time"
-                              value={r.time}
-                              onChange={(e) =>
-                                updateReminder(idx, { time: e.target.value })
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                      {formData.reminderTimes.length === 0 ? (
+                        <div className="py-12 flex flex-col items-center justify-center text-center bg-muted/5 rounded-3xl border-2 border-dashed border-primary/5">
+                          <Clock
+                            className="h-8 w-8 text-muted-foreground/20 mb-3"
+                            aria-hidden="true"
+                          />
+                          <p className="text-xs font-bold text-muted-foreground/40 italic">
+                            No reminders set for this medicine
+                          </p>
+                        </div>
+                      ) : (
+                        formData.reminderTimes.map((r, idx) => (
+                          <div
+                            key={idx}
+                            className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 rounded-2xl bg-muted/20 border border-border/50 group/item transition-all hover:border-primary/20"
+                          >
+                            <div className="relative flex-1">
+                              <Clock
+                                className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground"
+                                aria-hidden="true"
+                              />
+                              <Input
+                                type="time"
+                                value={r.time}
+                                onChange={(e) =>
+                                  updateReminder(idx, { time: e.target.value })
+                                }
+                                className="pl-9 h-11 rounded-full border-border bg-background font-bold text-sm"
+                              />
+                            </div>
+
+                            <Select
+                              value={r.mealContext}
+                              onValueChange={(val) =>
+                                updateReminder(idx, { mealContext: val })
                               }
-                              className="pl-9 h-11 rounded-full border-border bg-background font-bold text-sm"
+                            >
+                              <SelectTrigger className="h-11 rounded-full border-border bg-background font-medium sm:w-[140px]">
+                                <SelectValue placeholder="Meal context" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-2xl border-border/50">
+                                <SelectItem value="no_preference">
+                                  No preference
+                                </SelectItem>
+                                <SelectItem value="before_meal">
+                                  Before meal
+                                </SelectItem>
+                                <SelectItem value="after_meal">
+                                  After meal
+                                </SelectItem>
+                                <SelectItem value="with_meal">
+                                  With meal
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeReminder(idx)}
+                              className="h-11 w-11 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive shrink-0"
+                              aria-label="Remove reminder"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Inventory & Dosage */}
+                  <div className="space-y-8 lg:border-l lg:pl-8 lg:border-border/40">
+                    <div className="space-y-6">
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <Label className="text-sm font-black text-foreground flex items-center gap-2">
+                            <Pill className="h-4 w-4 text-primary" />
+                            Inventory & Dosage
+                          </Label>
+                          <p className="text-[10px] font-bold text-muted-foreground opacity-60">
+                            Manage your stock and standard dose
+                          </p>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
+                            Dose per intake
+                          </Label>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              min={0}
+                              step="any"
+                              placeholder="e.g. 1"
+                              className="pl-10 h-12 rounded-full border-border bg-muted/30 focus-visible:ring-primary/20 font-bold"
+                              value={formData.dosage || ""}
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  dosage: Math.max(0, e.target.value === "" ? 0 : Number(e.target.value)),
+                                }))
+                              }
+                            />
+                            <p className="px-3 mt-1.5 text-[9px] font-black text-muted-foreground/40 italic flex items-center gap-1">
+                              <ShieldCheck className="h-2.5 w-2.5" />
+                              Automatically deducted from total quantity on every intake
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
+                              Current
+                            </Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              className="h-12 rounded-full border-border bg-muted/30 focus-visible:ring-primary/20 font-black text-center"
+                              value={formData.currentQuantity}
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  currentQuantity: Math.max(0, Number(e.target.value)),
+                                }))
+                              }
                             />
                           </div>
-
-                          <Select
-                            value={r.mealContext}
-                            onValueChange={(val) =>
-                              updateReminder(idx, { mealContext: val })
-                            }
-                          >
-                            <SelectTrigger className="h-11 rounded-full border-border bg-background font-medium sm:w-[150px]">
-                              <SelectValue placeholder="Meal context" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-2xl border-border/50">
-                              <SelectItem value="no_preference">
-                                No preference
-                              </SelectItem>
-                              <SelectItem value="before_meal">
-                                Before meal
-                              </SelectItem>
-                              <SelectItem value="after_meal">
-                                After meal
-                              </SelectItem>
-                              <SelectItem value="with_meal">
-                                With meal
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeReminder(idx)}
-                            className="h-11 w-11 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive shrink-0"
-                            aria-label="Remove reminder"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
+                              Capacity
+                            </Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              className="h-12 rounded-full border-border bg-muted/30 focus-visible:ring-primary/20 font-black text-center"
+                              value={formData.totalQuantity}
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  totalQuantity: Math.max(0, Number(e.target.value)),
+                                }))
+                              }
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
+                              Unit
+                            </Label>
+                            <Select
+                              value={formData.unit}
+                              onValueChange={(val) =>
+                                setFormData((prev) => ({ ...prev, unit: val }))
+                              }
+                            >
+                              <SelectTrigger className="h-12 rounded-full border-border bg-muted/30 focus:ring-primary/20 focus:ring-offset-0 font-bold w-full">
+                                <SelectValue placeholder="Unit" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-2xl border-border/50">
+                                {[
+                                  "tablets",
+                                  "capsules",
+                                  "pills",
+                                  "mg",
+                                  "ml",
+                                  "doses",
+                                  "units",
+                                ].map((u) => (
+                                  <SelectItem
+                                    key={u}
+                                    value={u}
+                                    className="rounded-lg cursor-pointer"
+                                  >
+                                    {u.charAt(0).toUpperCase() + u.slice(1)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
-                      ))}
-                      {formData.reminderTimes.length === 0 && (
-                        <p className="text-xs text-muted-foreground italic p-3 bg-muted/30 rounded-xl border border-dashed border-border text-center">
-                          No reminders set for this medicine.
-                        </p>
-                      )}
+
+                        <div className="space-y-1.5 pt-2">
+                          <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
+                            Medication expiry date
+                          </Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-medium h-12 rounded-full border-border bg-muted/30 focus:ring-primary/20",
+                                  !formData.expiryDate &&
+                                    "text-muted-foreground",
+                                )}
+                              >
+                                <CalendarIcon
+                                  className="mr-2 h-4 w-4 text-primary"
+                                  aria-hidden="true"
+                                />
+                                {formData.expiryDate ? (
+                                  format(formData.expiryDate, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-auto p-0 rounded-2xl border-border shadow-xl"
+                              align="start"
+                            >
+                              <CalendarComponent
+                                mode="single"
+                                selected={formData.expiryDate}
+                                onSelect={(date) =>
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    expiryDate: date,
+                                  }))
+                                }
+                                initialFocus
+                                className="rounded-2xl"
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+
+                        <div className="space-y-1.5 pt-2">
+                          <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
+                            Notes & observations
+                          </Label>
+                          <Textarea
+                            placeholder="Take after meal..."
+                            className="min-h-[80px] rounded-2xl border-border bg-muted/30 focus-visible:ring-primary/20 font-medium resize-none p-4"
+                            value={formData.notes}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                notes: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -833,7 +1359,10 @@ export default function MedicineDetailPage() {
                       Prescribing doctor
                     </Label>
                     <div className="relative">
-                      <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      <Stethoscope
+                        className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+                        aria-hidden="true"
+                      />
                       <Input
                         placeholder="e.g. Dr. Jane Doe"
                         className="pl-10 h-11 rounded-full border-border bg-background font-medium"
@@ -880,7 +1409,10 @@ export default function MedicineDetailPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-primary" aria-hidden="true" />
+                      <FileText
+                        className="h-4 w-4 text-primary"
+                        aria-hidden="true"
+                      />
                       <span>Prescriptions</span>
                     </label>
 
@@ -889,7 +1421,10 @@ export default function MedicineDetailPage() {
                       onClick={() => setIsPrescriptionDialogOpen(true)}
                       className="h-10 sm:h-9 rounded-full gap-2 text-sm sm:text-xs border-dashed border-primary/30 hover:border-primary/50 hover:bg-primary/5 transition-colors font-medium px-4"
                     >
-                      <Plus className="h-4 w-4 sm:h-3 sm:w-3" aria-hidden="true" />
+                      <Plus
+                        className="h-4 w-4 sm:h-3 sm:w-3"
+                        aria-hidden="true"
+                      />
                       <span>
                         {(formData.prescriptionIds?.length ?? 0) > 0
                           ? "Manage attachments"
@@ -937,7 +1472,10 @@ export default function MedicineDetailPage() {
                               setPreviewDoc({ url: p.url, label: p.label })
                             }
                           >
-                            <Eye className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+                            <Eye
+                              className="h-4 w-4 sm:h-3.5 sm:w-3.5"
+                              aria-hidden="true"
+                            />
                           </Button>
                           <Button
                             variant="ghost"
@@ -946,7 +1484,10 @@ export default function MedicineDetailPage() {
                             className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg sm:rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                             aria-label="Remove prescription"
                           >
-                            <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+                            <Trash2
+                              className="h-4 w-4 sm:h-3.5 sm:w-3.5"
+                              aria-hidden="true"
+                            />
                           </Button>
                         </div>
                       </div>
@@ -972,7 +1513,10 @@ export default function MedicineDetailPage() {
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                     <div className="space-y-1">
                       <h3 className="text-base font-semibold flex items-center gap-2 text-foreground">
-                        <ImageIcon className="h-4 w-4 text-primary" aria-hidden="true" />
+                        <ImageIcon
+                          className="h-4 w-4 text-primary"
+                          aria-hidden="true"
+                        />
                         Images
                       </h3>
                       <p className="text-xs text-muted-foreground font-medium">
@@ -1020,7 +1564,10 @@ export default function MedicineDetailPage() {
                             className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg bg-white/20 backdrop-blur-md text-white hover:bg-white/40 border border-white/10"
                             aria-label="View image"
                           >
-                            <Eye className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+                            <Eye
+                              className="h-4 w-4 sm:h-3.5 sm:w-3.5"
+                              aria-hidden="true"
+                            />
                           </Button>
                           <Button
                             variant="ghost"
@@ -1029,14 +1576,20 @@ export default function MedicineDetailPage() {
                             className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg bg-destructive/20 backdrop-blur-md text-white hover:bg-destructive/80 border border-white/10"
                             aria-label="Remove image"
                           >
-                            <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+                            <Trash2
+                              className="h-4 w-4 sm:h-3.5 sm:w-3.5"
+                              aria-hidden="true"
+                            />
                           </Button>
                         </div>
                       </div>
                     ))}
                     {(!medicine.images || medicine.images.length === 0) && (
                       <div className="col-span-full py-8 sm:py-12 flex flex-col items-center justify-center text-center bg-muted/30 rounded-2xl border border-dashed border-border">
-                        <ImageIcon className="h-8 w-8 mb-2 text-muted-foreground/50" aria-hidden="true" />
+                        <ImageIcon
+                          className="h-8 w-8 mb-2 text-muted-foreground/50"
+                          aria-hidden="true"
+                        />
                         <p className="text-xs font-semibold text-muted-foreground">
                           No Images added yet.
                         </p>
@@ -1107,6 +1660,134 @@ export default function MedicineDetailPage() {
           />
         </div>
       </div>
+      {/* Refill Wizard Dialog */}
+      <ResponsiveDialog
+        open={isRefillDialogOpen}
+        onOpenChange={setIsRefillDialogOpen}
+      >
+        <ResponsiveDialogContent className="sm:max-w-md rounded-3xl">
+          <ResponsiveDialogHeader className="px-6 pt-8">
+            <ResponsiveDialogTitle className="text-2xl font-black flex items-center gap-3">
+              <Zap className="h-6 w-6 text-primary" />
+              Inventory Refill
+            </ResponsiveDialogTitle>
+          </ResponsiveDialogHeader>
+          <ResponsiveDialogBody className="p-4 space-y-4">
+            <div className="flex flex-col items-center justify-center p-4 sm:p-5 bg-primary/5 rounded-3xl border border-primary/10 space-y-3 sm:space-y-4">
+              {/* Calculation Context - Ultra Compact */}
+              <div className="flex items-center gap-6 text-muted-foreground/30">
+                <div className="text-center">
+                  <p className="text-[9px] font-black uppercase tracking-tighter opacity-60">Current</p>
+                  <p className="text-lg font-black text-foreground/80">{medicine?.currentQuantity || 0}</p>
+                </div>
+                <Plus className="h-3 w-3 opacity-30 shrink-0" />
+                <div className="text-center">
+                  <p className="text-[9px] font-black uppercase tracking-tighter opacity-60">Pack Size</p>
+                  <p className="text-lg font-black text-foreground/80">{medicine?.totalQuantity || 0}</p>
+                </div>
+              </div>
+
+              {/* Centered Result Stepper - Compacted */}
+              <div className="w-full max-w-[240px] space-y-2">
+                <div className="flex flex-col items-center">
+                  <Label className="text-[9px] font-black text-primary/60 uppercase text-center tracking-[0.2em] mb-1">Target Stock</Label>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    type="button"
+                    className="h-10 w-10 rounded-xl border-primary/10 bg-muted/20 hover:bg-primary/10 text-primary transition-all active:scale-90"
+                    onClick={() => setRefillValue((v) => Math.max(0, v - 1))}
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                  
+                  <div className="flex-1 relative">
+                    <Input 
+                      id="refill-input"
+                      type="number" 
+                      min={0}
+                      value={refillValue}
+                      onChange={(e) => setRefillValue(Math.max(0, Number(e.target.value)))}
+                      className="h-12 rounded-xl border-primary/20 bg-background font-black text-2xl text-center focus-visible:ring-primary/20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    type="button"
+                    className="h-10 w-10 rounded-xl border-primary/10 bg-muted/20 hover:bg-primary/10 text-primary transition-all active:scale-90"
+                    onClick={() => setRefillValue((v) => v + 1)}
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-[9px] font-bold text-muted-foreground/30 text-center italic">Calculated automatically</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-4 bg-muted/10 rounded-2xl">
+              <div className="flex-1">
+                <p className="text-xs font-black">Change the pack size?</p>
+                <p className="text-[10px] font-medium text-muted-foreground">
+                  Save as default for future refills
+                </p>
+              </div>
+              <Switch
+                id="update-pack-size"
+                onCheckedChange={(checked) => {
+                  const val = document.getElementById(
+                    "update-pack-size-input",
+                  ) as HTMLInputElement;
+                  if (checked) val?.parentElement?.classList.remove("hidden");
+                  else val?.parentElement?.classList.add("hidden");
+                }}
+              />
+            </div>
+
+            <div className="hidden space-y-2 animate-in slide-in-from-top-2 duration-200">
+              <Label className="text-xs text-muted-foreground ml-1">
+                New Default Pack Size
+              </Label>
+              <Input
+                id="update-pack-size-input"
+                type="number"
+                defaultValue={medicine?.totalQuantity}
+                className="h-12 rounded-2xl border-primary/10 bg-muted/20 font-black"
+              />
+            </div>
+          </ResponsiveDialogBody>
+          <ResponsiveDialogFooter className="p-6 pt-0">
+            <Button
+              className="w-full h-14 rounded-full text-lg shadow-xl shadow-primary/20"
+              onClick={() => {
+                const input = document.querySelector(
+                  'input[type="number"]',
+                ) as HTMLInputElement;
+                const result = refillValue || Number(input.value);
+                const packSwitch = document.getElementById(
+                  "update-pack-size",
+                ) as HTMLInputElement;
+                const newPackInput = document.getElementById(
+                  "update-pack-size-input",
+                ) as HTMLInputElement;
+
+                handleRefill(
+                  result,
+                  packSwitch?.getAttribute("aria-checked") === "true"
+                    ? Number(newPackInput?.value)
+                    : undefined,
+                );
+              }}
+            >
+              Confirm Refill
+            </Button>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     </div>
   );
 }

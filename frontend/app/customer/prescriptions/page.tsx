@@ -3,46 +3,26 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   FileText,
-  Search,
   Plus,
   Loader2,
-  ArrowLeft,
-  LayoutGrid,
-  List as ListIcon,
   Eye,
   Trash2,
   Package,
   Calendar as CalendarIcon,
   User as UserIcon,
-  ChevronRight,
-  Smartphone,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { DataToolbar } from "@/components/ui/data-toolbar";
-import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+
 
 import { getPrescriptions, deletePrescription } from "@/api/customer.api";
 import { PrescriptionCard } from "@/components/prescriptions/prescription-card";
@@ -87,19 +67,27 @@ export default function PrescriptionExplorerPage() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
-  
+
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [skip, setSkip] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
-  const [previewDoc, setPreviewDoc] = useState<{ url: string; label: string } | null>(null);
+  const [searchTerm, setSearchTerm] = useState(
+    searchParams.get("search") || "",
+  );
+  const [previewDoc, setPreviewDoc] = useState<{
+    url: string;
+    label: string;
+  } | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmLabel, setDeleteConfirmLabel] = useState<string>("");
-  const [activeLinkedMeds, setActiveLinkedMeds] = useState<{ open: boolean; meds: any[] }>({ open: false, meds: [] });
+  const [activeLinkedMeds, setActiveLinkedMeds] = useState<{
+    open: boolean;
+    meds: any[];
+  }>({ open: false, meds: [] });
 
   const debouncedSearch = useDebounce(searchTerm, 500);
 
@@ -130,10 +118,13 @@ export default function PrescriptionExplorerPage() {
 
       if (node) observer.current.observe(node);
     },
-    [loading, loadingMore, hasMore]
+    [loading, loadingMore, hasMore],
   );
 
-  const fetchPrescriptions = async (skipCount: number, isInitial: boolean = false) => {
+  const fetchPrescriptions = async (
+    skipCount: number,
+    isInitial: boolean = false,
+  ) => {
     if (isInitial) setLoading(true);
     else setLoadingMore(true);
 
@@ -230,16 +221,20 @@ export default function PrescriptionExplorerPage() {
       {/* Main Content Area */}
       <div className="px-1">
         {loading && skip === 0 ? (
-          <div className={cn(
-            "grid gap-4 sm:gap-6",
-            viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"
-          )}>
+          <div
+            className={cn(
+              "grid gap-4 sm:gap-6",
+              viewMode === "grid"
+                ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                : "grid-cols-1",
+            )}
+          >
             {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
                 className={cn(
                   "rounded-[2.5rem] bg-muted/40 animate-pulse",
-                  viewMode === "grid" ? "aspect-[4/5]" : "h-24 w-full"
+                  viewMode === "grid" ? "aspect-[4/5]" : "h-24 w-full",
                 )}
               />
             ))}
@@ -278,22 +273,38 @@ export default function PrescriptionExplorerPage() {
                   <Table>
                     <TableHeader className="bg-primary/5">
                       <TableRow className="hover:bg-transparent border-primary/5">
-                        <TableHead className="w-[300px] font-black text-xs text-primary/70">PRESCRIPTION LABEL</TableHead>
-                        <TableHead className="font-black text-xs text-primary/70">DOCTOR / PROVIDER</TableHead>
-                        <TableHead className="font-black text-xs text-primary/70 text-right">ISSUED DATE</TableHead>
-                        <TableHead className="font-black text-xs text-primary/70 text-center">MEDICINES</TableHead>
+                        <TableHead className="w-[300px] font-black text-xs text-primary/70">
+                          PRESCRIPTION LABEL
+                        </TableHead>
+                        <TableHead className="font-black text-xs text-primary/70">
+                          DOCTOR / PROVIDER
+                        </TableHead>
+                        <TableHead className="font-black text-xs text-primary/70 text-right">
+                          ISSUED DATE
+                        </TableHead>
+                        <TableHead className="font-black text-xs text-primary/70 text-center">
+                          MEDICINES
+                        </TableHead>
                         <TableHead className="w-[100px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {prescriptions.map((p) => (
-                        <TableRow key={p._id} className="hover:bg-primary/5 border-primary/5 transition-colors group">
+                        <TableRow
+                          key={p._id}
+                          onClick={() =>
+                            setPreviewDoc({ url: p.url, label: p.label })
+                          }
+                          className="hover:bg-primary/5 border-primary/5 transition-colors group cursor-pointer"
+                        >
                           <TableCell className="py-5">
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-10 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
                                 <FileText className="h-5 w-5" />
                               </div>
-                              <span className="font-black tracking-tight text-foreground">{p.label}</span>
+                              <span className="font-black tracking-tight text-foreground">
+                                {p.label}
+                              </span>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -303,48 +314,60 @@ export default function PrescriptionExplorerPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
-                             <div className="flex items-center justify-end gap-2 text-xs font-bold text-muted-foreground">
+                            <div className="flex items-center justify-end gap-2 text-xs font-bold text-muted-foreground">
                               <CalendarIcon className="h-3.5 w-3.5" />
-                              {p.issuedDate ? format(new Date(p.issuedDate), "MMM d, yyyy") : "N/A"}
+                              {p.issuedDate
+                                ? format(new Date(p.issuedDate), "MMM d, yyyy")
+                                : "N/A"}
                             </div>
                           </TableCell>
                           <TableCell>
-                             <div className="flex justify-center">
-                               {p.itemCount > 0 ? (
-                                 <Button 
-                                    variant="outline" 
-                                    onClick={() => setActiveLinkedMeds({ open: true, meds: p.linkedMedications })}
-                                    className="h-9 px-4 rounded-full border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary font-black text-[10px] gap-2 transition-all active:scale-95"
-                                 >
-                                    <Package className="h-3.5 w-3.5" />
-                                    Show ({p.itemCount})
-                                 </Button>
-                               ) : (
-                                 <Badge variant="outline" className="h-7 px-3 rounded-full border-primary/5 bg-muted/20 text-muted-foreground font-bold text-[9px]">
-                                    0 Medicines
-                                 </Badge>
-                               )}
-                             </div>
+                            <div className="flex justify-center">
+                              {p.itemCount > 0 ? (
+                                <Button
+                                  variant="outline"
+                                  onClick={() =>
+                                    setActiveLinkedMeds({
+                                      open: true,
+                                      meds: p.linkedMedications,
+                                    })
+                                  }
+                                  className="h-9 px-4 rounded-full border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary font-black text-[10px] gap-2 transition-all active:scale-95"
+                                >
+                                  <Package className="h-3.5 w-3.5" />
+                                  Show ({p.itemCount})
+                                </Button>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className="h-7 px-3 rounded-full border-primary/5 bg-muted/20 text-muted-foreground font-bold text-[9px]"
+                                >
+                                  0 Medicines
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
-                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                               <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-10 w-10 rounded-xl hover:bg-primary/10 text-primary transition-all active:scale-95"
-                                  onClick={() => setPreviewDoc({ url: p.url, label: p.label })}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-10 w-10 rounded-xl hover:bg-red-50 text-red-500 transition-all active:scale-95"
-                                  onClick={() => handleDelete(p._id, p.label)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                             </div>
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-10 w-10 rounded-xl hover:bg-primary/10 text-primary transition-all active:scale-95"
+                                onClick={() =>
+                                  setPreviewDoc({ url: p.url, label: p.label })
+                                }
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-10 w-10 rounded-xl hover:bg-red-50 text-red-500 transition-all active:scale-95"
+                                onClick={() => handleDelete(p._id, p.label)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -359,7 +382,9 @@ export default function PrescriptionExplorerPage() {
                       key={p._id}
                       prescription={p}
                       variant="list"
-                      onView={() => setPreviewDoc({ url: p.url, label: p.label })}
+                      onView={() =>
+                        setPreviewDoc({ url: p.url, label: p.label })
+                      }
                       onDelete={() => handleDelete(p._id, p.label)}
                     />
                   ))}
@@ -397,10 +422,12 @@ export default function PrescriptionExplorerPage() {
         document={previewDoc}
       />
 
-      <LinkedMedications 
-        medications={activeLinkedMeds.meds} 
+      <LinkedMedications
+        medications={activeLinkedMeds.meds}
         open={activeLinkedMeds.open}
-        onOpenChange={(open) => setActiveLinkedMeds(prev => ({ ...prev, open }))}
+        onOpenChange={(open) =>
+          setActiveLinkedMeds((prev) => ({ ...prev, open }))
+        }
       />
 
       <AlertDialog
@@ -413,7 +440,11 @@ export default function PrescriptionExplorerPage() {
               Delete Document?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-bold opacity-70">
-              Permanently remove <span className="text-foreground font-black">"{deleteConfirmLabel}"</span> from your vault? This cannot be undone.
+              Permanently remove{" "}
+              <span className="text-foreground font-black">
+                "{deleteConfirmLabel}"
+              </span>{" "}
+              from your vault? This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-3 mt-4">
