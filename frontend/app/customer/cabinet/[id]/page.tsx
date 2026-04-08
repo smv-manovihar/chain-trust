@@ -18,7 +18,6 @@ import {
   Loader2,
   Pill,
   Clock,
-  Calendar,
   ShieldCheck,
   Save,
   Trash2,
@@ -32,21 +31,13 @@ import {
   Eye,
   EyeOff,
   Stethoscope,
-  Package,
-  Box,
-  Power,
-  CircleSlash,
   Calendar as CalendarIcon,
   Activity,
-  BellRing,
-  Smartphone,
-  Mail,
   AlertCircle,
   History,
-  Undo2,
-  Trash,
   RotateCcw,
   Zap,
+  Flame,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -820,7 +811,7 @@ export default function MedicineDetailPage() {
           {/* Adherence Hero */}
           <Card className="p-6 rounded-3xl border-primary/10 bg-gradient-to-br from-primary/5 via-background to-background shadow-sm relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-              <Zap className="h-32 w-32 text-primary" />
+              <Flame className="h-32 w-32 text-primary" />
             </div>
 
             <div className="flex flex-col md:flex-row gap-8 items-center relative z-10">
@@ -877,7 +868,7 @@ export default function MedicineDetailPage() {
                   {medicine.currentStreak !== undefined &&
                     medicine.currentStreak > 0 && (
                       <Badge className="rounded-full bg-orange-500/10 text-orange-600 border-orange-200 font-black px-3 py-1 animate-pulse">
-                        <Zap className="h-3 w-3 mr-1.5 fill-current" />
+                        <Flame className="h-3 w-3 mr-1.5 fill-current" />
                         {medicine.currentStreak} Day Streak
                       </Badge>
                     )}
@@ -1191,13 +1182,19 @@ export default function MedicineDetailPage() {
                               onChange={(e) =>
                                 setFormData((prev) => ({
                                   ...prev,
-                                  dosage: Math.max(0, e.target.value === "" ? 0 : Number(e.target.value)),
+                                  dosage: Math.max(
+                                    0,
+                                    e.target.value === ""
+                                      ? 0
+                                      : Number(e.target.value),
+                                  ),
                                 }))
                               }
                             />
                             <p className="px-3 mt-1.5 text-[9px] font-black text-muted-foreground/40 italic flex items-center gap-1">
                               <ShieldCheck className="h-2.5 w-2.5" />
-                              Automatically deducted from total quantity on every intake
+                              Automatically deducted from total quantity on
+                              every intake
                             </p>
                           </div>
                         </div>
@@ -1215,7 +1212,10 @@ export default function MedicineDetailPage() {
                               onChange={(e) =>
                                 setFormData((prev) => ({
                                   ...prev,
-                                  currentQuantity: Math.max(0, Number(e.target.value)),
+                                  currentQuantity: Math.max(
+                                    0,
+                                    Number(e.target.value),
+                                  ),
                                 }))
                               }
                             />
@@ -1232,7 +1232,10 @@ export default function MedicineDetailPage() {
                               onChange={(e) =>
                                 setFormData((prev) => ({
                                   ...prev,
-                                  totalQuantity: Math.max(0, Number(e.target.value)),
+                                  totalQuantity: Math.max(
+                                    0,
+                                    Number(e.target.value),
+                                  ),
                                 }))
                               }
                             />
@@ -1677,22 +1680,32 @@ export default function MedicineDetailPage() {
               {/* Calculation Context - Ultra Compact */}
               <div className="flex items-center gap-6 text-muted-foreground/30">
                 <div className="text-center">
-                  <p className="text-[9px] font-black uppercase tracking-tighter opacity-60">Current</p>
-                  <p className="text-lg font-black text-foreground/80">{medicine?.currentQuantity || 0}</p>
+                  <p className="text-[9px] font-black uppercase tracking-tighter opacity-60">
+                    Current
+                  </p>
+                  <p className="text-lg font-black text-foreground/80">
+                    {medicine?.currentQuantity || 0}
+                  </p>
                 </div>
                 <Plus className="h-3 w-3 opacity-30 shrink-0" />
                 <div className="text-center">
-                  <p className="text-[9px] font-black uppercase tracking-tighter opacity-60">Pack Size</p>
-                  <p className="text-lg font-black text-foreground/80">{medicine?.totalQuantity || 0}</p>
+                  <p className="text-[9px] font-black uppercase tracking-tighter opacity-60">
+                    Pack Size
+                  </p>
+                  <p className="text-lg font-black text-foreground/80">
+                    {medicine?.totalQuantity || 0}
+                  </p>
                 </div>
               </div>
 
               {/* Centered Result Stepper - Compacted */}
               <div className="w-full max-w-[240px] space-y-2">
                 <div className="flex flex-col items-center">
-                  <Label className="text-[9px] font-black text-primary/60 uppercase text-center tracking-[0.2em] mb-1">Target Stock</Label>
+                  <Label className="text-[9px] font-black text-primary/60 uppercase text-center tracking-[0.2em] mb-1">
+                    Target Stock
+                  </Label>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
@@ -1703,14 +1716,16 @@ export default function MedicineDetailPage() {
                   >
                     <ChevronDown className="h-4 w-4" />
                   </Button>
-                  
+
                   <div className="flex-1 relative">
-                    <Input 
+                    <Input
                       id="refill-input"
-                      type="number" 
+                      type="number"
                       min={0}
                       value={refillValue}
-                      onChange={(e) => setRefillValue(Math.max(0, Number(e.target.value)))}
+                      onChange={(e) =>
+                        setRefillValue(Math.max(0, Number(e.target.value)))
+                      }
                       className="h-12 rounded-xl border-primary/20 bg-background font-black text-2xl text-center focus-visible:ring-primary/20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
@@ -1725,7 +1740,9 @@ export default function MedicineDetailPage() {
                     <ChevronUp className="h-4 w-4" />
                   </Button>
                 </div>
-                <p className="text-[9px] font-bold text-muted-foreground/30 text-center italic">Calculated automatically</p>
+                <p className="text-[9px] font-bold text-muted-foreground/30 text-center italic">
+                  Calculated automatically
+                </p>
               </div>
             </div>
 

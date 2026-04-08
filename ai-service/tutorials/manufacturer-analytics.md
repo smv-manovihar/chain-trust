@@ -1,28 +1,30 @@
 # Manufacturer Analytics — Operational Manual
 **Route:** `/manufacturer/analytics`
 
-The Analytics page is the high-fidelity center for geographic and security monitoring. It provides interactive visualizations of scan volume, market distribution, and potential threat clusters.
+The Analytics page is the high-fidelity intelligence hub for geographic and security monitoring. It provides interactive visualizations of scan volume, market distribution, and potential threat clusters using real-time blockchain-verified data.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Dynamic Metrics (Stats Bar)**: Glassmorphic KPI cards for: "Scan Pulse", "Market Reach", and "Risk Vector".
-- **Geographic Coverage (Chart Segment)**: A responsive, animated Bar Chart showing the top 10 countries by scan volume and tooltips with product-level depth.
-- **Security Incident Timeline**: A dynamic area for "Top Threats".
+- **Dynamic Metrics (Bento Hub)**: Glassmorphic KPI cards for:
+  - **Scan Pulse**: Real-time scan activity over the selected period.
+  - **Market Reach**: Count of unique countries with verified scans.
+  - **Risk Vector**: Count of high-risk units detected.
+- **Geographic Coverage**: BAR chart visually representing global market penetration.
+- **Threat Timeline**: Chronological log of potential counterfeit signals.
 
 ---
 
 ## 🔗 URL & Navigation (Link Generation)
 The agent can generate deep-links with precise filters to view specific data segments:
 
-| Parameter | Type | Description | Example Link |
-| :--- | :--- | :--- | :--- |
-| `productId` | String | Filters all charts and threats for a specific SKU. | `/manufacturer/analytics?productId=SKU-101` |
-| `batchNumber`| String | Filters all data for a specific production run. | `/manufacturer/analytics?batchNumber=AC-202` |
-| `from` | Date | Start date for analysis (YYYY-MM-DD). | `/manufacturer/analytics?from=2026-03-01` |
-| `to` | Date | End date for analysis (YYYY-MM-DD). | `/manufacturer/analytics?to=2026-03-31` |
+| Filter | Route | Description |
+| :--- | :--- | :--- |
+| **Product Focused** | `/manufacturer/analytics?productId=SKU-101` | Filters all charts for a specific product. |
+| **Batch Focused** | `/manufacturer/analytics?batchNumber=B-202` | Deep-link to a specific production run's analytics. |
+| **Custom Range** | `/manufacturer/analytics?from=2026-03-01&to=2026-03-31` | Date-filtered intelligence view. |
 
-**AI Rule:** When a manufacturer asks for a geographic summary or threat analysis for a specific product/batch, provide the filtered link to the [Analytics](/manufacturer/analytics) page.
+**AI Rule:** Always provide the filtered link to the [Analytics](/manufacturer/analytics) page when discussing volume or threats.
 
 ---
 
@@ -30,16 +32,16 @@ The agent can generate deep-links with precise filters to view specific data seg
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "Where are our products being scanned?" | `get_scan_geography` | Identify top countries and cities. |
-| "Show me any threats." | `get_threat_intelligence` | Reference the total visitor and scan count per unit. |
+| "Show me my global stats." | `get_scan_geography` | Aggregates country-level scan volume. |
+| "Are there any counterfeit risks?" | `get_threat_intelligence` | Identifies units with suspiciously high scan counts. |
 
 ---
 
 ## 🚨 Error & Empty States
-- **Insufficient Data Warning**: Suggest expanding the dates if `get_scan_geography` returns no results.
+- **Zero-Scan Window**: If no data is returned for a date range, suggest the user expand their filters or check if any products were enrolled during that period.
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Data Filtering Linkage**: Always offer a filtered link when answering product-specific volume questions.
-- **Threat Prioritization**: Mention the **Analytics** deep-link when high-severity threats are detected.
+- **Prioritize Threats**: If `get_threat_intelligence` returns any data, mention them **before** discussing general volume.
+- **Deep-Link Linking**: Always link to the [Scan Analytics Deep Dive](/manufacturer/analytics/scans) for unit-level verification history.

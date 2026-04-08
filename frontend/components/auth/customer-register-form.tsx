@@ -107,8 +107,8 @@ export function CustomerRegisterForm() {
 
   return (
     <AuthLayout
-      title="Start your journey"
-      subtitle="Join our community of customers securing the pharmaceutical supply chain."
+      title="Create your account"
+      subtitle="Track your medicines, log doses, and build healthy habits — your personal health companion."
     >
       <div className="flex flex-col space-y-2 text-center mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">

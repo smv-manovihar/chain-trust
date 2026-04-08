@@ -271,8 +271,11 @@ export const updateBatch = async (req: Request, res: Response) => {
 export const listBatches = async (req: Request, res: Response) => {
 	try {
 		const userId = (req as any).user?.id;
-		const { search, categories } = req.query;
+		const page = parseInt(req.query.page as string) || 1;
+		const limit = parseInt(req.query.limit as string) || 25;
+		const skip = (page - 1) * limit;
 
+		const { search, categories } = req.query;
 		const matchQuery: any = { createdBy: mongoose.Types.ObjectId.createFromHexString(userId) };
 
 		if (search) {
@@ -287,6 +290,8 @@ export const listBatches = async (req: Request, res: Response) => {
 			const catList = Array.isArray(categories) ? categories : (categories as string).split(',');
 			matchQuery.categories = { $in: catList };
 		}
+
+		const total = await Batch.countDocuments(matchQuery);
 
 		const batches = await Batch.aggregate([
 			{ $match: matchQuery },
@@ -311,10 +316,12 @@ export const listBatches = async (req: Request, res: Response) => {
 				$project: {
 					scanCountData: 0
 				}
-			}
+			},
+			{ $skip: skip },
+			{ $limit: limit }
 		]);
 
-		res.json({ batches });
+		res.json({ batches, total });
 	} catch (error) {
 		console.error('List batches error:', error);
 		res.status(500).json({ message: 'Internal server error' });

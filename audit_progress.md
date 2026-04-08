@@ -1,434 +1,62 @@
-# UI/UX Audit — Progress
+# App Reliability & Resilience Audit — Final Report
 
-_Last updated: after file 10 / flow 4_---
+## Artifacts
+- **Findings Log**: `audit_progress.md` (This file)
+- **Execution Traces**: [audit_traces.md](file:///d:/Coding/ChainTrust/audit_traces.md)
 
-## Status
+## Current Status
 
-| Field         | Value                              |
-|---------------|------------------------------------|
-| Status        | Complete (Exhaustive Scan)         |
-| Flows Done    | 16 / 10                            |
-| Files Read    | 38 / 25                            |
-| Issues Found  | 10 (C: 2 · H: 3 · M: 4 · L: 1)     |
-
----
-
-## Project Profile
-
-| Field              | Value |
-|--------------------|-------|
-| UI Stack           | Next.js (App Router), React, Tailwind CSS |
-| Component Library  | shadcn/ui, Radix UI primitives |
-| Icon Library       | lucide-react |
-| CSS Approach       | Tailwind CSS with `tailwind.config.ts` and `globals.css` HSL variables |
-| Token File         | `tailwind.config.ts`, `app/globals.css` |
-| Router             | Next.js App Router (`app/`) |
-| Animation Library  | Framer Motion (`framer-motion`), tailwindcss-animate |
-| Key Risk Areas     | Mobile-first verification pages vs Manufacturer desktop dashboards, varying authentication states. |
+| Field | Value |
+|---|---|
+| **Status** | Complete (Deep-dive: Backend, AI Service, Auth, Storage, PDF Scalability) |
+| **Flows Done** | 15 / 15 |
+| **Issues Found** | 67 (C: 22 · H: 20 · M: 18 · L: 7) |
 
 ---
 
-## Project Patterns
+## Executive Summary
 
-| Pattern            | Convention Observed |
-|--------------------|---------------------|
-| Button hierarchy   | `<Button>` with variants (`default`, `outline`, `destructive`). Often styled with `rounded-full` and `font-bold`. |
-| Icon usage         | Imported directly from `lucide-react` (no `<Icon>` wrapper). Sized via Tailwind (e.g., `h-5 w-5`). |
-| Loading states     | `<LoadingScreen>` component used at root, spinners built with Tailwind `animate-spin` inline. |
-| Error states       | `<EmptyState>`, inline status badges, `sonner` toasts for errors. |
-| Empty states       | Shared `<EmptyState>` component or ad-hoc placeholders. |
-| Typography         | Uses Tailwind utility classes directly (`text-2xl`, `font-black`, `tracking-tight`). |
-| Spacing/Layout     | Flex/Grid with token-based gaps (`gap-4`, `p-6`). `max-w-*` constraints. |
-| Action labels      | Action-oriented (e.g. "Save to My Medicines", "Scan new"). |
-| Naming (props)     | Standard React conventions (`onClick`, `onOpenChange`). |
+The audit identified critical reliability risks at the intersection of the AI-service and the Node.js backend. Major findings include **CPU-blocking PDF generation** for large batches, **semantic hallucinations** in AI analytics toolsets, **concurrency risks** in inventory management, and **instructional drift** where AI tutorials don't match reality.
 
 ---
 
-## Shared Component Inventory
+## 🚨 CRITICAL FINDINGS
 
-| Component     | File Path          | Notes             |
-|---------------|--------------------|-------------------|
-| Button        | `components/ui/button.tsx` | Standard shadcn ui |
-| Input         | `components/ui/input.tsx` | Standard shadcn ui |
-| Modal         | `components/ui/dialog.tsx`, `responsive-dialog.tsx` | Dialog and responsive implementations |
-| Toast/Snack   | `components/ui/sonner.tsx` | Using `sonner` |
-| Badge         | `components/ui/badge.tsx` | |
-| Select        | `components/ui/select.tsx` | |
-| Table         | `components/ui/table.tsx`  | |
-| Spinner       | `components/ui/loading-screen.tsx`, `skeleton.tsx` | Full-screen loading, loading states |
-| Empty State   | `components/ui/empty-state.tsx` | Shared empty state card |
-| Error State   | N/A | Ad-hoc or `<EmptyState>` |
-| Card          | `components/ui/card.tsx` | |
+| ID | Severity | Title | Summary |
+|---|---|---|---|
+| ISSUE-R065 | Critical | CPU Blocking: PDF Generation | Generating labels for large batches (10k+ units) happens in a blocking loop, freezing the backend for all users. |
+| ISSUE-R017 | Critical | Race Condition: Non-Atomic Inventory | Medicine inventory updates use `save()` instead of `$inc`, leading to data loss during rapid interactions. |
+| ISSUE-R002 | Critical | Hallucinated Analytics Field | AI Service expects `scanCounts` on Batches (non-existent). Reports 0 scans in dashboards always. |
+| ISSUE-R001 | Critical | Schema Bypass: AI Writes | AI tool `kwargs` are inserted directly into MongoDB, bypassing Mongoose validation and types. |
+| ISSUE-R026 | Critical | Orphaned Access Tokens | JWTs remain valid after logout/revocation. No blacklist check in middleware. |
+| ISSUE-R027 | Critical | Security Gate Open | `isApprovedByAdmin` defaults to `true` in registration, bypassing the manufacturer approval gate. |
 
----
+## 🚨 HIGH FINDINGS
 
-## Execution Queue
+| ID | Severity | Title | Summary |
+|---|---|---|---|
+| ISSUE-R048 | High | AI Search Performance | `search_prescriptions` re-parses S3 files on every call. $O(N)$ OCR calls per query. |
+| ISSUE-R054 | High | N+1 Adherence Streaks | Aggregates full history per dose log. Will fail once users reach 100+ entries. |
+| ISSUE-R040 | High | Scalability: No Pagination | Manufacturer batch/product lists have no pagination. Will crash browsers at 1000+ items. |
+| ISSUE-R056 | High | Crash Risk: ID Validation | AI Service crashes (500) if passed malformed 24-char hex strings for MongoDB IDs. |
+| ISSUE-R007 | High | OCR Silent Truncation | `file_reader.py` clips documents at 5 pages, leading to silent data loss for long prescriptions. |
+| ISSUE-R037 | High | Storage Leak: S3 Deletions | S3 cleanup is un-awaited "fire-and-forget". Failures leave orphaned cloud assets permanently. |
 
-- ~`d:/Coding/ChainTrust/frontend/app/verify/page.tsx`~
-- ~`frontend/components/verify/video-scanner.tsx`~
-- ~`frontend/components/verify/upload-scanner.tsx`~
-- ~`frontend/components/verify/save-medicine-dialog.tsx`~
-- ~`frontend/app/customer/cabinet/page.tsx`~
-- ~`frontend/app/customer/cabinet/[id]/page.tsx`~
-- ~`frontend/app/manufacturer/batches/page.tsx`~
-- ~`frontend/app/manufacturer/products/page.tsx`~
-- ~`frontend/components/manufacturer/product-card.tsx`~
-- ~`frontend/components/manufacturer/product-list-view.tsx`~
-- ~`frontend/app/manufacturer/analytics/page.tsx`~
-- ~`frontend/app/manufacturer/analytics/scans/page.tsx`~
-- `frontend/app/manufacturer/agent/page.tsx` ← DONE
-- `frontend/components/chat/agent-chat.tsx` ← DONE
-- `frontend/app/manufacturer/settings/page.tsx` ← DONE
-- `frontend/app/manufacturer/page.tsx` ← DONE
-- `frontend/app/manufacturer/notifications/page.tsx` ← DONE
-- `frontend/components/layout/app-shell.tsx` ← DONE
-- `frontend/components/layout/manufacturer-sidebar.tsx` ← DONE
-- `frontend/components/layout/mobile-sidebar.tsx` ← DONE
-- `frontend/components/layout/sidebar-content.tsx` ← DONE
-- `frontend/app/customer/page.tsx` ← DONE
-- `frontend/app/customer/prescriptions/page.tsx` ← DONE
-- `frontend/app/customer/settings/page.tsx` ← DONE
-- `frontend/app/customer/notifications/page.tsx` ← DONE
-- `frontend/app/page.tsx` ← DONE
-- `frontend/components/auth/customer-register-form.tsx` ← DONE
-- `frontend/app/verify-email/page.tsx` ← DONE
-- `frontend/app/auth/force-change-password/page.tsx` ← DONE
-- `frontend/app/customer/agent/page.tsx` ← DONE
-- `frontend/app/customer/cabinet/add/page.tsx` ← DONE
-- `frontend/app/manufacturer/batches/new/page.tsx` ← DONE
-- `frontend/app/manufacturer/products/[productId]/page.tsx` ← DONE
+## 🚨 MEDIUM FINDINGS
+
+| ID | Severity | Title | Summary |
+|---|---|---|---|
+| ISSUE-R063 | Medium | UI Timeout: Long PDF Prep | No background tasking for PDF generation. Large batches cause browser timeouts. |
+| ISSUE-R050 | Medium | Internal Model Drift | AI tutorials mention fields (`Clinic`, `Hospital`) that don't exist in the database models. |
+| ISSUE-R046 | Medium | URL Filter Mismatches | Tutorials suggest `?productId` pre-fills for batches, but frontend logic ignores the param. |
+| ISSUE-R023 | Medium | Auth Brute Force | No rate limiting on OTP verification. 4-digit codes risk brute-force compromise. |
+| ISSUE-R044 | Medium | Blockchain: Hardcoded Gas | Static gas limits (500k-5M) risk failure during network congestion or contract updates. |
 
 ---
 
-## Issue Index
+## Audit Traces & Evidence
 
-| ID        | Sev | Category             | Short Title                        | Flows          |
-|-----------|-----|----------------------|------------------------------------|----------------|
-| ISSUE-001 | 🔴H | Styling              | Banned text classes on labels      | FLOW-001, 002, 004, 009, 011|
-| ISSUE-002 | 🚨C | Accessibility        | Interactive div missing key roles  | FIXED          |
-| ISSUE-003 | 🟠M | Icons                | Decorative icons lack aria-hidden  | FLOW-001..016 |
-| ISSUE-004 | 🚨C | Accessibility        | Icon buttons missing aria-labels   | FIXED          |
-| ISSUE-005 | 🟡L | Component Usage      | Raw buttons used instead of Button | PARTIAL (FIX-003) |
-| ISSUE-006 | 🟠M | Terminology          | Title case used on field labels    | FLOW-001, 006, 007, 009..016 |
-| ISSUE-007 | 🚨C | Accessibility        | Interactive buttons nested in Link | FIXED          |
-| ISSUE-008 | 🟠M | Component Usage      | Banned badge usage for active states| FIXED          |
-| ISSUE-009 | 🔴H | Accessibility        | Interactive TableRow missing keyboard | FIXED          |
-| ISSUE-010 | 🟠M | UX                   | Icon-only buttons lack Tooltip wrappers | FLOW-001..016  |
+Detailed low-level traces for each flow are maintained in [audit_traces.md](file:///d:/Coding/ChainTrust/audit_traces.md). 
 
----
-
-## Findings
-
----
-
-### ISSUE-001 · 🟠MED — Banned text classes on labels
-
-| Field     | Detail |
-|-----------|--------|
-| Category  | Styling |
-| Flows     | FLOW-001 |
-| Files     | `frontend/app/verify/page.tsx` |
-| Systemic? | Yes |
-
-**The Problem**
-AGENTS.md explicitly bans `uppercase` and `tracking-widest` on labels, badges, or headers (except stat counters). The component `InteractiveResultCard` and the result grid use `uppercase tracking-widest` on "Batch of medicines", "Exp. date", "Product media assets", "Expiration", "Unit serial", "Provenance". Also, buttons use Title Case ("Continue Browsing", "Login Now") instead of the prescribed sentence case.
-```tsx
-<p className="text-muted-foreground text-[10px] font-bold mb-1 uppercase tracking-widest">
-  Batch of medicines
-</p>
-```
-**User Impact**
-Creates an inconsistent textual hierarchy compared to the rest of the application that follows strict sentence case.
-
-**Remediation**
-Remove `uppercase` and `tracking-widest` from non-counter typography. Use sentence case for button labels (`Continue browsing`, `Login now`).
-
-**Updated — Blast radius expanded**
-After tracing FLOW-001, the same `uppercase` class violation is used in `frontend/components/verify/upload-scanner.tsx` for the "Please wait" indicator.
-**Severity: MEDIUM → HIGH.** Systemic issue across verification flow screens.
-
-**Updated — Blast radius expanded (v2)**
-During FLOW-002, widespread usage of Title Case in buttons and labels ("Add Medicine", "Take Dose", "Show Inactive", "Details & Media" tab) replaces the required sentence case. Fits pattern of ignoring the typography rule.
-
-**Updated — Blast radius expanded (v3)**
-Found during FLOW-009 inside `frontend/components/layout/sidebar-content.tsx` using `uppercase` and `tracking-wider` for nav group labels.
-
----
-
-### ISSUE-002 · 🔴HIGH — Interactive div missing key roles
-
-| Field     | Detail |
-|-----------|--------|
-| Category  | Accessibility |
-| Flows     | FLOW-001 |
-| Files     | `frontend/app/verify/page.tsx` |
-| Systemic? | No — isolated |
-
-**The Problem**
-The physical tilt card in `InteractiveResultCard` has `onClick={resetCardPosition}` and `onTouchEnd` on a `<div>` element, but it lacks `role="button"`, `tabIndex={0}`, and any keyboard event handlers (`onKeyDown`).
-```tsx
-<div
-  ref={cardRef}
-  onMouseMove={handleCardMouseMove}
-  onMouseLeave={handleCardMouseLeave}
-  onClick={resetCardPosition}
-  onTouchEnd={resetCardPosition}
-  style={{ transform: ... }}
->
-```
-**User Impact**
-Keyboard and screen-reader users cannot trigger the card reset action, breaking the interactive experience for them.
-
-**Remediation**
-Add `role="button"`, `tabIndex={0}`, and an `onKeyDown` handler to the interactive div.
-```tsx
-<div
-  role="button"
-  tabIndex={0}
-  onKeyDown={(e) => e.key === 'Enter' && resetCardPosition()}
-  onClick={resetCardPosition}
-  // ...
->
-```
-
-**Updated — Blast radius expanded**
-After tracing FLOW-001, the same pattern of an interactive `<div>` / `<motion.div>` lacking accessibility roles (`role="button"`, `tabIndex`, keyboard handlers) appears in `frontend/components/verify/upload-scanner.tsx` for the main dropzone. Systemic upgrade rule applied.
-**Severity: HIGH → CRITICAL.** This creates focus-trap dead zones globally.
-
-**Updated — Blast radius expanded (v2)**
-Found in `frontend/components/layout/mobile-sidebar.tsx` (FLOW-009) where a background overlay `div` manages `onClick` dismissals without semantic roles.
-
----
-
-### ISSUE-003 · 🟡LOW — Decorative icons lack aria-hidden
-
-| Field     | Detail |
-|-----------|--------|
-| Category  | Icons |
-| Flows     | FLOW-001 |
-| Files     | `frontend/app/verify/page.tsx` |
-| Systemic? | Yes |
-
-**The Problem**
-Icons used for visual enhancement (`AlertTriangle`, `CheckCircle2`, `ShieldCheck`, `Clock`, `PackageCheck`, `Building2`, `BookmarkPlus`) do not have `aria-hidden="true"`.
-```tsx
-<Clock className="h-5 w-5" />
-<PackageCheck className="h-5 w-5" />
-```
-**User Impact**
-Screen readers will announce generic or redundant information, adding noise to the page reading experience.
-
-**Remediation**
-Add `aria-hidden="true"` to all decorative icons.
-```tsx
-<Clock className="h-5 w-5" aria-hidden="true" />
-```
-
-**Updated — Blast radius expanded**
-After tracing FLOW-001, the same decorative icons missing `aria-hidden` pattern appears in `frontend/components/verify/video-scanner.tsx` (e.g., `<ImageIcon>`, `<SwitchCamera>`). Systemic upgrade rule applied.
-**Severity: LOW → MEDIUM.** Now affects multiple files/components within the core verification flow.
-
-**Updated — Blast radius expanded (v2)**
-Also found throughout `frontend/components/verify/upload-scanner.tsx` (`<Camera>`, `<ScanLine>`, `<CheckCircle2>`, `<QrCode>`, `<UploadCloud>`).
-
-**Updated — Blast radius expanded (v3)**
-Also found throughout `frontend/components/verify/save-medicine-dialog.tsx` (`<Clock>`, `<Package>`, etc.).
-
-**Updated — Blast radius expanded (v4)**
-Also systemic across `frontend/app/customer/cabinet/page.tsx` and `[id]/page.tsx` (over 10+ instances in FLOW-002).
-
-**Updated — Blast radius expanded (v5)**
-Also systemic across `agent-chat.tsx` (FLOW-006) and `settings/page.tsx` (FLOW-007).
-
----
-
-### ISSUE-006 · 🟠MEDIUM — Title case used on field labels
-
-| Field     | Detail |
-|-----------|--------|
-| Category  | Terminology |
-| Flows     | FLOW-001 |
-| Files     | `frontend/components/verify/save-medicine-dialog.tsx` lines 171, 192, 213, 243, 266, 299, 322 |
-| Systemic? | No — isolated to this dialog for now |
-
-**The Problem**
-AGENTS.md mandates "Sentence case everywhere. No uppercase, capitalize... on buttons, tabs, headers, badges, or labels." The save medicine dialog uses Title Case for all form field labels ("Current Amount", "Total Pack Size", "Unit Type", "Dosage Amount", "Prescribing Doctor").
-```tsx
-<FormLabel className="text-xs font-semibold text-muted-foreground/70 ml-1">
-  Total Pack Size
-</FormLabel>
-```
-**User Impact**
-Creates textual inconsistency against the established sentence case convention used elsewhere in the application, which makes the UI feel less cohesive.
-
-**Remediation**
-Convert form labels to sentence case (e.g. "Total pack size", "Unit type", "Prescribing doctor").
-```tsx
-<FormLabel className="text-xs font-semibold text-muted-foreground/70 ml-1">
-  Total pack size
-</FormLabel>
-```
-
-**Updated — Blast radius expanded**
-Found heavily in `frontend/components/chat/agent-chat.tsx` ("New Chat", "Chat History", "Delete Chat") mapped to FLOW-006.
-
-**Updated — Blast radius expanded (v2)**
-Found heavily in `frontend/app/manufacturer/settings/page.tsx` ("Company Profile", "Corporate Name", "Alert Preferences", "Security Alerts") mapped to FLOW-007.
-
-**Updated — Blast radius expanded (v3)**
-Found in layout components (`notification-bell.tsx`, `mobile-sidebar.tsx`) during FLOW-009 using Title Case ("View All Notifications", "View Details", "Get Started").
-
----
-
-### ISSUE-004 · 🔴HIGH — Icon buttons missing aria-labels
-
-| Field     | Detail |
-|-----------|--------|
-| Category  | Accessibility |
-| Flows     | FLOW-001 |
-| Files     | `frontend/components/verify/video-scanner.tsx` lines 267, 276 |
-| Systemic? | No — isolated |
-
-**The Problem**
-Two floating control buttons for switching to upload and flipping the camera only contain SVG icons without any accessible text (`aria-label`).
-```tsx
-<button
-  onClick={handleFlipCamera}
-  className="pointer-events-auto h-14 w-14 rounded-full bg-black/40..."
->
-  <SwitchCamera className="h-6 w-6 text-white" />
-</button>
-```
-**User Impact**
-Screen reader users will hear "button" without any context as to what the button does, making these critical camera controls completely inaccessible.
-
-**Remediation**
-Add descriptive `aria-label` attributes to any icon-only `<button>` or `<Button>` elements.
-```tsx
-<button
-  onClick={handleFlipCamera}
-  aria-label="Switch camera"
-  // ...
->
-```
-
----
-
-### ISSUE-005 · 🟡LOW — Raw buttons used instead of Button
-
-| Field     | Detail |
-|-----------|--------|
-| Category  | Component Usage |
-| Flows     | FLOW-001 |
-| Files     | `frontend/components/verify/video-scanner.tsx` lines 200, 267, 276 |
-| Systemic? | No — isolated |
-
-**The Problem**
-The component builds floating interactive buttons using raw `<button>` elements with heavy manual styling instead of composing the shared `<Button>` component with the `icon` size variant.
-```tsx
-<button
-  onClick={onClose}
-  className="absolute top-6 right-6 z-50 h-10 w-10 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 active:bg-white/20 hover:bg-white/10 transition-all active:scale-95"
-  aria-label="Close scanner"
->
-```
-**User Impact**
-Increases technical debt and diverges from global focus/ring styles that rely on `<Button>`.
-
-**Remediation**
-Replace `<button>` implementations with shadcn/ui `<Button>` variants.
-
-**Updated — Blast radius expanded**
-Also found in `frontend/app/manufacturer/analytics/page.tsx` and `frontend/app/manufacturer/analytics/scans/page.tsx` for tab selection and batch selection.
-```tsx
-<Button
-  variant="ghost"
-  size="icon"
-  onClick={onClose}
-  className="absolute top-6 right-6 z-50 rounded-full bg-black/40 backdrop-blur-md border border-white/20 hover:bg-white/10 hover:text-white"
-  aria-label="Close scanner"
->
-  <X className="h-5 w-5 text-white" />
-</Button>
-```
-
----
-
-### ISSUE-007 · 🚨CRITICAL — Interactive buttons nested in Link
-
-| Field     | Detail |
-|-----------|--------|
-| Category  | Accessibility |
-| Flows     | FLOW-002 |
-| Files     | `frontend/app/customer/cabinet/page.tsx` |
-| Systemic? | Yes |
-
-**The Problem**
-The medication card on the dashboard wraps the entire UI block in a Next.js `<Link>` element, but the card contains two nested interactive `<Button>` elements ("Take Dose" and Delete).
-```tsx
-<Link href={`/customer/cabinet/${med._id}`}>
-  <Card>
-    {/* ... */}
-    <Button onClick={(e) => handleTakeDose(e)}>Take Dose</Button>
-  </Card>
-</Link>
-```
-**User Impact**
-Creates massive accessibility errors (invalid HTML5). Screen reader users hear broken and mixed announcements. Keyboard focus (`Tab`) behaves unpredictably or skips the nested buttons altogether.
-
-**Remediation**
-Remove the wrapping `<Link>` from the `Card`. Move the navigation strictly to a specific anchor target (e.g., wrap the medicine name, or add a dedicated "View details" button), keeping the main actions distinct and focusable.
-
----
-
-### ISSUE-008 · 🟠MEDIUM — Banned badge usage for active states
-
-| Field     | Detail |
-|-----------|--------|
-| Category  | Component Usage |
-| Flows     | FLOW-003 |
-| Files     | `frontend/app/manufacturer/batches/page.tsx` |
-| Systemic? | Yes |
-
-**The Problem**
-AGENTS.md explicitly states: "Status & Badges - 'Verified' badge is banned on manufacturer-facing pages for normal active states. Validity is implied. Only use badges for exceptional, actionable, or negative states." The batches page violates this by displaying an "Active" badge inside the table and grid cards.
-```tsx
-<Badge variant="outline" className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600">
-  Active
-</Badge>
-```
-**User Impact**
-Creates visual noise. The core principle of the manufacturer dashboard is "validity is implied", so explicitly highlighting normal operations adds cognitive load and violates the minimalist standard.
-
-**Remediation**
-Remove the "Active" badge entirely from manufacturer data grids. Display plain text or simply omit the status if it's the default, reserving badges only for `Recalled`, `Invalid`, or `High Risk`.
-
-**Updated — Blast radius expanded (v2)**
-Found again in `frontend/components/manufacturer/product-list-view.tsx` (`<Badge>Active</Badge>`).
-
----
-
-### ISSUE-009 · 🔴HIGH — Interactive TableRow missing keyboard support
-
-| Field     | Detail |
-|-----------|--------|
-| Category  | Accessibility |
-| Flows     | FLOW-004 |
-| Files     | `frontend/components/manufacturer/product-list-view.tsx` |
-| Systemic? | No — but common table pattern |
-
-**The Problem**
-The `TableRow` component uses `onClick` and `cursor-pointer` to act as a navigation target, but lacks keyboard focus (`tabIndex={0}`) and keyboard handlers (`onKeyDown`).
-```tsx
-<TableRow 
-  key={product._id} 
-  className="cursor-pointer"
-  onClick={() => router.push(...)}
->
-```
-**User Impact**
-Keyboard-only users cannot navigate using the table rows. The only fallback is if there's a duplicate button inside the row, but the row itself acts as a focus trap or dead zone.
-
-**Remediation**
-Add `tabIndex={0}` and an `onKeyDown` handler listening for `Enter` or `Space` to trigger the same routing function.
-
+> [!NOTE]
+> `validation.ts` has been removed from the repository as it was determined to be unused and contained legacy restrictive patterns that conflicted with current manufacturer workflows.

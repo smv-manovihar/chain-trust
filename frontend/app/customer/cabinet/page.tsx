@@ -7,20 +7,13 @@ import { Button } from "@/components/ui/button";
 import {
   Pill,
   Clock,
-  AlertTriangle,
-  Calendar,
-  Activity,
-  BellRing,
   Archive,
   Plus,
   ShieldCheck,
-  Smartphone,
-  ChevronRight,
-  Trash2,
-  ExternalLink,
-  ShieldAlert,
-  QrCode,
   RotateCcw,
+  Flame,
+  QrCode,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -148,7 +141,7 @@ export default function MyMedicinesPage() {
     try {
       await undoDose(id);
       toast.success("Dose undone", {
-        description: `Your record for ${name} has been reverted.`
+        description: `Your record for ${name} has been reverted.`,
       });
       fetchCabinet();
     } catch (err) {
@@ -204,12 +197,14 @@ export default function MyMedicinesPage() {
           onChange: setViewMode,
         }}
         filters={
-          <div className={cn(
-            "flex items-center space-x-2 px-3 sm:px-4 h-11 sm:h-12 rounded-full border transition-all duration-300 shrink-0",
-            showInactive 
-              ? "bg-primary/10 border-primary/30 text-primary shadow-[0_0_15px_rgba(var(--primary),0.1)]" 
-              : "bg-muted/40 border-border/50 text-muted-foreground"
-          )}>
+          <div
+            className={cn(
+              "flex items-center space-x-2 px-3 sm:px-4 h-11 sm:h-12 rounded-full border transition-all duration-300 shrink-0",
+              showInactive
+                ? "bg-primary/10 border-primary/30 text-primary shadow-[0_0_15px_rgba(var(--primary),0.1)]"
+                : "bg-muted/40 border-border/50 text-muted-foreground",
+            )}
+          >
             <Switch
               id="show-inactive"
               checked={showInactive}
@@ -269,122 +264,136 @@ export default function MyMedicinesPage() {
             {viewMode === "grid" ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                 {medications.map((med) => {
-                  const isRecentlyTaken = !!med.lastDoseTaken && (Date.now() - new Date(med.lastDoseTaken).getTime() < 5 * 60 * 1000);
-                  
+                  const isRecentlyTaken =
+                    !!med.lastDoseTaken &&
+                    Date.now() - new Date(med.lastDoseTaken).getTime() <
+                      5 * 60 * 1000;
+
                   return (
-                  <Card
-                    key={med._id}
-                    role="article"
-                    tabIndex={0}
-                    onClick={() => router.push(`/customer/cabinet/${med._id}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        router.push(`/customer/cabinet/${med._id}`);
+                    <Card
+                      key={med._id}
+                      role="article"
+                      tabIndex={0}
+                      onClick={() =>
+                        router.push(`/customer/cabinet/${med._id}`)
                       }
-                    }}
-                    className={cn(
-                      "p-5 sm:p-6 transition-all duration-500 flex flex-col gap-4 sm:gap-6 rounded-3xl border-primary/5 shadow-sm hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 relative overflow-hidden cursor-pointer group",
-                      med.isUserAdded
-                        ? "bg-muted/30"
-                        : "bg-card/40 backdrop-blur-md",
-                    )}
-                  >
-                    {/* Glass Background Artifact */}
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-primary/10 transition-colors" />
-
-                    <div className="flex gap-4 items-center relative z-10 w-full shrink-0">
-                      {med.images && med.images.length > 0 ? (
-                        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl overflow-hidden shrink-0 shadow-sm border border-primary/10 bg-white">
-                          <img
-                            src={resolveMediaUrl(med.images[0])}
-                            alt={med.name}
-                            className="h-full w-full object-cover"
-                            crossOrigin="anonymous"
-                          />
-                        </div>
-                      ) : (
-                        <div
-                          className={cn(
-                            "h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center rounded-xl transition-all duration-500 shadow-inner shrink-0",
-                            "bg-primary/5 text-primary group-hover:bg-primary group-hover:text-primary-foreground",
-                          )}
-                        >
-                          {med.isUserAdded ? (
-                            <Pill className="h-5 w-5" aria-hidden="true" />
-                          ) : (
-                            <ShieldCheck
-                              className="h-5 w-5"
-                              aria-hidden="true"
-                            />
-                          )}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0 flex flex-col">
-                        <h3 className="font-bold text-base md:text-lg leading-tight group-hover:text-primary transition-colors truncate">
-                          {med.name}
-                        </h3>
-                        <p className="text-xs text-muted-foreground font-black mt-0.5 opacity-70 truncate">
-                          {med.brand}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Quantity Tracker */}
-                    <div className="relative z-10 w-full flex-1">
-                      <div className="flex justify-between items-end mb-2">
-                        <span className="text-[10px] font-black text-muted-foreground opacity-60 uppercase tracking-widest">
-                          Inventory
-                        </span>
-                        <span
-                          className={cn(
-                            "text-xs font-black tabular-nums",
-                            (med.currentQuantity || 0) < 5
-                              ? "text-destructive"
-                              : "text-primary",
-                          )}
-                        >
-                          {med.currentQuantity || 0} /{" "}
-                          {med.totalQuantity || "--"} {med.unit || "Units"}
-                        </span>
-                      </div>
-                      <Progress
-                        value={
-                          ((med.currentQuantity || 0) /
-                            (med.totalQuantity || 1)) *
-                          100
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          router.push(`/customer/cabinet/${med._id}`);
                         }
-                        className="h-2 rounded-full overflow-hidden"
-                      />
-                    </div>
+                      }}
+                      className={cn(
+                        "p-5 sm:p-6 transition-all duration-500 flex flex-col gap-4 sm:gap-6 rounded-3xl border-primary/5 shadow-sm hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 relative overflow-hidden cursor-pointer group",
+                        med.isUserAdded
+                          ? "bg-muted/30"
+                          : "bg-card/40 backdrop-blur-md",
+                      )}
+                    >
+                      {/* Glass Background Artifact */}
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-primary/10 transition-colors" />
 
-                    <div className="flex flex-col gap-2 w-full mt-auto relative z-10 shrink-0">
-                      <div className="flex items-center gap-2 bg-background/50 border border-border/40 px-3 py-2.5 rounded-xl text-[10px] sm:text-xs font-bold text-muted-foreground overflow-hidden">
-                        <Clock
-                          className="h-3.5 w-3.5 shrink-0 text-primary"
-                          aria-hidden="true"
-                        />
-                        <span className="truncate">
-                          Expiry:{" "}
-                          {med.expiryDate
-                            ? format(new Date(med.expiryDate), "MMM yyyy")
-                            : "No Expiry"}
-                        </span>
+                      {/* Adherence Streak Badge */}
+                      {med.currentStreak !== undefined &&
+                        med.currentStreak > 0 && (
+                          <Badge className="absolute top-4 right-4 rounded-full bg-orange-500/10 text-orange-600 border-orange-200 font-black px-2 py-0.5 text-[9px] z-20 animate-pulse">
+                            <Flame className="h-2.5 w-2.5 mr-1 fill-current" />
+                            {med.currentStreak} Day Streak
+                          </Badge>
+                        )}
+
+                      <div className="flex gap-4 items-center relative z-10 w-full shrink-0">
+                        {med.images && med.images.length > 0 ? (
+                          <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl overflow-hidden shrink-0 shadow-sm border border-primary/10 bg-white">
+                            <img
+                              src={resolveMediaUrl(med.images[0])}
+                              alt={med.name}
+                              className="h-full w-full object-cover"
+                              crossOrigin="anonymous"
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            className={cn(
+                              "h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center rounded-xl transition-all duration-500 shadow-inner shrink-0",
+                              "bg-primary/5 text-primary group-hover:bg-primary group-hover:text-primary-foreground",
+                            )}
+                          >
+                            {med.isUserAdded ? (
+                              <Pill className="h-5 w-5" aria-hidden="true" />
+                            ) : (
+                              <ShieldCheck
+                                className="h-5 w-5"
+                                aria-hidden="true"
+                              />
+                            )}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0 flex flex-col">
+                          <h3 className="font-bold text-base md:text-lg leading-tight group-hover:text-primary transition-colors truncate">
+                            {med.name}
+                          </h3>
+                          <p className="text-xs text-muted-foreground font-black mt-0.5 opacity-70 truncate">
+                            {med.brand}
+                          </p>
+                        </div>
                       </div>
-                      {!med.isUserAdded && (
+
+                      {/* Quantity Tracker */}
+                      <div className="relative z-10 w-full flex-1">
+                        <div className="flex justify-between items-end mb-2">
+                          <span className="text-[10px] font-black text-muted-foreground opacity-60 uppercase tracking-widest">
+                            Inventory
+                          </span>
+                          <span
+                            className={cn(
+                              "text-xs font-black tabular-nums",
+                              (med.currentQuantity || 0) < 5
+                                ? "text-destructive"
+                                : "text-primary",
+                            )}
+                          >
+                            {med.currentQuantity || 0} /{" "}
+                            {med.totalQuantity || "--"} {med.unit || "Units"}
+                          </span>
+                        </div>
+                        <Progress
+                          value={
+                            ((med.currentQuantity || 0) /
+                              (med.totalQuantity || 1)) *
+                            100
+                          }
+                          className="h-2 rounded-full overflow-hidden"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-2 w-full mt-auto relative z-10 shrink-0">
                         <div className="flex items-center gap-2 bg-background/50 border border-border/40 px-3 py-2.5 rounded-xl text-[10px] sm:text-xs font-bold text-muted-foreground overflow-hidden">
-                          <Archive
+                          <Clock
                             className="h-3.5 w-3.5 shrink-0 text-primary"
                             aria-hidden="true"
                           />
-                          <span className="truncate text-foreground font-black">
-                            Code: {med.batchNumber}
+                          <span className="truncate">
+                            Expiry:{" "}
+                            {med.expiryDate
+                              ? format(new Date(med.expiryDate), "MMM yyyy")
+                              : "No Expiry"}
                           </span>
                         </div>
-                      )}
-                    </div>
+                        {!med.isUserAdded && (
+                          <div className="flex items-center gap-2 bg-background/50 border border-border/40 px-3 py-2.5 rounded-xl text-[10px] sm:text-xs font-bold text-muted-foreground overflow-hidden">
+                            <Archive
+                              className="h-3.5 w-3.5 shrink-0 text-primary"
+                              aria-hidden="true"
+                            />
+                            <span className="truncate text-foreground font-black">
+                              Code: {med.batchNumber}
+                            </span>
+                          </div>
+                        )}
+                      </div>
 
-                    {/* Card Quick Actions */}
+                      {/* Card Quick Actions */}
                       <div className="flex items-center gap-2 relative z-10 w-full pt-2 shrink-0">
                         {isRecentlyTaken && (
                           <Button
@@ -407,9 +416,9 @@ export default function MyMedicinesPage() {
                           onClick={(e) => handleTakeDose(e, med._id, med.name)}
                           className={cn(
                             "h-[2.5rem] sm:h-11 flex-1 rounded-xl text-[11px] sm:text-xs font-black transition-all shadow-sm",
-                            isRecentlyTaken 
-                              ? "bg-muted text-muted-foreground border-border/50" 
-                              : "bg-primary/5 hover:bg-primary hover:text-primary-foreground border-primary/20 text-primary"
+                            isRecentlyTaken
+                              ? "bg-muted text-muted-foreground border-border/50"
+                              : "bg-primary/5 hover:bg-primary hover:text-primary-foreground border-primary/20 text-primary",
                           )}
                         >
                           {isRecentlyTaken ? "Recently Taken" : "Take Dose"}
@@ -444,6 +453,9 @@ export default function MyMedicinesPage() {
                         </TableHead>
                         <TableHead className="font-black text-xs text-primary/70">
                           INVENTORY STATUS
+                        </TableHead>
+                        <TableHead className="font-black text-xs text-primary/70 text-center">
+                          STREAK
                         </TableHead>
                         <TableHead className="font-black text-xs text-primary/70 text-right">
                           EXPIRY
@@ -532,6 +544,19 @@ export default function MyMedicinesPage() {
                               />
                             </div>
                           </TableCell>
+                          <TableCell className="text-center">
+                            {med.currentStreak !== undefined &&
+                            med.currentStreak > 0 ? (
+                              <Badge className="rounded-full bg-orange-500/10 text-orange-600 border-orange-200 font-black px-2 py-0.5 text-[10px]">
+                                <Flame className="h-3 w-3 mr-1 fill-current" />
+                                {med.currentStreak} Days
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground/30 font-bold">
+                                —
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2 text-xs font-bold text-muted-foreground">
                               <Clock
@@ -562,7 +587,11 @@ export default function MyMedicinesPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             {(() => {
-                              const isRecentlyTaken = !!med.lastDoseTaken && (Date.now() - new Date(med.lastDoseTaken).getTime() < 5 * 60 * 1000);
+                              const isRecentlyTaken =
+                                !!med.lastDoseTaken &&
+                                Date.now() -
+                                  new Date(med.lastDoseTaken).getTime() <
+                                  5 * 60 * 1000;
                               return (
                                 <div className="flex items-center justify-end gap-1 opacity-100 group-hover:opacity-100 transition-opacity">
                                   {isRecentlyTaken && (
@@ -586,7 +615,9 @@ export default function MyMedicinesPage() {
                                     disabled={isRecentlyTaken}
                                     className={cn(
                                       "h-10 w-10 rounded-xl transition-all active:scale-95",
-                                      isRecentlyTaken ? "text-muted-foreground/30" : "hover:bg-primary/10 text-primary"
+                                      isRecentlyTaken
+                                        ? "text-muted-foreground/30"
+                                        : "hover:bg-primary/10 text-primary",
                                     )}
                                     onClick={(e) =>
                                       handleTakeDose(e, med._id, med.name)
@@ -641,7 +672,13 @@ export default function MyMedicinesPage() {
                           : "bg-card/40 backdrop-blur-md",
                       )}
                     >
-                      <div className="flex gap-4 items-center w-full sm:w-[200px] shrink-0">
+                      <div className="flex gap-4 items-center w-full sm:w-[200px] shrink-0 relative">
+                        {med.currentStreak !== undefined &&
+                          med.currentStreak > 0 && (
+                            <div className="absolute -top-2 -right-2 bg-orange-500 text-white rounded-full p-1 shadow-lg z-20 animate-pulse border-2 border-background">
+                              <Flame className="h-3 w-3 fill-current" />
+                            </div>
+                          )}
                         {med.images && med.images.length > 0 ? (
                           <div className="h-12 w-12 overflow-hidden shrink-0 shadow-sm border border-primary/10">
                             <img
@@ -718,7 +755,11 @@ export default function MyMedicinesPage() {
 
                         <div className="flex items-center gap-1">
                           {(() => {
-                            const isRecentlyTaken = !!med.lastDoseTaken && (Date.now() - new Date(med.lastDoseTaken).getTime() < 5 * 60 * 1000);
+                            const isRecentlyTaken =
+                              !!med.lastDoseTaken &&
+                              Date.now() -
+                                new Date(med.lastDoseTaken).getTime() <
+                                5 * 60 * 1000;
                             return (
                               <>
                                 {isRecentlyTaken && (
@@ -743,9 +784,9 @@ export default function MyMedicinesPage() {
                                   }
                                   className={cn(
                                     "h-8 px-3 rounded-lg text-[10px] font-black transition-all",
-                                    isRecentlyTaken 
-                                      ? "bg-muted text-muted-foreground border-border/50" 
-                                      : "bg-primary/5 hover:bg-primary hover:text-primary-foreground border-primary/20 text-primary"
+                                    isRecentlyTaken
+                                      ? "bg-muted text-muted-foreground border-border/50"
+                                      : "bg-primary/5 hover:bg-primary hover:text-primary-foreground border-primary/20 text-primary",
                                   )}
                                 >
                                   {isRecentlyTaken ? "Taken" : "Dose"}

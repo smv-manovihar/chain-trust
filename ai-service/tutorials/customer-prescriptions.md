@@ -1,30 +1,31 @@
-# Prescriptions (Digitized Registry) — Operational Manual
+# Prescriptions (Digitized Vault) — Operational Manual
 **Route:** `/customer/prescriptions`
 
-The Prescriptions page is the high-fidelity document archive for a user's medical orders. It utilizes advanced digitization to index and search physical paper prescriptions, linking them to digital medication records.
+The Prescriptions page is the secure, high-fidelity archive for a user's medical documents. It uses AI-driven text extraction to digitize paper prescriptions, making them searchable and linkable to the digital medicine cabinet.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Search Nexus**: A prominently designed, rounded-full search bar for finding prescriptions by doctor name, medication, or date.
-- **Document Hub (Cards / Registry)**:
-  - **Identified Doctor Context**: Each record shows the "Doctor's Name", "Clinic/Hospital", and "Date of Issue".
-  - **Digitized Status Badge**:
-    - **Digitized (Blue Dot)**: Processing complete and searchable.
-    - **Pending (Amber Dot)**: Extraction in progress.
-- **Record Actions**: h-10 rounded-xl buttons for "View Scan", "Read Details", and "Link to My Medicines".
+- **Data Toolbar**: Features a search input and a view toggle (Grid vs. List).
+- **View Modes**:
+  - **Vault Grid (Default)**: Visual-first cards showing the document preview, doctor name, and digitization status.
+  - **Technical List**: A dense table view showing **Doctor / Provider**, **Issued Date**, and **Linked Medicines** count.
+- **Digitization Status**:
+  - **Completed (Blue)**: Processing finished; content is searchable and readable via tools.
+  - **Processing (Amber)**: AI extraction in progress.
+  - **Failed (Red)**: Document unreadable or extraction error.
+- **Linked Medications**: A specific badge on each card/row showing the count of cabinet items associated with this prescription.
 
 ---
 
 ## 🔗 URL & Navigation (Link Generation)
-The agent can generate links to specific documents or search results:
+The agent can generate links to search results or filtered states:
 
-| Parameter | Type | Description | Example Link |
-| :--- | :--- | :--- | :--- |
-| `search` | String | Filters the registry by digitized text or metadata. | `/customer/prescriptions?search=Paracetamol` |
-| `id` | String | Opens a specific prescription scan for viewing. | `/customer/prescriptions?id=PD-101` |
+| Filter | Route | Description |
+| :--- | :--- | :--- |
+| **Search Content** | `/customer/prescriptions?search=Dr.Smith` | Filter by doctor, medication name, or clinic. |
 
-**AI Rule:** When a user asks for a "prescription" or asks about a "Doctor's order," generate the link with the `search` or `id` parameter.
+**AI Rule:** When a user asks "Show me my prescriptions for Paracetamol," use the `search` parameter in the link.
 
 ---
 
@@ -32,19 +33,18 @@ The agent can generate links to specific documents or search results:
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "What prescriptions do I have?" | `list_prescriptions` | Provide a summary of the digitized records. |
-| "What did Dr. X order?" | `search_prescriptions(query="Dr. X")` | Filter by regex for doctor names. |
-| "Read the text of my latest one." | `read_prescription` | Use Document ID for line-level digitized access. |
+| "What medications are on this?" | `read_prescription` | Use Document ID to read the digitized text line-by-line. |
+| "Did I upload Dr. X's note?" | `search_prescriptions` | Search across the content of all uploaded documents. |
+| "List my files." | `list_prescriptions` | Returns the registry items and their status. |
 
 ---
 
 ## 🚨 Error & Empty States
-- **No Document Record Found**: Shows an "Empty Pharmacy" illustration. AI should suggest uploading a photo of their paper prescription.
-- **Digitization Error**: Red alert on the document card. Suggest checking if the scan is clear.
+- **Empty Vault**: UI shows "No prescriptions found". Guide the user to upload their first file using the **Upload New Document** button.
+- **Failed Extraction**: Advise the user to re-upload with a clearer, higher-resolution photo.
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Registry Awareness**: Always mention that prescriptions are "digitized" and searchable.
-- **Deep-Link Linkage**: Offer a link to the [Prescription Registry](/customer/prescriptions) for any document-related queries.
-- **My Medicines Correlation**: If a prescription is found, ask if the user has added that medication to their [My Medicines](/customer/cabinet) list.
+- **Content Discovery**: If a user asks a medical question about an order, always `search_prescriptions` first before checking the cabinet.
+- **Vault Linkage**: Remind the user they can **Link to My Medicines** directly from the prescription record to keep their inventory accurate.

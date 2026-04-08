@@ -18,7 +18,12 @@ export const createBatch = async (data: CreateBatchDto, signal?: AbortSignal) =>
 	return response.data;
 };
 
-export const listBatches = async (params?: { search?: string; categories?: string | string[] }, signal?: AbortSignal) => {
+export const listBatches = async (params?: { 
+	search?: string; 
+	categories?: string | string[];
+	page?: number;
+	limit?: number;
+}, signal?: AbortSignal) => {
 	const response = await client.get('/batches', { params, signal });
 	return response.data;
 };

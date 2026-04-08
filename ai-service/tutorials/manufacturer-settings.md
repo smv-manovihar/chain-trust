@@ -1,25 +1,28 @@
 # Manufacturer Settings — Operational Manual
 **Route:** `/manufacturer/settings`
 
-The Settings page is where a manufacturer manages their corporate identity, executive security preferences, and API/Web3 integrations. It emphasizes data privacy and streamlined authentication.
+The Settings page is the corporate command hub for managing company identity, executive security preferences, and account integrations. It emphasizes data privacy and institutional verification.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Unified Profile Header**: A prominently designed, rounded-2xl banner displaying the company logo and executive role.
-- **Settings Category Cards**: Grouped into modular, glassmorphic cards: "Company Details", "Executive Security", and "API Integrations".
+- **Tabbed Corporate Matrix**:
+  - **Company**: Corporate identity fields (Company Name, Domain, Address).
+  - **Security**: Executive authentication controls and password management.
+  - **Notifications**: Granular toggles for **Production Alerts**, **Security Risks**, and **Registry Updates**.
+  - **Advanced**: Danger zone actions (Account deletion) and corporate data exports.
+- **Glassmorphic Bento Cards**: High-fidelity modular layouts grouping related corporate settings.
 
 ---
 
 ## 🔗 URL & Navigation (Link Generation)
-The agent can generate links to specific settings or actions:
+The agent can generate links to specific corporate settings:
 
 | Destination | Route | Description |
 | :--- | :--- | :--- |
-| **Settings Profile** | `/manufacturer/settings` | Corporate settings overview. |
-| **Google Connect** | `/manufacturer/settings?action=google_connect` | Triggers the Google connection flow. |
-
-**AI Rule:** Use the settings route to guide the user towards account security and company profile management.
+| **Corporate Profile** | `/manufacturer/settings` | Main company overview. |
+| **Notification Center** | `/manufacturer/settings?tab=notifications` | Opens the notification matrix for production alerts. |
+| **Security Hub** | `/manufacturer/settings?tab=security` | Opens executive authentication and security controls. |
 
 ---
 
@@ -27,16 +30,17 @@ The agent can generate links to specific settings or actions:
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "What's our company info?" | `get_user_profile` | Check company name, email, and Google status. |
-| "Is our Google account linked?" | `get_user_profile` | Check `isGoogleConnected` flag. |
+| "What's our company profile?" | `get_user_profile` | Retrieves company name, verified domain, and executive contact. |
+| "Is our account admin-approved?" | `get_user_profile` | Check the `isApprovedByAdmin` flag for manufacturer status. |
 
 ---
 
 ## 🚨 Error & Empty States
-- **Incomplete Profile Warning**: If a company email is missing, a "Complete Your Profile" amber banner may appear. AI should proactively mention this.
+- **Approval Pending**: If the account is not yet approved, a "Verification Pending" banner appears. AI should explain that "Your manufacturer credentials are being reviewed by the ChainTrust safety board."
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Privacy Focus**: Provide a link to the [Settings](/manufacturer/settings) page for any profile mutation requests.
-- **Authentication Source**: Use the `provider` field from `get_user_profile` to know the authentication context.
+- **Corporate Privacy**: Always link to the [Settings](/manufacturer/settings) page rather than asking for corporate details in chat.
+- **Admin Liaison**: If a user asks about approval status, guide them to the **Company** tab to verify their submitted documents.
+- **Security Guidance**: If an executive is using a shared email, suggest connecting via **Google Auth** for improved security logs.

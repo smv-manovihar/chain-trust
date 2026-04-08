@@ -18,7 +18,12 @@ const calculateStreak = async (item: any): Promise<number> => {
 	startOfToday.setHours(0, 0, 0, 0);
 
 	// Get logs for this item sorted DESC
-	const logs = await DosageLog.find({ cabinetItemId: item._id }).sort({ timestamp: -1 }).lean();
+	// Reliability: Limit search to last 200 logs to prevent O(N) scaling crashes.
+	// 200 logs cover ~2-3 months for most users, sufficient for streak verification.
+	const logs = await DosageLog.find({ cabinetItemId: item._id })
+		.sort({ timestamp: -1 })
+		.limit(200)
+		.lean();
 	
 	let streak = 0;
 	let checkDate = new Date(startOfToday);
@@ -475,11 +480,7 @@ export const markDoseTaken = async (req: Request, res: Response): Promise<void> 
 
 		// 2. Inventory Logic
 		const decrement = item.dosage || 1;
-
 		const inventoryBefore = item.currentQuantity || 0;
-		if (item.currentQuantity !== undefined && item.currentQuantity > 0) {
-			item.currentQuantity = Math.max(0, item.currentQuantity - decrement);
-		}
 
 		// 3. Create Dosage Log (Audit Trail)
 		const log = new DosageLog({
@@ -489,12 +490,8 @@ export const markDoseTaken = async (req: Request, res: Response): Promise<void> 
 			doseAmount: decrement,
 			inventoryBefore
 		});
-		await log.save();
 
-		// 4. Update Adherence State & Streak (Calculate on Write)
-		item.lastDoseTaken = log.timestamp;
-		
-		// Calculate wasPunctual
+		// 4. Calculate Punctuality
 		let wasPunctual = false;
 		if (item.reminderTimes && item.reminderTimes.length > 0) {
 			const now = new Date();
@@ -512,17 +509,37 @@ export const markDoseTaken = async (req: Request, res: Response): Promise<void> 
 		}
 		log.wasPunctual = wasPunctual;
 		await log.save();
-		
-		await item.save();
-		const currentStreak = await refreshStreak(item._id.toString());
 
-		// 5. Dynamic Low-Stock Alert
-		// Threshold: 3 days of doses (buffer)
+		// 5. Atomic Update: Decrement inventory and set lastDoseTaken (FIX-002)
+		const updateResult = await CabinetItem.findOneAndUpdate(
+			{ _id: id, userId },
+			{ 
+				$inc: { currentQuantity: item.currentQuantity !== undefined && item.currentQuantity > 0 ? -decrement : 0 },
+				$set: { lastDoseTaken: log.timestamp }
+			},
+			{ new: true }
+		).lean();
+
+		if (!updateResult) {
+			res.status(404).json({ message: 'Failed to update cabinet item inventory.' });
+			return;
+		}
+
+		// Ensure quantity never goes below 0
+		if (updateResult.currentQuantity !== undefined && updateResult.currentQuantity < 0) {
+			await CabinetItem.updateOne({ _id: id }, { $set: { currentQuantity: 0 } });
+			updateResult.currentQuantity = 0;
+		}
+
+		// 6. Update Streak
+		const currentStreak = await refreshStreak(id as string);
+
+		// 7. Dynamic Low-Stock Alert
+		const finalQuantity = updateResult.currentQuantity || 0;
 		const dailyRequirement = item.reminderTimes?.length || 1; 
 		const lowStockThreshold = dailyRequirement * 3;
 
-		if (item.currentQuantity !== undefined && item.currentQuantity <= lowStockThreshold) {
-			// Check if we already sent a low stock alert today to avoid spam
+		if (finalQuantity <= lowStockThreshold) {
 			const startOfDay = new Date();
 			startOfDay.setHours(0, 0, 0, 0);
 
@@ -538,12 +555,12 @@ export const markDoseTaken = async (req: Request, res: Response): Promise<void> 
 					user: userId,
 					type: 'medicine_expiry',
 					title: 'Low Medication Stock',
-					message: `Your supply for "${item.name}" is low (${item.currentQuantity} remaining). This is less than a 3-day buffer based on your routine.`,
+					message: `Your supply for "${item.name}" is low (${finalQuantity} remaining). This is less than a 3-day buffer based on your routine.`,
 					link: `/customer/cabinet/${item._id}`,
 					metadata: {
 						cabinetItemId: item._id,
 						medicineName: item.name,
-						currentQuantity: item.currentQuantity,
+						currentQuantity: finalQuantity,
 						isLowStock: true
 					}
 				});
@@ -552,8 +569,8 @@ export const markDoseTaken = async (req: Request, res: Response): Promise<void> 
 
 		res.json({ 
 			message: 'Dose marked as taken', 
-			currentQuantity: item.currentQuantity,
-			lastDoseTaken: item.lastDoseTaken,
+			currentQuantity: finalQuantity,
+			lastDoseTaken: log.timestamp,
 			currentStreak,
 			wasPunctual: log.wasPunctual,
 			logId: log._id
@@ -591,30 +608,38 @@ export const undoDose = async (req: Request, res: Response): Promise<void> => {
 			return;
 		}
 
-		// 3. Restore inventory
-		if (item.currentQuantity !== undefined) {
-			item.currentQuantity += latestLog.doseAmount;
-		}
-
-		// 4. Delete the log
-		await DosageLog.findByIdAndDelete(latestLog._id);
-
-		// 5. Revert lastDoseTaken to the next most recent log (if any)
+		// 3. Find the next most recent log (if any) to set lastDoseTaken correctly
 		const previousLog = await DosageLog.findOne({ 
 			userId, 
-			cabinetItemId: id 
+			cabinetItemId: id,
+			_id: { $ne: latestLog._id }
 		}).sort({ timestamp: -1 });
-
-		item.lastDoseTaken = previousLog ? previousLog.timestamp : undefined;
-		await item.save();
-
+		
+		// 4. Delete the latest log
+		await DosageLog.findByIdAndDelete(latestLog._id);
+		
+		// 5. Atomic Update: Restore inventory and update lastDoseTaken
+		const updateResult = await CabinetItem.findOneAndUpdate(
+			{ _id: id, userId },
+			{ 
+				$inc: { currentQuantity: latestLog.doseAmount },
+				$set: { lastDoseTaken: previousLog ? previousLog.timestamp : null }
+			},
+			{ new: true }
+		).lean();
+		
+		if (!updateResult) {
+			res.status(404).json({ message: 'Failed to revert dose. Cabinet item not found.' });
+			return;
+		}
+		
 		// 6. Update Streak (Calculate on Write)
-		const currentStreak = await refreshStreak(item._id.toString());
-
+		const currentStreak = await refreshStreak(id as string);
+		
 		res.json({ 
 			message: 'Dose reverted successfully', 
-			currentQuantity: item.currentQuantity,
-			lastDoseTaken: item.lastDoseTaken,
+			currentQuantity: updateResult.currentQuantity,
+			lastDoseTaken: updateResult.lastDoseTaken,
 			currentStreak
 		});
 	} catch (err) {

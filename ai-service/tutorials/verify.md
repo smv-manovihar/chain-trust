@@ -7,20 +7,23 @@ The Verify page is the front-line defense against counterfeit pharmaceuticals. I
 
 ## 🎨 Visual Details & Layout
 - **Full-Screen Scanning Aperture**: A centralized, high-fidelity QR scanning window.
-- **Verification Hub (Manual Entry)**: Dynamic input field for the product's "Unique Identifier" (salt).
-- **Result Panels**: High-visibility green for "AUTHENTIC", amber for "SUSPICIOUS", and red for "RECALLED".
+- **Verification Hub (Manual Entry)**: Dynamic input field for the product's **Unique Salt**.
+- **Result Panels**: High-visibility status indicators:
+  - **AUTHENTIC (Green)**: Verified on the ChainTrust blockchain.
+  - **SUSPICIOUS (Amber)**: High scan volume detected (potential clone).
+  - **RECALLED (Red)**: Product flagged as unsafe by manufacturer or regulator.
+- **Scan Counter**: Displays the total number of times this specific unit has been verified globally, serving as a primary indicator of clone-based counterfeiting.
 
 ---
 
 ## 🔗 URL & Navigation (Link Generation)
-The agent can generate deep-links to specific verification results or instructions:
+The agent can generate deep-links to specific verification results:
 
 | Parameter | Type | Description | Example Link |
 | :--- | :--- | :--- | :--- |
 | `id` / `salt` | String | Automatically triggers a verification attempt for a specific salt. | `/verify?id=7a8b9c...` |
-| `mode` | String | Sets the initial UI mode (e.g., `scan` or `manual`). | `/verify?mode=manual` |
 
-**AI Rule:** When a user provides a product salt or batch unit code, generate a link with the `id` parameter to provide instant verification feedback.
+**AI Rule:** When a user provides a product salt, generate a link with the `id` parameter to provide instant verification feedback.
 
 ---
 
@@ -28,16 +31,17 @@ The agent can generate deep-links to specific verification results or instructio
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "I want to verify this salt: X." | `get_view_data(params={"salt": salt})` | Fetch status. If no salt, guide them to scan/enter. |
-| "Is this batch safe?" | `get_view_data` | Look for "AUTHENTIC", "SUSPICIOUS", or "RECALLED" flags. |
+| "Is this batch safe?" | `get_view_data` | Reference the blockchain status and scan count. |
+| "I have a salt code." | `get_view_data(params={"salt": salt})` | Manually check authenticity via tool logic. |
 
 ---
 
 ## 🚨 Error & Empty States
-- **Camera Access Denied**: Displays a "Camera Required" empty state. AI should offer manual entry guidance.
+- **Camera Access Denied**: Displays a "Manual Discovery" mode prompt. AI should suggest the user type the code found under the scratch-off label.
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Blockchain Authority**: Phrase verification as "Authenticity confirmed on the ChainTrust global ledger."
-- **Direct Linkage**: After verification, suggest the user check their **My Medicines** list for 24/7 background security monitoring.
+- **Blockchain Authority**: Always frame verification results as "Confirmed by the ChainTrust decentralized ledger."
+- **Scan Count Alert**: If the scan count is > 1 for a new purchase, advise the user that the product might be a **Sophisticated Clone** even if the salt is authentic.
+- **Post-Verification**: After a successful scan, suggest adding the medicine to their [Vault](/customer/cabinet) for ongoing monitoring.

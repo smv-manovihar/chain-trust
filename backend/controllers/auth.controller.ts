@@ -7,6 +7,7 @@ import RefreshToken from '../models/refresh-token.model.js';
 import CabinetItem from '../models/cabinet.model.js';
 import Product from '../models/product.model.js';
 import Batch from '../models/batch.model.js';
+import RevokedToken from '../models/revoked-token.model.js';
 import {
 	FRONTEND_URL,
 	JWT_SECRET,
@@ -24,6 +25,7 @@ import {
 	generateOTP,
 	generateVerificationToken,
 	sendEmailVerification,
+	sendPasswordResetOTP,
 } from '../utils/email.utils.js';
 
 import { OAuth2Client } from 'google-auth-library';
@@ -47,6 +49,8 @@ interface PublicUser {
 	mustChangePassword: boolean;
 	isApprovedByAdmin: boolean;
 	avatar: string | null;
+	provider?: string;
+	providerId?: string | null;
 }
 
 const publicUser = (u: IUser): PublicUser => ({
@@ -60,6 +64,8 @@ const publicUser = (u: IUser): PublicUser => ({
 	mustChangePassword: u.mustChangePassword,
 	isApprovedByAdmin: u.isApprovedByAdmin,
 	avatar: u.avatar,
+	provider: u.provider,
+	providerId: u.providerId,
 });
 
 // Google OAuth (server-side redirect flow)
@@ -156,7 +162,7 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
 				avatar: getHighResAvatar(userInfo.picture),
 				isEmailVerified: userInfo.email_verified === true,
 				isActive: true,
-				isApprovedByAdmin: true, // Auto-approving all registrations for now
+				isApprovedByAdmin: true, // Social login is auto-approved for lower friction
 			});
 
 			await user.save();
@@ -365,8 +371,8 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
 			emailVerificationOtp: verificationOtp,
 			emailVerificationOtpExpiresAt: otpExpiry,
 			
-			// Security FIX-007: Currently auto-approving all roles
-			isApprovedByAdmin: true,
+			// Security FIX-007: Approval now defaults to false in the model
+			// isApprovedByAdmin is omitted to use model default
 		});
 
 		await newUser.save();
@@ -529,6 +535,13 @@ export const logoutUser = async (req: Request, res: Response): Promise<void> => 
 			secure: process.env.NODE_ENV === 'production',
 			sameSite: (process.env.NODE_ENV === 'production' ? 'strict' : 'lax') as 'strict' | 'lax',
 		};
+
+		const accessToken = extractToken(req);
+		if (accessToken) {
+			const decoded = jwt.decode(accessToken) as { exp: number };
+			const expiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+			await RevokedToken.create({ token: accessToken, expiresAt });
+		}
 
 		res.clearCookie('accessToken', cookieOptions);
 		res.clearCookie('refreshToken', cookieOptions);
@@ -1098,6 +1111,118 @@ export const changeEmail = async (req: Request, res: Response): Promise<void> =>
 		});
 	} catch (err) {
 		console.error('Change email error:', err);
+		res.status(500).json({ message: 'Server error' });
+	}
+};
+
+// ─── Forgot / Reset Password ──────────────────────────────────────────────────
+
+export const requestPasswordReset = async (req: Request, res: Response): Promise<void> => {
+	const { email } = req.body;
+
+	if (!email) {
+		res.status(400).json({ message: 'Email is required' });
+		return;
+	}
+
+	// Generic success response — always returned to prevent email enumeration
+	const genericSuccess = { message: 'If that email is registered, a reset code has been sent.' };
+
+	try {
+		const user = await User.findOne({ email: (email as string).toLowerCase() });
+
+		if (!user) {
+			// Return 200 even for unknown emails (no enumeration)
+			res.json(genericSuccess);
+			return;
+		}
+
+		if (!user.password) {
+			// Google-SSO only account — inform the user specifically
+			res.status(400).json({
+				message: 'This account uses Google Sign-In and does not have a password. Please log in with Google.',
+			});
+			return;
+		}
+
+		const otp = generateOTP();
+		const otpExpiry = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
+		user.resetPasswordOtp = otp;
+		user.resetPasswordOtpExpiresAt = otpExpiry;
+		// Clear any stale token-based reset fields
+		user.resetPasswordToken = null;
+		user.resetPasswordExpiresAt = null;
+
+		await user.save();
+
+		await sendPasswordResetOTP(user.email, otp, user.name);
+
+		res.json(genericSuccess);
+	} catch (err) {
+		console.error('Request password reset error:', err);
+		res.status(500).json({ message: 'Server error' });
+	}
+};
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+	const { email, otp, newPassword } = req.body;
+
+	if (!email || !otp || !newPassword) {
+		res.status(400).json({ message: 'Email, OTP, and new password are required' });
+		return;
+	}
+
+	if (newPassword.length < 8) {
+		res.status(400).json({ message: 'New password must be at least 8 characters long' });
+		return;
+	}
+
+	try {
+		const user = await User.findOne({ email: (email as string).toLowerCase() });
+
+		if (!user) {
+			res.status(400).json({ message: 'Invalid or expired reset code' });
+			return;
+		}
+
+		if (!user.resetPasswordOtp || !user.resetPasswordOtpExpiresAt) {
+			res.status(400).json({ message: 'No reset code found. Please request a new one.' });
+			return;
+		}
+
+		if (new Date() > user.resetPasswordOtpExpiresAt) {
+			// Clean up expired OTP
+			user.resetPasswordOtp = null;
+			user.resetPasswordOtpExpiresAt = null;
+			await user.save();
+			res.status(400).json({ message: 'Reset code has expired. Please request a new one.' });
+			return;
+		}
+
+		if (user.resetPasswordOtp !== otp) {
+			res.status(400).json({ message: 'Invalid reset code' });
+			return;
+		}
+
+		const hashed = await hash(newPassword, 10);
+
+		user.password = hashed;
+		user.mustChangePassword = false;
+		// Wipe all reset fields
+		user.resetPasswordOtp = null;
+		user.resetPasswordOtpExpiresAt = null;
+		user.resetPasswordToken = null;
+		user.resetPasswordExpiresAt = null;
+
+		await user.save();
+
+		// Invalidate all existing sessions for security
+		await RefreshToken.updateMany({ userId: user._id }, { isActive: false });
+
+		res.json({ message: 'Password reset successfully. Please log in with your new password.' });
+	} catch (err) {
+		console.error('Reset password error:', err);
 		res.status(500).json({ message: 'Server error' });
 	}
 };

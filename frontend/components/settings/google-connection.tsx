@@ -33,7 +33,9 @@ export function GoogleConnection({
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <Shield className="h-5 w-5 text-primary" />
-          <CardTitle className="text-base font-black">Account Linking</CardTitle>
+          <CardTitle className="text-base font-black">
+            Account Linking
+          </CardTitle>
         </div>
         <CardDescription>
           Connect your Google account for faster, more secure access.
@@ -72,10 +74,14 @@ export function GoogleConnection({
             </div>
           </div>
           {isConnected ? (
-            <div className="flex items-center gap-1.5 text-green-500 text-[10px] px-3 py-1 bg-green-500/10 rounded-full border border-green-500/20">
+            <Button
+              variant="outline"
+              disabled
+              className="rounded-full h-10 px-5 gap-2 font-black text-[10px] bg-green-500/5 border-green-500/20 text-green-600 opacity-100"
+            >
               <CheckCircle2 className="h-3.5 w-3.5" />
-              Verified
-            </div>
+              Linked
+            </Button>
           ) : (
             <Button
               variant="outline"

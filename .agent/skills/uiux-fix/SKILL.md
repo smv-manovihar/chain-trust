@@ -1,732 +1,636 @@
 ---
-name: uiux-fix-implementation
+name: uiux-fix
 description: >
-  Use this skill after a UI/UX audit has been completed and the user wants to
-  implement the fixes. Triggers: "implement the UI fixes", "fix the issues found",
-  "apply the UI remediations", "start fixing the design issues", "fix the
-  inconsistencies", "implement the UX plan".
-  This skill reads findings from audit_progress.md (produced by the uiux-audit
-  skill), builds a structured implementation plan linking fixes to ISSUE-NNN IDs,
-  presents it for user review, incorporates feedback, then executes fixes one at
-  a time with a checkpoint after every change. A single fix may resolve multiple
-  ISSUE-NNN entries. ISSUE statuses in audit_progress.md are updated after every
-  fix. User preferences stated during execution are recorded and honoured for all
-  subsequent fixes.
+  Use this skill after a UI/UX audit has been completed and the user wants
+  to implement the fixes.
+  Triggers: "implement the audit fixes", "fix the UI issues found", "apply the
+  UX remediations", "start fixing the design issues", "implement the UX plan",
+  "fix the accessibility issues", "fix the design inconsistencies".
+  This skill reads audit findings from uiux_audit.md, builds a structured
+  implementation plan, presents it for user review, incorporates feedback, then
+  executes fixes one at a time with a checkpoint after every change.
+  Use native artifacts (referenced here as uiux_fix_plan.md) to manage these phases for maximum visibility and persistence.
   Do NOT begin editing files until the plan has been reviewed and approved.
   Do NOT use this skill to run a new audit — that is the uiux-audit skill's job.
 compatibility: >
   Tool-agnostic. Works in any AI code editor or agent runtime: Cursor, Windsurf,
   GitHub Copilot Workspace, Zed, JetBrains AI, Cline, Continue, Aider, Claude
-  Code, or any environment with read/write and search capabilities. When search
-  or grep tools are available they MUST be used for ISSUE-NNN and FIX-NNN lookups
-  instead of full-file reads — this is the primary mechanism for keeping context
-  size bounded across long fix sessions.
+  Code, or any environment with the ability to read and write files. If the
+  environment provides specialised tools, these **MUST** be used instead of
+  their raw terminal equivalents to take advantage of the agent's optimised
+  capabilities.
 depends_on: uiux-audit
 ---
 
-# UI/UX Fix Implementation Skill
+# UI/UX Fix Skill
 
 ---
 
 ## The Core Philosophy
 
-Finding a UI inconsistency is one thing. Fixing it safely — without introducing
-a new inconsistency, without breaking a component that 12 screens depend on, and
-without making changes the designer would reverse in the next review — is harder.
+The gap between spotting a design problem and safely fixing it in a live
+codebase is wider than it looks. A change that is visually correct in isolation
+can still break the product if it introduces a spacing value outside the
+project's scale, swaps a colour that bypasses a design token, hard-codes a
+pixel size that violates the responsive grid, or silently removes a semantic
+HTML attribute that an assistive technology depended on.
 
-This skill enforces three practices that naive "just fix it" approaches skip:
+This skill closes that gap. It does three things that naive "just apply the fix"
+approaches skip:
 
-**Plan first, get approval — including the per-fix approach.** Every fix has a
-blast radius. Changing a shared `<Button>` variant touches every screen that
-uses it. Renaming a label in one place requires finding every place the old label
-appears. The user needs to see the full picture — and the specific approach for
-each fix — before any file is touched.
-
-**A fix may resolve multiple issues at once.** UI inconsistencies often cluster.
-The same shared `<Button>` being used incorrectly on five screens is one fix
-(update the shared component) that closes five ISSUE-NNN entries simultaneously.
-Plan these as a single FIX-NNN; link all resolved issues in the plan and update
-all of them in the audit file at once.
-
-**Track user preferences as they emerge and apply them forward.** During a fix
-session, the user will reveal things the audit could not know: "we intentionally
-use two different icon libraries because the product designer approved both",
-"Cancel always goes on the right on this product", "that copy was written by
-legal and can't be changed". These are **user preferences** — project policy
-revealed during execution. They must be recorded immediately and applied to all
-subsequent fix approaches so the agent does not keep proposing fixes the user has
-already disqualified.
+- **Plan first, get approval.** UI/UX fixes are not free. Each one has a blast
+  radius across themes, component variants, breakpoints, and accessibility
+  contracts. The user needs to see the full picture — including the detailed
+  approach for every fix — before any file is touched.
+- **Treat user feedback as a first-class input.** The user knows things the
+  audit does not — a visual inconsistency may be intentional brand expression, a
+  WCAG deviation may already have an approved exception, or the proposed
+  component swap may conflict with a design-system decision already in progress.
+  The plan, including each fix's approach, must adapt to that knowledge before
+  execution begins.
+- **Execute one fix at a time with a visible checkpoint.** Not in a batch. Not
+  all CRITICAL accessibility issues first without pause. One fix at a time, in
+  planned order, with the user able to pause or redirect after each change.
 
 ---
 
 ## What This Skill Reads
 
-Primary input: `audit_progress.md` from the uiux-audit skill.
-Secondary input: `audit_traces.md` for flow context — **accessed by searching
-for specific FLOW-NNN or ISSUE-NNN IDs only, never read in full.**
+This skill's primary input is `uiux_audit.md`, produced by the uiux-audit skill.
+Before building the plan, re-read the **Design System Patterns** section of that
+file carefully. Every fix you write will be judged against those patterns. A fix
+that uses a hard-coded hex instead of the project's colour token, a raw pixel
+value instead of the spacing scale, or a component import from the wrong library
+will be rejected — and rightly so.
 
-Before building the plan, read:
-- The **Project Profile** table
-- The **Project Patterns** table
-- The **Shared Component Inventory** table
-- The **Issue Index** (one-line rows only — not the full Findings section)
+If `uiux_audit.md` does not exist, or exists but has no entries in the Audit
+Log, stop immediately and tell the user:
 
-The full Findings blocks are read **per-issue on demand** by searching for
-`ISSUE-NNN` — not by reading the Findings section top to bottom. This is
-mandatory for context efficiency on audits with many findings.
-
-If `audit_progress.md` does not exist or has an empty Issue Index, stop and say:
-
-> "No audit findings found. Run the uiux-audit skill first, then return here."
+> "No UI/UX audit findings found. Run the uiux-audit skill first, then return
+> here."
 
 Do not attempt to audit and fix in the same run of this skill.
-
----
-
-## ISSUE-NNN Lookup Protocol
-
-> **This protocol applies throughout all phases of this skill — during planning,
-> during execution, and during checkpoints. It is never optional.**
-
-When you need the details of a specific issue:
-
-1. Search for `ISSUE-NNN` (e.g., `ISSUE-007`) in `audit_progress.md`
-2. Read only the matching finding block — stop reading at the next `---` divider
-3. If you need its linked flows, search for the `FLOW-NNN` IDs from that block
-   in `audit_traces.md` — read only those sections
-
-**Never read `audit_progress.md` or `audit_traces.md` from top to bottom to
-recall an issue.** The Issue Index gives you the one-line summary; the search
-gives you the full block on demand. These two operations together cost a fraction
-of a full-file read and keep the context window available for reasoning.
 
 ---
 
 ## The Four Phases
 
 | Phase | Name | Output |
-|-------|------|--------|
+|---|---|---|
 | 0 | Ingest & Understand | Internal notes; no files written |
-| 1 | Build the Implementation Plan | `uiux_fix_plan.md` created |
-| 2 | Present for Review | User feedback incorporated into plan |
-| **—** | **HARD STOP — no file may be modified until Phase 2 clears** | |
-| 3 | Execute, Checkpoint, Repeat | Source files edited; audit file updated |
+| 1 | Build the Implementation Plan | `uiux_fix_plan.md` (Native Artifact) |
+| 2 | Present for Review | User feedback incorporated into Plan |
+| **—** | **HARD STOP** | **No file may be modified until Phase 2 clears** |
+| 3 | Execute, Checkpoint, Repeat | `task.md` (Native Artifact) updated; source files edited |
+| 4 | Finalize & Verify | `walkthrough.md` (Native Artifact) created |
+
+There is exactly one hard stop: between Phase 2 and Phase 3.
 
 ---
 
 ## Phase 0 — Ingest & Understand
 
-### 0-A. Read the Audit Summary
+Read the following, in this order, before writing a single line of the plan.
 
-From `audit_progress.md`, read (in order):
-1. The **Status** table — get total issue counts at each severity
-2. The **Project Profile** table — UI stack, component library, icon library, token file
-3. The **Project Patterns** table — button hierarchy, icon usage, action labels, spacing
-4. The **Shared Component Inventory** — the ground truth for what shared components exist
-5. The **Issue Index** — the one-liner-per-issue table only
+### 0-A. Read the Audit Findings
 
-Do not read the Findings section yet. Individual findings are fetched by
-ISSUE-NNN search in Phase 0-B.
+Open `uiux_audit.md`. Extract every finding from the Audit Log. For each
+finding, note:
 
-### 0-B. Fetch Full Details for Every Issue
+- Its severity (CRITICAL / HIGH / MEDIUM / LOW)
+- Its category (Accessibility, Visual Hierarchy, Spacing & Layout, Typography,
+  Interaction & States, Responsive Design, Design System Deviation,
+  Colour & Contrast, Navigation, Form UX, etc.)
+- Its file(s) and component(s) affected, with line or selector references
+- Whether it was marked as systemic (affecting multiple components or screens)
+- Whether it has an `**Updated:**` block (higher-confidence findings — observed
+  from multiple angles during the audit)
+- Whether it carries a WCAG criterion reference (e.g. WCAG 2.1 AA 1.4.3) —
+  these are legally significant in many jurisdictions and must not be silently
+  deferred
 
-For each ISSUE-NNN in the Issue Index, search for that ID in `audit_progress.md`
-and read its full finding block. For each issue note:
+Also note the **Total Files Audited** and coverage percentage to understand the
+scale and representative depth of the findings.
 
-- Severity and category
-- Files and line ranges affected
-- Whether it is systemic (affects multiple files/screens)
-- Linked FLOW-NNN IDs (for context if needed — look up via search)
-- The remediation already proposed in the audit
+Also copy the **Design System Patterns** section verbatim. It is the style
+contract every fix — and every approach — must satisfy.
 
-### 0-C. Identify Grouping Opportunities
+### 0-B. Read Every Affected File and Component
 
-Before writing the plan, identify which issues can be fixed together as a single
-FIX-NNN. Group issues when:
+Before planning a fix, open and re-read each file named in the findings. Do not
+rely on the code snippets in the audit log — those snippets were written at a
+point in time. For each file or component, note:
 
-- They share the same root cause (e.g., the same shared component missing a
-  variant means all screens using the wrong ad-hoc solution get fixed at once)
-- They are in the same file and the changes do not conflict
-- They represent the same systemic pattern (e.g., all five screens using
-  `aria-hidden` incorrectly — one global find-and-fix)
-- Fixing one issue would naturally resolve another (e.g., replacing a custom
-  spinner with `<Spinner />` everywhere also fixes the sizing inconsistency
-  logged as a separate issue)
+- Which design tokens, theme variables, or CSS custom properties it already
+  imports (your fix must use these, not raw values)
+- Which existing component variants exist (the fix must not silently break a
+  variant not tested in the audit)
+- Which ARIA attributes or semantic HTML elements are present (removing or
+  altering these is a separate risk surface from visual changes)
+- Whether the component has a Storybook story or snapshot test (the fix must
+  not cause an unintended visual regression in the test suite)
+- Whether the component is shared across multiple pages or routes (a change
+  here has a wider blast radius than it may appear)
 
-**When grouping:** the FIX-NNN links all resolved ISSUE-NNN IDs. Each linked
-issue gets marked Fixed in the audit file when the fix completes.
+### 0-C. Identify Fix Dependencies
 
-### 0-D. Identify Fix Dependencies
+Some fixes must happen before others. Map the dependencies explicitly — they
+drive the Execution Order in Phase 1.
 
-Map dependencies before setting execution order:
+Common dependency patterns:
 
-- **Design token fixes first** — if a color token is wrong, every component
-  using it inherits the problem. Fix the token before fixing the components.
-- **Shared component fixes before per-screen fixes** — fix the shared `<Button>`
-  variant before patching the 8 screens that use it incorrectly.
-- **Terminology fixes before component fixes** — if a label is wrong and is
-  also inside a component, fix the source-of-truth string first.
-- **Systemic fixes as a group** — issues marked systemic should be resolved
-  completely in one FIX-NNN, not left partially fixed across some files.
+- **Token definitions before usage fixes:** if a colour token or spacing
+  variable does not yet exist in the design token file, create it before fixing
+  the component that should use it.
+- **Shared component fixes before page-level fixes:** if a `Button` component
+  has incorrect focus styles, fix the component first — then page-level fixes
+  that override those styles become coherent.
+- **Base typography scale before heading fixes:** if the type scale is wrong
+  at the root level, fix it before normalising individual heading sizes.
+- **Responsive breakpoints before layout fixes:** if the breakpoint values
+  themselves are wrong, fix them before adjusting the layout rules that
+  reference them.
+- **Systemic fixes as a group:** findings marked systemic (e.g. "all form
+  labels missing `for` attribute") should be fixed together in a single step
+  so no partial state exists where some instances have the fix and others don't.
+- **Accessibility fixes before aesthetic fixes:** WCAG violations that affect
+  keyboard navigation or screen readers should land before cosmetic changes so
+  the product is never in a state that is more accessible than it was, then
+  less, then more again.
 
-### 0-E. Draft a Concrete Approach for Every Fix
+### 0-D. Draft a Concrete Approach for Every Fix
 
-For each FIX-NNN, decide before writing the plan:
+Before writing `uiux_fix_plan.md`, think through the specific implementation
+for each finding. For each fix, decide:
 
-- Exactly which lines/props/classes change in which files
-- Which shared components, tokens, or utilities will be used (by their exact
-  name from the Shared Component Inventory)
-- Whether any new import is required
-- Whether the change affects a shared component (and therefore every screen that
-  uses it — document the blast radius)
-- What could go wrong and how the approach prevents it
+- Exactly which lines, selectors, props, or attributes will change and how
+- Which design-system constructs will be used (the exact token name, the exact
+  component variant, the exact ARIA pattern, the exact breakpoint variable)
+- Whether any new token, variable, or import is required
+- What the before/after diff looks like conceptually — including what the
+  visual or interaction change will be
+- What WCAG criterion the fix satisfies, if applicable
+- What could go wrong and how the approach mitigates it (e.g. a colour change
+  that also affects a dark-mode variant)
 
-These decisions become the **Approach Details** subsections in `uiux_fix_plan.md`
-and are the primary thing the user reviews before execution.
+These decisions become the **Approach Details** section of `uiux_fix_plan.md`
+and are the primary thing the user will review and amend before execution begins.
 
 ---
 
 ## Phase 1 — Build the Implementation Plan
 
-Create `uiux_fix_plan.md` in the project root.
+Create a file named `uiux_fix_plan.md` in the project root (acting as the native Implementation Plan).
 
-```markdown
+This file is the single source of truth for the implementation. It will be
+updated as the user provides feedback (Phase 2) and as fixes are completed
+(Phase 3). Sections are updated in place; the Execution Log is append-only.
+
+### uiux_fix_plan.md Structure
+
+````markdown
 # UI/UX Fix Implementation Plan
 
-> **Status:** Draft — Awaiting User Review
-> **Source audit:** `audit_progress.md`
-> **Last updated:** [describe what changed and why on every update]
+> - **Status:** Draft — Awaiting User Review
+> - **Source audit:** `uiux_audit.md`
+> - **Last updated:** [note what changed and why, on every update]
 
 ---
 
-## Project Patterns (from audit)
+## Design System Patterns (from audit)
 
-*(Copied verbatim — every fix must match these. Updated if user corrects a
-pattern during review; marked *(user-corrected)*.)*
+_(Copied verbatim from uiux_audit.md — every fix must match these)_
 
-| Pattern           | Convention |
-|-------------------|------------|
-| Button hierarchy  |            |
-| Icon usage        |            |
-| Action labels     |            |
-| Loading states    |            |
-| Error states      |            |
-| Spacing/Layout    |            |
-| Typography        |            |
-| Naming (props)    |            |
-
----
-
-## User Preferences
-
-*(Append-only. Preferences stated by the user during review or execution are
-recorded here immediately and applied to all subsequent fix approaches.
-Never delete an entry — if a preference is revised, append the revision with
-a note.)*
-
-| # | Preference | Stated during | Applied to |
-|---|------------|---------------|------------|
-| P-001 | *(example) Cancel button always right-aligned on this product* | Phase 2 review | FIX-004 approach revised |
+- **Design system / component library:**
+- **Colour token convention:**
+- **Spacing scale:**
+- **Typography scale:**
+- **Breakpoint convention:**
+- **Icon library:**
+- **Component naming convention:**
+- **Dark mode / theming approach:**
+- **WCAG conformance target:**
 
 ---
 
 ## Fix Inventory
 
-*(All audit issues normalised into fixable units. One FIX-NNN per root cause.
-A FIX-NNN may resolve multiple ISSUE-NNN entries. Systemic issues are one
-FIX-NNN with multiple targets.)*
+_(All findings from the audit, normalised into fixable units. Each finding
+becomes one Fix Item. Systemic findings that span multiple components become
+one Fix Item with multiple targets.)_
 
-| ID      | Severity | Title                                  | Resolves Issues              | File(s)                     | Depends On | Status  |
-|---------|----------|----------------------------------------|------------------------------|-----------------------------|------------|---------|
-| FIX-001 | 🚨CRIT   | Replace raw div buttons with `<Button>`| ISSUE-004, ISSUE-011         | `Checkout.tsx`, `Cart.tsx`  | —          | Pending |
-| FIX-002 | 🔴HIGH   | Unify "Submit"/"Confirm" labels        | ISSUE-001                    | `CheckoutForm.tsx`          | —          | Pending |
-| FIX-003 | 🔴HIGH   | Add missing loading state to CTA       | ISSUE-007, ISSUE-009         | `OrderSummary.tsx`          | FIX-001    | Pending |
-| FIX-004 | 🟠MED    | Replace custom spinner with `<Spinner>`| ISSUE-003, ISSUE-006, ISSUE-012 | 3 files (see Approach)   | —          | Pending |
-| FIX-005 | 🟡LOW    | Add aria-hidden to decorative icons    | ISSUE-015                    | `NavBar.tsx`, `Footer.tsx`  | —          | Pending |
+| ID | Audit Issue ID(s) | Severity | Title | File(s) / Component(s) | Category | Depends On | Status |
+|---|---|---|---|---|---|---|---|
+| FIX-001 | ISSUE-001, ISSUE-002 | 🚨 CRITICAL | Focus indicator missing on all interactive elements | `Button.tsx`, `Input.tsx`, `Link.tsx` | Accessibility | — | Pending |
+| FIX-002 | ISSUE-003 | 🚨 CRITICAL | Colour contrast ratio 2.1:1 on body text (requires 4.5:1) | `tokens/color.ts` | Colour & Contrast | — | Pending |
+| FIX-003 | ISSUE-011 | 🔴 HIGH | Form inputs missing associated `<label>` elements | `ContactForm.tsx`, `LoginForm.tsx` | Accessibility | — | Pending |
+| FIX-004 | ISSUE-008 | 🔴 HIGH | Heading hierarchy skips H2 → H4 on dashboard | `Dashboard.tsx` | Visual Hierarchy | — | Pending |
+| FIX-005 | ISSUE-016 | 🟠 MEDIUM | Inconsistent spacing between card components (12px vs 16px) | `CardGrid.tsx` | Spacing & Layout | — | Pending |
 
 ---
 
 ## Approach Details
 
-*(Review this section carefully before approving. Each subsection describes
-exactly what will change, which components/tokens will be used, and what the
-blast radius is. Flag anything wrong — wrong component name, wrong prop,
-different preference — and the approach will be revised before any file is
-touched.)*
+_(This is the section to review carefully before approving the plan.
+Each Fix Item has its own subsection describing exactly what will be changed,
+which design-system constructs will be used, and what risks the approach
+accounts for. Comment on any subsection — wrong token name, wrong component
+API, different ARIA pattern preferred — and the plan will be updated before a
+single file is touched.)_
 
-### FIX-001 — Replace raw div buttons with `<Button>`
+### FIX-001 — Focus indicator missing on all interactive elements
 
-**Resolves:** ISSUE-004, ISSUE-011
-**Files:** `src/components/checkout/Checkout.tsx` lines 44–49,
-           `src/components/cart/Cart.tsx` lines 88–91
-
-**Approach:**
-Replace `<div onClick={...} className="...">` with `<Button variant="primary"
-onClick={...}>` using the shared `Button` component from
-`src/components/ui/Button.tsx`. The `variant="primary"` prop matches the
-existing usage on adjacent screens confirmed in the Project Patterns record.
-
-**Blast radius:** Contained — `<Button>` is already used on 14 other screens
-without issue. Only the two files above are affected; no shared component is
-being modified.
-
-**What will not change:** Click handlers, aria-labels, and surrounding layout.
-
-**Risk accounted for:** The current `<div>` has no keyboard support. The
-`<Button>` component already handles `onKeyDown` — this is a net accessibility
-gain, not a regression risk.
+- **Audit Issue ID(s):** ISSUE-001, ISSUE-002
+- **Files:** `Button.tsx`, `Input.tsx`, `Link.tsx`
+- **WCAG criterion:** 2.4.7 Focus Visible (AA)
+- **Approach:**
+Add a `focus-visible` CSS rule to each component using the project's existing
+`--color-focus-ring` token (value: `#005FCC`). The rule will be:
+`outline: 2px solid var(--color-focus-ring); outline-offset: 2px;`
+applied via the component's existing CSS Module / styled-component block.
+The `:focus-visible` pseudo-class (not `:focus`) is used so that mouse users
+are not affected.
+- **What will not change:** Component props, variants, and all other styles
+remain unchanged. No new dependencies.
+- **Risk accounted for:** Verify that no global CSS reset in the project applies
+`outline: none` to these elements after the component styles — if it does, the
+selector specificity will need to be raised and this will be flagged at the
+checkpoint.
 
 ---
 
-### FIX-002 — Unify "Submit" / "Confirm" labels
+### FIX-002 — Colour contrast ratio 2.1:1 on body text
 
-**Resolves:** ISSUE-001
-**Files:** `src/components/checkout/CheckoutForm.tsx` line 112
-
-**Approach:**
-Change `"Submit"` to `"Confirm Order"` to match the label used on the
-confirmation modal (`ConfirmModal.tsx` line 34) and the pattern established in
-Project Patterns ("Confirmation actions → 'Confirm [Object]' format").
-
-**Blast radius:** One label in one file. No shared component touched.
-
-**What will not change:** The `onSubmit` handler, form validation, or layout.
-
-**Risk accounted for:** No translation/i18n keys detected in this project —
-the string is a literal. If i18n is added later this will need a key.
-
----
-
-### FIX-003 — Add missing loading state to CTA
-
-**Resolves:** ISSUE-007, ISSUE-009
-**Files:** `src/components/checkout/OrderSummary.tsx` lines 67–74
-**Depends on:** FIX-001 must complete first (the button will be a proper
-`<Button>` after FIX-001, enabling the `isLoading` prop)
-
-**Approach:**
-Add `isLoading={isSubmitting}` to the `<Button>` introduced by FIX-001. The
-`isSubmitting` state already exists in the parent component's `useState` — it
-is set to `true` on submit and `false` on response. Wire it to the prop.
-The `<Button>` component already renders a `<Spinner />` internally when
-`isLoading` is true — no additional spinner code needed.
-
-**Blast radius:** Contained to this one component.
-
-**What will not change:** Submission logic, error handling, or layout.
+- **Audit Issue ID(s):** ISSUE-003
+- **File:** `tokens/color.ts`
+- **WCAG criterion:** 1.4.3 Contrast (Minimum) (AA)
+- **Approach:**
+Update the `--color-text-primary` token from `#9CA3AF` (current, failing) to
+`#374151` (new, ratio 7.6:1 on white background). This is a single token
+change that propagates automatically to every consumer.
+- **What will not change:** All other colour tokens. No component files need to
+change — they already reference the token correctly.
+- **Risk accounted for:** Verify the new value against the dark-mode background
+(`--color-surface-dark`: `#1F2937`) — the updated token achieves 9.2:1 there
+as well. If a dark-mode override exists that also hard-codes a text colour,
+it will be flagged at the checkpoint.
 
 ---
 
-### FIX-004 — Replace custom spinner with `<Spinner />`
+### FIX-003 — Form inputs missing associated `<label>` elements
 
-**Resolves:** ISSUE-003, ISSUE-006, ISSUE-012
-**Files:**
-- `src/app/settings/page.tsx` lines 23–27
-- `src/components/profile/AvatarUpload.tsx` lines 51–55
-- `src/components/dashboard/StatsCard.tsx` lines 38–42
-
-**Approach:**
-Remove the inline `<div className="animate-spin ...">` pattern in each file and
-replace with `<Spinner size="md" />` from `src/components/ui/Spinner.tsx`.
-The `size="md"` prop matches the 24 px size used by the custom implementation.
-
-**Blast radius:** Three files, each isolated. The shared `<Spinner>` component
-is not being modified — only consumers are being updated.
-
-**What will not change:** The surrounding layout, conditional rendering logic,
-or any state that controls visibility.
-
-**Risk accounted for:** The custom spinner used `text-blue-500` for color. The
-shared `<Spinner>` uses the `primary` design token — verify this renders the
-same color in the current theme before approving. If the color differs and is
-intentional, flag it and I will adjust the approach.
+- **Audit Issue ID(s):** ISSUE-011
+- **Files:** `ContactForm.tsx`, `LoginForm.tsx`
+- **WCAG criterion:** 1.3.1 Info and Relationships (A), 3.3.2 Labels or Instructions (A)
+- **Approach:**
+Replace the current `<span>` used as a visual label with a proper `<label>`
+element using the `htmlFor` prop linked to the existing `id` on each `<input>`.
+If no `id` exists, add one using the convention `${fieldName}-input` (matching
+the project's existing naming pattern visible in `SignupForm.tsx`).
+- **What will not change:** Visual appearance is unchanged — the `<label>` will
+receive the same CSS class as the current `<span>`. No props, validation
+logic, or layout change.
+- **Risk accounted for:** Check that `react-hook-form` or the form library in
+use does not programmatically set `aria-labelledby` in a way that would
+duplicate labelling. If it does, prefer the library's own label association
+API and note the deviation at the checkpoint.
 
 ---
 
-### FIX-005 — Add aria-hidden to decorative icons
+### FIX-004 — Heading hierarchy skips H2 → H4 on dashboard
 
-**Resolves:** ISSUE-015
-**Files:** `src/components/layout/NavBar.tsx`, `src/components/layout/Footer.tsx`
+- **Audit Issue ID(s):** ISSUE-008
+- **File:** `Dashboard.tsx`
+- **WCAG criterion:** 1.3.1 Info and Relationships (A)
+- **Approach:**
+Change the widget section headings from `<h4>` to `<h2>` (they are the first
+heading level below the page `<h1>`). The visual size is controlled by the
+`.widget-heading` CSS class, not the HTML element — so this change is
+semantics-only and has no visual impact.
+- **What will not change:** Visual appearance unchanged. No other files affected.
+- **Risk accounted for:** Confirm no JavaScript in the page uses
+`querySelectorAll('h4')` to drive behaviour (e.g. an accordion). If it does,
+update the selector to use a `data-` attribute instead.
 
-**Approach:**
-Add `aria-hidden="true"` to every icon that appears alongside visible text
-labels (e.g., the home, settings, and profile icons in the nav). Icons that
-are the sole identifier of an action (standalone icon buttons) will receive
-`aria-label` instead — these are identified in ISSUE-015's finding block.
+---
 
-**Blast radius:** Attribute additions only. No visual change, no logic change.
+### FIX-005 — Inconsistent spacing between card components
+
+- **Audit Issue ID(s):** ISSUE-016
+- **File:** `CardGrid.tsx`
+- **Approach:**
+Standardise the `gap` value in the card grid to `spacing-4` (16px) — the
+value used by the majority of instances and documented as the canonical card
+gap in the design system docs. The three instances currently using `spacing-3`
+(12px) will be updated.
+- **What will not change:** Card width, padding, or any other layout property.
+- **Risk accounted for:** Verify the 16px gap does not cause the four-column
+layout to overflow its container at the 1280px breakpoint — at that width the
+available width per card shrinks by 4px total, which is within safe limits.
+Flag if a custom breakpoint override is using the 12px value intentionally.
 
 ---
 
 ## Execution Order
 
-*(Dependencies first, then severity, then blast radius.)*
+_(Sorted by: dependencies first, then WCAG severity, then blast radius. Non-
+obvious ordering decisions are explained.)_
 
-1. **FIX-004** — No dependencies; isolated consumer-only changes; unblocks visual
-   consistency across the most screens
-2. **FIX-001** — No dependencies; unblocks FIX-003
-3. **FIX-002** — No dependencies; isolated label change; safe to run in parallel
-   with FIX-001 but sequenced after for clarity
-4. **FIX-003** — Depends on FIX-001 being complete
-5. **FIX-005** — No dependencies; low-risk; scheduled last
+1. **FIX-002** — Token change with zero file dependencies; fixes the contrast
+   failure at its root so all subsequent fixes inherit the correct values
+2. **FIX-001** — CRITICAL accessibility; no dependencies; safe immediately
+3. **FIX-003** — CRITICAL accessibility; isolated to two form files
+4. **FIX-004** — HIGH accessibility; semantics-only; isolated to one file
+5. **FIX-005** — MEDIUM cosmetic; last to avoid touching layout during
+   accessibility fixes
 
 ---
 
 ## Deferred / Excluded Items
 
-*(Append-only. Items the user asks to skip or defer are moved here with reason.)*
+_(Empty until user review. Items the user asks to skip or defer are moved here
+with a reason.)_
 
 ---
 
 ## Execution Log
 
-*(Append-only. One entry per completed FIX-NNN. Never edit a completed entry.)*
+_(Append-only. One entry per completed fix. Never edit a completed entry.)_
 
 <!-- entries appear here as fixes are applied -->
-```
+
+---
+
+## Verification Plan
+
+### Manual Verification
+- Visual inspection of changed components across different breakpoints.
+- Accessibility audit (e.g., using Screen Reader or Lighthouse) on the affected pages.
+- Verify that design tokens are correctly applied.
+````
 
 ---
 
 ## Phase 2 — Present for Review
 
-**Hard stop. No source file may be modified until explicit user approval.**
+This is the hard stop. Do not touch any source file until you have explicit
+approval.
 
 Present `uiux_fix_plan.md` to the user. Your message must cover:
 
-### 1. Headline Summary
+1. **Headline summary** — plain-English count of findings at each severity
+   level, and how many carry a WCAG criterion (and therefore have legal or
+   contractual weight). Do not make the user parse the table to get this.
 
-Plain-English count of: total issues, fixes planned, how many fixes resolve
-multiple issues at once. Example:
+2. **Execution order rationale** — one sentence justifying the first two or
+   three ordering decisions, especially why token/system-level fixes land before
+   component-level fixes.
 
-> "The audit found 15 issues. I've grouped them into 5 fixes — 3 of those
-> fixes each resolve 2 or more issues simultaneously, so you get full coverage
-> in fewer changes."
+3. **Approach Details call-out** — explicitly direct the user to the Approach
+   Details section and tell them this is the most important part to review:
 
-### 2. Multi-Issue Fix Call-Out
+   > "The **Approach Details** section describes exactly what each fix will do —
+   > which token, which ARIA pattern, which HTML element, which CSS rule, and
+   > which lines change. Please read each subsection and tell me if anything
+   > looks wrong before I write a single line of code. Wrong token name? A
+   > different ARIA pattern your team prefers? A WCAG exception already approved
+   > for this element? This is the right moment to catch that."
 
-Explicitly highlight which FIX-NNN entries resolve more than one ISSUE-NNN,
-and why they were grouped. This helps the user understand the grouping logic
-and catch any groupings they disagree with.
+4. **Three gating questions:**
+   - Are there any fixes to skip entirely (intentional design decision, element
+     being replaced, already fixed in another branch or design-system PR)?
+   - Are there any fixes to defer (not skip forever, just do after a release or
+     pending a design review)?
+   - Are there any approaches in the Approach Details you want changed before
+     execution starts?
 
-### 3. Approach Details Direction
+5. **Clear approval prompt** — tell the user exactly what to say to start
+   execution, e.g.: *"Reply 'approved' to begin, or share your feedback and
+   I'll update the plan before we start."*
 
-Explicitly direct the user to the Approach Details section:
+### Handling User Feedback
 
-> "The **Approach Details** section is the most important part to review — it
-> describes exactly what each fix will change: which component, which prop,
-> which line, and what the blast radius is. Please read each subsection and
-> flag anything that conflicts with a project decision I may not know about:
-> wrong component name, wrong variant, a label that was intentionally different,
-> a spinner color that was approved by the designer. This is the moment to
-> catch that — before any file is touched."
+When the user responds with feedback, do not start executing. Update the plan
+first. Apply exactly one of these operations to `uiux_fix_plan.md` per piece of
+feedback:
 
-### 4. Blast Radius Call-Out
+| User says | Operation on uiux_fix_plan.md |
+|---|---|
+| "Skip FIX-005, the 12px gap is intentional" | Move FIX-005 to Deferred/Excluded with reason |
+| "Defer FIX-004 until the design system migration is done" | Move FIX-004 to Deferred/Excluded with reason |
+| "Do FIX-003 before FIX-001" | Update Execution Order; note the reason |
+| "For FIX-001, use `box-shadow` instead of `outline` — our reset nukes outlines" | Update FIX-001's Approach Details subsection; mark *(user-revised)* |
+| "The focus ring colour token is `--focus-ring`, not `--color-focus-ring`" | Update Design System Patterns; mark *(user-corrected)*; update every Approach Details subsection that referenced the old name |
+| "FIX-002's new value needs to work on our brand-yellow background too, not just white" | Update FIX-002's Approach Details with the additional contrast check; mark *(user-revised)* |
+| "There's a FIX-006 you missed — the modal has no focus trap" | Add FIX-006 to Fix Inventory **and** a new Approach Details subsection; place it in Execution Order |
 
-Flag any fix that modifies a shared component (not just its consumers), since
-those changes affect every screen in the product. Ask the user to confirm the
-proposed approach for those specifically.
+After applying all feedback, update the plan's status line to
+`Revised — Awaiting Final Approval` and list what changed in the Last updated
+field.
 
-### 5. Four Gating Questions
+Present the updated plan and ask for final approval. Repeat — update, present,
+await — until the user explicitly approves.
 
-- Are there any fixes to **skip entirely** (intentional pattern, being replaced,
-  already fixed in another branch)?
-- Are there any fixes to **defer** (not skip forever, just not now)?
-- Are there any **groupings to split** (two issues you want fixed separately
-  rather than together)?
-- Are there any **approaches to revise** in the Approach Details before execution?
-
-### 6. Clear Approval Prompt
-
-> "Reply **'approved'** to begin, or share feedback and I'll update the plan
-> before we start. Once approved, I'll apply one fix at a time and pause for
-> your confirmation at each checkpoint."
-
----
-
-### Handling User Feedback During Review
-
-When the user responds with feedback, update the plan **before** starting
-execution. Apply exactly one of these operations per piece of feedback:
-
-| User says | Operation |
-|-----------|-----------|
-| "Skip FIX-002, that label was intentional" | Move to Deferred/Excluded with reason; record as User Preference P-NNN |
-| "Defer FIX-005 until after the next release" | Move to Deferred/Excluded with reason |
-| "Split FIX-001 — fix Checkout.tsx this sprint, Cart.tsx next" | Split into FIX-001a and FIX-001b; update Issue links on each; re-order |
-| "For FIX-004, use `<LoadingDot />` not `<Spinner />`" | Update Approach Details subsection; mark *(user-revised)*; record as User Preference P-NNN |
-| "Cancel should always be on the left on this product" | Record as User Preference P-NNN; scan all Approach Details for button placement and revise |
-| "The icon library we use is Lucide only — ignore HeroIcons findings" | Record as User Preference P-NNN; move affected issues to Deferred/Excluded |
-| "Add a fix for ISSUE-016 you missed" | Add to Fix Inventory + Approach Details; place in Execution Order |
-| "Group ISSUE-013 with FIX-003" | Update FIX-003's Resolves column; fetch and merge ISSUE-013 details into Approach Details |
-
-After applying feedback:
-- Update the plan's status to `Revised — Awaiting Final Approval`
-- Describe what changed in the Last updated field
-- Re-present and await approval
-
-**Never interpret silence as approval.**
+**Never interpret silence as approval.** If the user goes quiet after you
+present the plan, wait.
 
 ---
 
 ## Phase 3 — Execute, Checkpoint, Repeat
 
-Execution begins only after explicit approval. One fix at a time.
+Execution begins only after explicit user approval. Follow this loop for every
+fix in the Execution Order, one at a time.
 
----
+### Step 3-A. Announce the Fix
 
-### Step 3-A. Fetch the Issue Details Before Each Fix
-
-Before announcing a fix, search for each linked ISSUE-NNN in `audit_progress.md`
-to refresh context. Read only the matching finding blocks — do not re-read the
-full file. This ensures the fix is applied to the right lines even if the
-approach was written during an earlier session.
+Before editing any file, post a short message that echoes the approved approach
+from Approach Details:
 
 ```
-Search "ISSUE-004" in audit_progress.md → read block → stop at next ---
-Search "ISSUE-011" in audit_progress.md → read block → stop at next ---
-```
-
-Apply any User Preferences that are relevant to this fix before proceeding.
-
----
-
-### Step 3-B. Announce the Fix
-
-Post a short message before touching any file:
-
-```
-Applying FIX-001 — Replace raw div buttons with <Button>
-Resolves: ISSUE-004, ISSUE-011
-Files: src/components/checkout/Checkout.tsx (lines 44–49)
-       src/components/cart/Cart.tsx (lines 88–91)
-Approach (as approved): Replacing <div onClick> with <Button variant="primary"
-onClick>. No shared component modified. Keyboard support and focus management
-improved as a side effect.
-User preferences applied: none applicable to this fix.
+Applying FIX-003 — Form inputs missing associated <label> elements (Issues: ISSUE-011)
+Files: ContactForm.tsx, LoginForm.tsx
+WCAG: 1.3.1 Info and Relationships (A), 3.3.2 Labels or Instructions (A)
+Approach (as approved): Replacing <span> label elements with <label htmlFor>
+linked to each input's id. Using id convention "${fieldName}-input" to match
+SignupForm.tsx. Visual appearance unchanged — same CSS class applied.
 (No other files touched in this step.)
 ```
 
-This gives the user a final chance to object before any file changes.
+This gives the user a final chance to object before the file changes.
 
----
+### Step 3-B. Apply the Fix
 
-### Step 3-C. Apply the Fix
+Edit only the files listed for this Fix Item. Do not "while I'm here" fix
+adjacent issues. The fix must:
 
-Edit only the files listed for this FIX-NNN. The fix must:
+- Match the approach in the approved Approach Details subsection exactly
+- Use only tokens, variables, component variants, ARIA patterns, and naming
+  conventions from Design System Patterns
+- Not change the visual appearance of any element not explicitly named in the
+  Fix Item
+- Not add new package dependencies without announcing them in Step 3-A
+- Not alter existing ARIA attributes or semantic elements beyond what the Fix
+  Item specifies
 
-- Match the approved Approach Details exactly
-- Use the exact component names, prop names, and token names from the Shared
-  Component Inventory and Project Patterns record
-- Not change any logic, state, or handler that is not part of the fix
-- Not add new package dependencies without announcing them in Step 3-B
-- Not "while I'm here" fix adjacent issues — those go in the Fix Inventory
+After editing, read the changed file back to verify:
 
----
+- No syntax error was introduced
+- The design token / ARIA attribute / HTML element referenced actually exists
+  in the project
+- No unintended adjacent lines were changed
 
-### Step 3-D. Update `audit_progress.md` — Issue Statuses
+### Step 3-C. Update task.md and Implementation Plan
 
-After applying the fix, update the status of every linked ISSUE-NNN in the
-Issue Index of `audit_progress.md`. Use search to locate each row — do not
-re-read the full file.
+Immediately after applying the fix, update the `task.md` (native Task artifact) checklist and append an entry to the Execution Log in `uiux_fix_plan.md`.
 
-**Status markers:**
-
-| Outcome | Marker | When to use |
-|---------|--------|-------------|
-| ✅ Fixed | `✅ Fixed · FIX-NNN` | Fix applied and complete |
-| ⏸ Deferred | `⏸ Deferred · [reason]` | User asked to defer |
-| ⛔ Excluded | `⛔ Excluded · [reason]` | User asked to skip permanently |
-| ⚠️ Partial | `⚠️ Partial · FIX-NNN` | Fix applied to some files but not all |
-
-Update the Issue Index row for each linked ISSUE-NNN:
+For completed fixes:
+1. Append a log entry to `uiux_fix_plan.md`:
 
 ```markdown
-<!-- Before -->
-| ISSUE-004 | 🔴H | Buttons | Raw div used as button | FLOW-001 |
-
-<!-- After -->
-| ISSUE-004 | 🔴H | Buttons | Raw div used as button | FLOW-001 | ✅ Fixed · FIX-001 |
-```
-
-> The Issue Index is the audit file's status surface. It must always reflect
-> the current state of every issue. Reading the Issue Index alone should tell
-> anyone the full resolution status of the audit without opening the Findings
-> section.
-
----
-
-### Step 3-E. Write the Execution Log Entry
-
-Append an entry to the Execution Log in `uiux_fix_plan.md` immediately after:
-
-```markdown
-### ✅ FIX-001 — Replace raw div buttons with `<Button>`
-
+### ✅ FIX-003 — Form inputs missing associated `<label>` elements (Issues: ISSUE-011)
 **Completed**
-
-| Field              | Detail |
-|--------------------|--------|
-| Issues resolved    | ISSUE-004 ✅, ISSUE-011 ✅ |
-| Files changed      | `src/components/checkout/Checkout.tsx`, `src/components/cart/Cart.tsx` |
-| What was done      | Replaced `<div onClick>` with `<Button variant="primary" onClick>` in both files. Keyboard navigation now works on both elements. |
-| What was not changed | Click handlers, aria-labels, surrounding layout |
-| Shared component modified? | No — only consumers updated |
-| User preferences applied | None applicable |
-| Approach deviation | None — implemented exactly as approved |
-| Follow-up noted    | `Cart.tsx` has a third button on mobile breakpoint (line 103) not in the original issue scope — logged for next audit run |
+- **Files changed:** `ContactForm.tsx`, `LoginForm.tsx`
+- **What was done:** Replaced all `<span>` label elements with `<label htmlFor>`
+  elements. Added `id` attributes to inputs using the `${fieldName}-input`
+  convention. CSS class unchanged — visual appearance identical.
+- **WCAG criteria satisfied:** 1.3.1 (A), 3.3.2 (A)
+- **What was not changed:** Validation logic, form layout, component props.
+- **Tests affected:** `ContactForm.test.tsx` snapshot updated to reflect the
+  `<label>` element. Functionality tests still pass.
+- **Approach deviation:** None — implemented exactly as described in Approach Details.
 ```
 
-Update FIX-001's status in the Fix Inventory from `Pending` → `✅ Done`.
+2. Update `task.md` to mark the fix as completed.
+3. Locate the issue in `uiux_audit.md` and prepend `✅ FIXED — ` to its title.
 
-> If the fix deviated from the approved approach, the **Approach deviation**
-> field must explain what changed and why. Never silently diverge from the
-> approved approach.
+For deferred items (items moved to "Deferred / Excluded" in `uiux_fix_plan.md`):
+1. Locate the issue in `uiux_audit.md`.
+2. Prepend `⏭️ DEFERRED — ` to its title.
+3. Replace the **Remediation** section with a **Deferred Reason** section using the user's reasoning from `uiux_fix_plan.md`.
+4. If an "Audit Legend" does not exist at the top of `uiux_audit.md`, add one:
 
----
+```markdown
+## Audit Legend
 
-### Step 3-F. The Checkpoint
+- `✅ FIXED` — Issue resolved in the codebase.
+- `🔴 CRITICAL` / `🔴 HIGH` / `🟠 MEDIUM` / `🟡 LOW` — Active audit findings.
+- `⏭️ DEFERRED` — Acknowledged by user but out of scope (e.g. intentional pattern, planned refactor, or low priority).
+```
 
-After every single fix, post:
+### Step 3-D. The Checkpoint
+
+After every single fix — not after every batch, after every single fix — post:
 
 ```
-Checkpoint after FIX-001
-✅ Done: FIX-001 — Replace raw div buttons with <Button>
-         Resolved: ISSUE-004 ✅, ISSUE-011 ✅
+Checkpoint after FIX-003
+✅ Done: FIX-003 — Form inputs missing associated <label> elements (ContactForm.tsx, LoginForm.tsx) (Issues: ISSUE-011)
+⏳ Next: FIX-004 — Heading hierarchy skips H2 → H4 on dashboard (Dashboard.tsx)
+        Planned approach: Change <h4> widget headings to <h2>; visual size
+        controlled by .widget-heading CSS class — no visual change.
 
-⏳ Next: FIX-002 — Unify "Submit"/"Confirm" labels (CheckoutForm.tsx line 112)
-         Approach: Change "Submit" → "Confirm Order" to match ConfirmModal.tsx.
-         Resolves: ISSUE-001
-
-uiux_fix_plan.md and audit_progress.md have both been updated.
-Reply 'continue' to apply FIX-002, 'pause' to stop here, or share feedback
+uiux_fix_plan.md and task.md have been updated. Review the change before I continue.
+Reply 'continue' to apply FIX-004, 'pause' to stop here, or share feedback
 to adjust the approach before the next fix.
 ```
 
 Then stop. Do not proceed until the user responds.
 
----
-
-### Step 3-G. Capture User Preferences During Execution
-
-When the user says anything during a checkpoint that reveals a project
-convention, design decision, or constraint — not just feedback on the specific
-fix, but something that applies more broadly — record it immediately as a
-User Preference in `uiux_fix_plan.md`:
-
-```markdown
-| P-002 | "Confirm" label only used on modals; forms always use "Save" | After FIX-002 checkpoint | FIX-006 approach revised; ISSUE-014 approach pre-revised |
-```
-
-Then immediately scan all remaining Approach Details subsections for conflicts
-with the new preference and revise them before the next fix. Announce the
-revision at the next checkpoint.
-
-**A preference once recorded is permanent for this session.** If the user later
-contradicts a preference, append the new entry with a note referencing the
-original — do not delete the original.
-
----
-
-### Step 3-H. Handle Checkpoint Responses
+### Step 3-E. Handle Checkpoint Responses
 
 | User says | What to do |
-|-----------|------------|
-| "continue" / "go ahead" | Apply next fix; return to Step 3-A |
-| "pause" / "stop" | Write Pause Summary (Step 3-I); stop |
-| "skip this one" | Move next FIX-NNN to Deferred/Excluded; mark linked issues `⏸ Deferred` in audit_progress.md; announce new next item; wait |
-| "change the approach to X" | Update the Approach Details subsection; mark *(user-revised)*; record as User Preference if broadly applicable; re-announce (Step 3-B); wait |
-| "also fix ISSUE-NNN in this step" | Fetch ISSUE-NNN details by search; if compatible with current fix, add to FIX-NNN's Resolves list and update the approach; if not compatible, create a new FIX-NNN and insert in Execution Order |
-| "that label was intentional — revert it" | Revert the change; mark the linked issue `⛔ Excluded`; record the reason as User Preference; update audit_progress.md |
-| "this preference applies everywhere" | Record as User Preference; scan all remaining Approach Details for conflicts; revise and announce before next step |
+|---|---|
+| "continue" / "go ahead" / "yes" | Apply the next fix; return to Step 3-A |
+| "pause" / "stop" / "hold on" | Write the Pause Summary (Step 3-F); stop |
+| "skip this one" | Move the next Fix Item to Deferred/Excluded; announce the new next item; wait |
+| "change the approach to X" | Update the Approach Details subsection for the next Fix Item; re-announce (Step 3-A) with the revised approach; wait |
+| "actually add this other fix first" | Add to Fix Inventory + Approach Details; insert before current next item in Execution Order; announce; wait |
 
----
+### Step 3-F. Finalize (walkthrough.md)
 
-### Step 3-I. Pause / Completion Summary
+Once all fixes are complete, create a `walkthrough.md` (native Walkthrough artifact) summarizing the changes, visual/accessibility tests performed, and screenshots/recordings if possible.
 
-When the user pauses or all fixes are complete, prepend this summary to the
-top of `uiux_fix_plan.md`:
+### Step 3-G. Pause Summary
+
+If the user pauses, write a summary at the top of `uiux_fix_plan.md`:
 
 ```markdown
-<!-- ══════════════════════════════════════════════════════════════════ -->
-## 📋 Implementation Summary — [Paused | Complete]
+<!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**Paused by:** User request / All fixes applied
-**Fixes completed:** N of M planned
-**Issues resolved:** N of N total (✅ N fixed · ⏸ N deferred · ⛔ N excluded)
+## 📋 UI/UX Implementation Summary — [Paused | Complete]
+
+**Paused by:** User request / All fixes applied _(keep one)_
+**Fixes completed:** N of M total planned
+**WCAG violations resolved:** N of M
 
 ### Applied Fixes
 
-| ID      | Title                              | Issues Resolved                | Deviation? |
-|---------|------------------------------------|--------------------------------|------------|
-| FIX-001 | Replace raw div buttons            | ISSUE-004 ✅, ISSUE-011 ✅     | None       |
-| FIX-004 | Replace custom spinner             | ISSUE-003 ✅, ISSUE-006 ✅, ISSUE-012 ✅ | None |
+| ID | Title | File(s) | WCAG Criteria | Audit Issue ID(s) | Approach deviation? |
+|---|---|---|---|---|---|
+| FIX-002 | Colour contrast ratio on body text | `tokens/color.ts` | 1.4.3 AA | ISSUE-003 | None |
+| FIX-003 | Form inputs missing `<label>` | `ContactForm.tsx`, `LoginForm.tsx` | 1.3.1, 3.3.2 | ISSUE-011 | None |
 
 ### Remaining Fixes
 
-| ID      | Severity | Title                    | Issues         | Reason not applied |
-|---------|----------|--------------------------|----------------|--------------------|
-| FIX-003 | 🔴HIGH   | Add loading state to CTA | ISSUE-007, ISSUE-009 | Paused by user |
+| ID | Severity | Title | Audit Issue ID(s) | Reason not yet applied |
+|---|---|---|---|---|
+| FIX-001 | 🚨 CRITICAL | Focus indicator missing | ISSUE-001, ISSUE-002 | Paused by user |
+| FIX-004 | 🔴 HIGH | Heading hierarchy skip | ISSUE-008 | Paused by user |
 
-### Deferred / Excluded Issues
+### Deferred / Excluded
 
-| Issue     | Title                          | Status          | Reason |
-|-----------|--------------------------------|-----------------|--------|
-| ISSUE-001 | "Submit" vs "Confirm" label    | ⛔ Excluded     | User: label intentional — legal copy |
-| ISSUE-015 | Decorative icons missing aria  | ⏸ Deferred      | User: defer to accessibility sprint |
-
-### User Preferences Recorded This Session
-
-| #     | Preference                                   | Applied to |
-|-------|----------------------------------------------|------------|
-| P-001 | Cancel always right-aligned on this product  | FIX-003 revised |
-| P-002 | Forms use "Save"; modals use "Confirm"       | FIX-002 excluded; FIX-006 revised |
+| ID | Title | Audit Issue ID(s) | Reason |
+|---|---|---|---|
+| FIX-005 | Inconsistent card spacing | ISSUE-016 | User: 12px gap intentional per designer |
 
 ### Follow-up Gaps Noted During Implementation
 
-*(Issues noticed while applying fixes that are not in the original audit.)*
+_(Issues noticed while applying fixes that are not in the original audit and
+have not been fixed — for the next audit run or a manual design review.)_
 
-- `Cart.tsx` line 103 — third button on mobile breakpoint uses raw `<div>`; not
-  in original audit scope; recommend adding to next audit run
-- `CheckoutForm.tsx` — no loading state on the secondary "Save for later" action;
-  similar to ISSUE-007 but not captured; recommend adding to Issue Index
+- `ContactForm.tsx` — error messages surface via colour only; no icon or text
+  pattern to satisfy WCAG 1.4.1 Use of Color (A) — not in this audit's scope
+- `Dashboard.tsx` — motion in the widget refresh animation may need
+  `prefers-reduced-motion` guard (WCAG 2.3.3 AAA)
 
 ### To Resume
 
-Open a new session, reference `uiux_fix_plan.md` and `audit_progress.md`, and say:
-"Resume UI/UX fixes from FIX-003 — the plan is already approved. User preferences
-P-001 and P-002 must be honoured."
-<!-- ══════════════════════════════════════════════════════════════════ -->
+Open a new session, reference `uiux_fix_plan.md`, and say:
+"Resume UI/UX implementation from FIX-001 — the plan is already approved."
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
 ```
 
 ---
 
-## Keeping `uiux_fix_plan.md` Consistent
+## What a Fix Must Never Do
+
+| Rule | Reasoning |
+|---|---|
+| Never fix more than one Fix Item in a single edit | Mixing two fixes makes the checkpoint meaningless and regressions untraceable |
+| Never deviate from the approved Approach Details without announcing it | Silent deviations break the review contract |
+| Never use a raw colour hex, pixel value, or spacing number when a token exists | Breaks design system consistency and makes future theming changes incomplete |
+| Never remove or alter an ARIA attribute without it being explicitly part of the Fix Item | Accessibility attributes have a wider blast radius than they appear |
+| Never change the visual appearance of elements not named in the Fix Item | "While I'm here" style tweaks introduce unplanned changes |
+| Never rewrite surrounding code not part of the fix | "While I'm here" rewrites introduce unplanned changes |
+| Never mark a Fix Item Done if the fix is partial | Mark it ⚠️ Partially Applied and note what remains |
+| Never skip the checkpoint | "Trivial" fixes have caused production incidents |
+| Never edit `uiux_audit.md` beyond status synchronization | The fixer may prepend `✅ FIXED — ` or `⏭️ DEFERRED — ` to titles and update the body ONLY for Deferred items to include the user's reasoning. |
+
+---
+
+## Keeping uiux_fix_plan.md Consistent
 
 | Section | Mutation rule |
-|---------|--------------|
+|---|---|
 | Status line | Overwrite on every phase transition |
-| Last updated field | Overwrite; describe what changed and why |
-| Project Patterns | Overwrite if user corrects; mark *(user-corrected)* |
-| **User Preferences** | **Append-only always — never delete or overwrite an entry** |
-| Fix Inventory | Status column overwrites; all other columns fixed once written |
-| **Approach Details** | **Overwrite per subsection on user revision; mark *(user-revised)* and note what changed** |
+| Last updated field | Overwrite; always describe what changed and why |
+| Design System Patterns | Overwrite if user corrects a pattern; mark _(user-corrected)_ |
+| Fix Inventory table | Status column overwrites; all other columns fixed once written |
+| **Approach Details** | **Overwrite per subsection if user revises an approach; mark _(user-revised)_ and note what changed** |
 | Execution Order | Overwrite when reordering; note the reason |
 | Deferred / Excluded | Append-only |
-| **Execution Log** | **Append-only — never edit a completed entry** |
-| Pause/Completion Summary | Written once at top; overwrite only when resuming |
-
-## Keeping `audit_progress.md` Consistent
-
-This skill has **one permitted write operation** on the audit file: updating the
-status column of ISSUE-NNN rows in the Issue Index table. All other sections of
-`audit_progress.md` are read-only for this skill.
-
-| Operation | Permitted? |
-|-----------|-----------|
-| Add status marker to Issue Index row | ✅ Yes — after each fix |
-| Rewrite a Finding block | ❌ No — that belongs to the audit skill |
-| Update the Status table (Files Read, etc.) | ❌ No |
-| Add new issues to the Issue Index | ❌ No — use the follow-up gaps section in `uiux_fix_plan.md` |
+| Execution Log | Append-only; never edit a completed entry |
+| Pause/Completion Summary | Written once at the top; overwrite only when resuming |
 
 ---
 
@@ -734,16 +638,14 @@ status column of ISSUE-NNN rows in the Issue Index table. All other sections of
 
 | Anti-Pattern | Why It Is Dangerous | Correction |
 |---|---|---|
-| Reading `audit_progress.md` top-to-bottom to recall an issue | Blows context window on large audits | Always search for `ISSUE-NNN` by ID; read only the matching block |
-| Starting execution before plan approval | Unapproved fixes conflict with user decisions | Hard stop at Phase 2 — no exceptions |
-| Skipping Approach Details review | User may object to specific component, prop, or label choice | Explicitly direct user to Approach Details in Phase 2 |
-| Applying multiple fixes in one edit | A regression cannot be isolated | One FIX-NNN = one edit = one checkpoint |
-| Not recording a user preference stated during a checkpoint | The next fix repeats the same mistake the user just corrected | Every project-policy statement → User Preferences table immediately |
-| Not scanning remaining Approach Details after a preference is recorded | Later fixes contradict the preference the user just stated | Scan and revise all remaining approaches before the next step |
-| Marking an issue Fixed before the fix is complete across all listed files | Issue Index shows false resolution | Only mark ✅ Fixed when every file in the Fix Item is updated |
-| Using a component name not in the Shared Component Inventory | Introduces a new inconsistency while fixing an old one | Cross-check the Inventory before every fix approach |
-| Treating user silence as approval | User may be reviewing carefully | Explicitly wait; re-prompt if needed |
-| Deviating from the approved Approach Details without announcing it | Breaks the review contract | Announce any deviation in Step 3-B; document it in the Execution Log |
-| Writing "while I'm here" fixes not in the plan | Unreviewed changes bypass the safety model | Log as follow-up gap; add to Fix Inventory + Approach Details for next session |
-| Applying a shared component fix without documenting blast radius | Touches every screen invisibly | Always state blast radius in Approach Details for any shared component change |
-| Editing Execution Log entries retroactively | Corrupts the implementation record | Execution Log is append-only — corrections go in a new entry |
+| Starting execution before plan approval | Fixes applied to an unseen plan conflict with user decisions and design intent | Hard stop at Phase 2 |
+| Skipping Approach Details review | User may object to the token name, ARIA pattern, or HTML element used | Explicitly direct user to Approach Details in Phase 2 |
+| Applying multiple fixes in one edit | A visual regression or accessibility failure cannot be isolated to a single cause | One Fix Item = one edit = one checkpoint |
+| Treating user silence as approval | The user may be reviewing carefully, checking with a designer, or running a screen reader test | Explicitly wait; re-prompt if needed |
+| Deviating from approved approach without announcement | Breaks the review contract; user approved one pattern, got another | Announce any deviation at the checkpoint; document it in the Execution Log |
+| Using hard-coded values instead of design tokens | The fix passes visually today but breaks on theme switch, dark mode, or the next design-system update | Re-read Design System Patterns before every fix |
+| Marking a fix Done before verifying visuals | An invisible component is worse than an ugly one | Always check rendering metrics if applicable |
+| Adding "bonus fixes" not in the plan | Unreviewed changes bypass the safety model and can alter interactions the user didn't approve | Add to Fix Inventory + Approach Details; get it reviewed at a checkpoint |
+| Illegally editing `uiux_audit.md` | Altering audit data destroys the project record | Only edit `uiux_audit.md` to synchronize status (Fixed/Deferred) and reasons; never rewrite trace payloads or other metadata. |
+| Vague Execution Log entries ("fixed the styles") | Makes the log useless for understanding what changed | Always specify files, elements, token names, WCAG criteria addressed, what was not changed, tests affected, approach deviation |
+| Fixing WCAG violations without noting the criterion | Removes traceability for compliance reporting | Every accessibility fix must record which criterion it satisfies |

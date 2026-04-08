@@ -1,6 +1,5 @@
 import os
 import json
-import re
 from enum import Enum
 from typing import List, Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field
@@ -90,8 +89,8 @@ class SearchMyMedicinesArgs(BaseModel):
 class AddMedicineArgs(BaseModel):
     name: str = Field(description="[Required] Name of the medicine")
     brand: str = Field(description="[Required] Manufacturer or brand name")
-    composition: str = Field(
-        description="[Required] Molecules and strength, e.g. 'Paracetamol 500mg'"
+    composition: Optional[str] = Field(
+        default=None, description="[Optional] Molecules and strength, e.g. 'Paracetamol 500mg'"
     )
     medicine_code: Optional[str] = Field(
         default=None, description="[Optional] UPC or Barcode from packaging"
@@ -280,6 +279,22 @@ class GetThreatIntelligenceArgs(BaseModel):
     )
 
 
+class ListNotificationsArgs(BaseModel):
+    limit: int = Field(
+        default=20,
+        le=50,
+        description="[Optional] Max number of notifications to return (max: 50, default: 20)",
+    )
+
+
+class ListUpcomingDosesArgs(BaseModel):
+    pass
+
+
+class ListCategoriesArgs(BaseModel):
+    pass
+
+
 # --- Prescription Registry ---
 
 
@@ -433,6 +448,18 @@ class Tools:
             "get_threat_intelligence": {
                 "present": "Checking security threats...",
                 "past": "Checked security threats.",
+            },
+            "list_notifications": {
+                "present": "Fetching your notifications...",
+                "past": "Retrieved latest notifications.",
+            },
+            "list_upcoming_doses": {
+                "present": "Checking upcoming medication doses...",
+                "past": "Retrieved upcoming doses.",
+            },
+            "list_categories": {
+                "present": "Fetching product categories...",
+                "past": "Retrieved available categories.",
             },
         }
 
@@ -615,6 +642,22 @@ class Tools:
                 "ERROR", f"View data synchronization failed: {e}"
             )
 
+    async def list_notifications(self, limit: int = 20) -> str:
+        """Retrieves a list of personal notifications (alerts, recalls, stock warnings). **Use** to see recent system events."""
+        try:
+            data = await tool_store.get_notifications_summary(self.user_id)
+            return self._format_output("SUCCESS", "Notifications retrieved.", data)
+        except Exception as e:
+            return self._format_output("ERROR", f"Failed to list notifications: {e}")
+
+    async def list_upcoming_doses(self) -> str:
+        """[Customer Only] Retrieves upcoming medication doses/events for the next 24 hours. **Use** to see the user's schedule."""
+        try:
+            data = await tool_store.get_upcoming_doses_summary(self.user_id)
+            return self._format_output("SUCCESS", "Upcoming doses retrieved.", data)
+        except Exception as e:
+            return self._format_output("ERROR", f"Failed to list upcoming doses: {e}")
+
     # --- Customer Tools ---
 
     async def list_my_medicines(
@@ -680,56 +723,68 @@ class Tools:
         )
 
     async def add_medicine(self, **kwargs) -> str:
-        """Adds new med to cabinet. **Use** for creation. **Do NOT use** for updates."""
-        success = await tool_store.add_medicine_to_cabinet(self.user_id, **kwargs)
-        if success:
-            return self._format_output(
-                "SUCCESS", f"Added '{kwargs.get('name')}' to My Medicines."
-            )
-        return self._format_output(
-            "ERROR",
-            "Failed to add medication. Verify that 'name', 'brand', and 'composition' are provided and correctly formatted. If the error persists, check if the medicine already exists in the cabinet.",
-        )
-
-    async def update_medicine(self, medicine_id: str, **kwargs) -> str:
-        """Modifies existing med record. **Use** for dosage/notes. **Do NOT use** for removal."""
-        updates = {k: v for k, v in kwargs.items() if v is not None}
-        if not updates:
+        """Adds new med to cabinet. **IMPORTANT:** Confirm final details with the user before calling this. **Use** for creation. **Do NOT use** for updates."""
+        try:
+            success = await tool_store.add_medicine_to_cabinet(self.user_id, **kwargs)
+            if success:
+                return self._format_output(
+                    "SUCCESS", f"Added '{kwargs.get('name')}' to My Medicines."
+                )
             return self._format_output(
                 "ERROR",
-                "No update fields provided. Specify fields to modify (e.g. dosage, notes).",
+                "Failed to add medication. Ensure 'name' and 'brand' are provided. If it already exists, use update_medicine instead.",
             )
+        except Exception as e:
+            return self._format_output("ERROR", f"Operation failed: {e}. Ask the user for any missing details if necessary.")
 
-        success = await tool_store.update_cabinet_item(
-            medicine_id, self.user_id, updates
-        )
-        if success:
-            return self._format_output("SUCCESS", f"Medication {medicine_id} updated.")
-        return self._format_output(
-            "ERROR",
-            f"Medication '{medicine_id}' not found or update failed. Verify the medication ID by running list_my_medicines first. Ensure you are only providing fields that exist (e.g., dosage, notes, quantity).",
-        )
+    async def update_medicine(self, medicine_id: str, **kwargs) -> str:
+        """Modifies existing med record. **IMPORTANT:** Confirm final details with the user before calling this. **Use** for dosage/notes. **Do NOT use** for removal."""
+        try:
+            updates = {k: v for k, v in kwargs.items() if v is not None}
+            if not updates:
+                return self._format_output(
+                    "ERROR",
+                    "No update fields provided. Specify fields to modify (e.g. dosage, notes).",
+                )
+
+            success = await tool_store.update_cabinet_item(
+                medicine_id, self.user_id, updates
+            )
+            if success:
+                return self._format_output("SUCCESS", f"Medication {medicine_id} updated.")
+            return self._format_output(
+                "ERROR",
+                f"Medication '{medicine_id}' not found or update failed. Verify the medication ID and ensure you are only updating editable fields.",
+            )
+        except Exception as e:
+            return self._format_output("ERROR", f"Update failed: {e}. If the ID format was wrong, verify it first.")
 
     async def remove_medicine(self, medicine_id: str) -> str:
-        """Deletes med from cabinet. **Use** for permanent removal. **Do NOT use** to hide items."""
-        success = await tool_store.remove_cabinet_item(medicine_id, self.user_id)
-        if success:
-            return self._format_output(
-                "SUCCESS", f"Medication {medicine_id} permanently removed."
-            )
-        return self._format_output("ERROR", f"Medication '{medicine_id}' not found.")
+        """Deletes med from cabinet. **IMPORTANT:** Confirm final details with the user before calling this. **Use** for permanent removal. **Do NOT use** to hide items."""
+        try:
+            success = await tool_store.remove_cabinet_item(medicine_id, self.user_id)
+            if success:
+                return self._format_output(
+                    "SUCCESS", f"Medication {medicine_id} permanently removed."
+                )
+            return self._format_output("ERROR", f"Medication '{medicine_id}' not found.")
+        except Exception as e:
+            return self._format_output("ERROR", f"Removal failed: {e}.")
 
     async def mark_dose_taken(self, medicine_id: str) -> str:
-        """Decrements med quantity. **Use** on dose confirmation. **Do NOT use** for inventory audits."""
-        success = await tool_store.mark_dose_taken(medicine_id, self.user_id)
-        if success:
+        """Decrements med quantity. **IMPORTANT:** Confirm with the user before calling this. **Use** on dose confirmation. **Do NOT use** for inventory audits."""
+        try:
+            success = await tool_store.mark_dose_taken(medicine_id, self.user_id)
+            if success:
+                return self._format_output(
+                    "SUCCESS", "Dose recorded. Inventory quantity decremented."
+                )
             return self._format_output(
-                "SUCCESS", "Dose recorded. Inventory quantity decremented."
+                "ERROR",
+                "Could not mark dose. Verity the medication ID is correct and there is enough stock.",
             )
-        return self._format_output(
-            "ERROR",
-            "Could not mark dose. Verity the medication ID is correct. The item may be out of stock (quantity = 0), in which case a dose cannot be recorded until inventory is updated.",
-        )
+        except Exception as e:
+            return self._format_output("ERROR", f"Action failed: {e}.")
 
     async def list_prescriptions(self, skip: int = 0, limit: int = 10) -> str:
         """Lists docs with Proxy IDs. **Use** for file discovery. **Do NOT use** to read content."""
@@ -801,42 +856,26 @@ class Tools:
 
     async def search_prescriptions(self, query: str) -> str:
         """Global digitized content search. **Use** to find terms across files. **Do NOT use** for summaries."""
-        await self.prescription_registry.build()
-        matches = []
-        try:
-            pattern = re.compile(query, re.IGNORECASE)
-        except re.error:
-            return self._format_output("ERROR", f"Invalid regex pattern: {query}")
-
-        for p in self.prescription_registry.registry.values():
-            # Priority: Stored content
-            content = p.get("content")
-
-            # Fallback: On-the-fly parsing
-            if not content:
-                content = await fetch_and_parse(p["url"], p["label"])
-
-            if pattern.search(content):
-                matches.append(
-                    f"- **Document [{p['index']}] ({p['label']}):** Found matches for '{query}'"
-                )
-
-        if not matches:
+        # Reliability Fix: Offload search to MongoDB rather than looping S3 in Python
+        matches_data = await tool_store.search_prescriptions_content(self.user_id, query)
+        
+        if not matches_data:
             return self._format_output(
                 "SUCCESS", f"No prescriptions contain the term '{query}'."
             )
 
-        # Anti-Data Dump Safeguard
-        max_matches = 20
-        total_matches = len(matches)
-        if total_matches > max_matches:
-            matches = matches[:max_matches]
+        matches = []
+        for p in matches_data:
+            # We don't have Proxy ID indexing for the search result subset yet, 
+            # so we use the database ID as a reference or a note to run list_prescriptions.
             matches.append(
-                f"\n... [NOTE: Output truncated to 20 matches out of {total_matches}. Please refine your search query to narrow down results.]"
+                f"- **{p['label']}:** Found matches for '{query}' (ID: {p['id']})"
             )
 
         return self._format_output(
-            "SUCCESS", "Keyword matches found:", "\n".join(matches)
+            "SUCCESS", 
+            f"Keyword matches found in {len(matches)} document(s):", 
+            "\n".join(matches) + "\n\n[NOTE: Use read_prescription with the list IDs from list_page_guides/list_prescriptions to view full text.]"
         )
 
     # --- Manufacturer Tools ---
@@ -1026,9 +1065,15 @@ class Tools:
             rows.append(
                 f"| {d['batchNumber']} | {d['unit']} | {d['visitorCount']} | {d['totalScans']} |"
             )
-        return self._format_output(
-            "SUCCESS", "Critical threat signals identified.", "\n".join(rows)
-        )
+        return self._format_output("SUCCESS", "Critical threat signals identified.", "\n".join(rows))
+
+    async def list_categories(self) -> str:
+        """[Manufacturer Only] Retrieves all unique product categories defined by your company. **Use** to identify valid categories for new product enrollment."""
+        try:
+            data = await tool_store.get_categories_summary(self.user_id)
+            return self._format_output("SUCCESS", "Product categories retrieved.", data)
+        except Exception as e:
+            return self._format_output("ERROR", f"Failed to list categories: {e}")
 
     # --- Integration ---
 
@@ -1057,6 +1102,12 @@ class Tools:
                 name="get_view_data",
                 description=self.get_view_data.__doc__,
                 args_schema=GetViewDataArgs,
+            ),
+            StructuredTool.from_function(
+                coroutine=self.list_notifications,
+                name="list_notifications",
+                description=self.list_notifications.__doc__,
+                args_schema=ListNotificationsArgs,
             ),
         ]
 
@@ -1110,6 +1161,12 @@ class Tools:
                         name="get_threat_intelligence",
                         description=self.get_threat_intelligence.__doc__,
                         args_schema=GetThreatIntelligenceArgs,
+                    ),
+                    StructuredTool.from_function(
+                        coroutine=self.list_categories,
+                        name="list_categories",
+                        description=self.list_categories.__doc__,
+                        args_schema=ListCategoriesArgs,
                     ),
                 ]
             )
@@ -1169,6 +1226,12 @@ class Tools:
                         name="search_prescriptions",
                         description=self.search_prescriptions.__doc__,
                         args_schema=SearchPrescriptionsArgs,
+                    ),
+                    StructuredTool.from_function(
+                        coroutine=self.list_upcoming_doses,
+                        name="list_upcoming_doses",
+                        description=self.list_upcoming_doses.__doc__,
+                        args_schema=ListUpcomingDosesArgs,
                     ),
                 ]
             )

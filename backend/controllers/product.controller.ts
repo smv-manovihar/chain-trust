@@ -200,10 +200,14 @@ export const updateProduct = async (req: Request, res: Response) => {
 			const oldImages = product.images || [];
 			const removedImages = oldImages.filter(img => !images.includes(img));
 			
-			// Best-effort non-blocking deletion
+			// Reliability: Await deletion to prevent storage leaks if process restarts
 			if (removedImages.length > 0) {
-				Promise.all(removedImages.map(img => s3Service.deleteFile(img)))
-					.catch(err => console.error('Failed to cleanup some images during product update:', err));
+				try {
+					await Promise.all(removedImages.map(img => s3Service.deleteFile(img)));
+				} catch (err) {
+					console.error('Critical: Failed to cleanup some images during product update:', err);
+					// We continue as the DB update is primary, but we logged the error
+				}
 			}
 			
 			product.images = images;
@@ -241,10 +245,13 @@ export const deleteProduct = async (req: Request, res: Response) => {
 			return res.status(404).json({ message: 'Product not found' });
 		}
 
-		// IMAGE CLEANUP: Delete all images associated with this product
+		// Reliability: Await deletion to prevent storage leaks
 		if (product.images && product.images.length > 0) {
-			Promise.all(product.images.map(img => s3Service.deleteFile(img)))
-				.catch(err => console.error('Failed to cleanup images during product deletion:', err));
+			try {
+				await Promise.all(product.images.map(img => s3Service.deleteFile(img)));
+			} catch (err) {
+				console.error('Critical: Failed to cleanup images during product deletion:', err);
+			}
 		}
 
 		await product.deleteOne();

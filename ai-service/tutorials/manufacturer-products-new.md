@@ -1,27 +1,28 @@
 # Enroll New Product — Operational Manual
 **Route:** `/manufacturer/products/new`
 
-The New Product page is a comprehensive enrollment form used to register a new SKU (Product ID) into the manufacturer's global catalog. It defines the product's technical specs, branding, and images.
+The New Product page is a comprehensive enrollment form used to register a new digital asset (Product ID) into the manufacturer's global catalog. It defines the product's technical specifications, visual branding, and regulatory metadata.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Detailed Registration Form**: A modular, glassmorphic card with field groups for:
-  - **Identity**: **Product Name**, **Brand**, and **Canonical SKU**.
-  - **Metadata**: **Description**, **Chemical Formula**, and **Category Selection**.
-  - **Branding**: A high-fidelity "Packaging Image" uploader.
-- **Identified Action Targets**: A primary, h-12 rounded-full "Enroll Product" button that saves the data to the secure repository.
+- **Multi-Step Form Sections**: A structured form organized into high-fidelity interaction groups:
+  - **Identity Hub**: Fields for **Product Name**, **Brand**, and a unique **Product ID (SKU)**.
+  - **Categorization**: A dropdown for selecting the product's functional category (e.g., Antibiotic, Cardiac).
+  - **Visual Asset Manager**: A specialized uploader for packaging photos. Supports drag-and-drop and provides an "Inventory Preview".
+  - **Technical Core**: Fields for **Chemical Composition**, **Description**, and **Medical Context**.
+- **Primary CTA**: A high-z-index "Enroll Product" button that registers the asset on the secure ledger.
 
 ---
 
 ## 🔗 URL & Navigation (Link Generation)
-The agent can identify this route for manufacturers starting their catalog journey:
+The agent should direct manufacturers to this route when they need to expand their digital portfolio:
 
 | Destination | Route | Description |
 | :--- | :--- | :--- |
-| **New Catalog Entry** | `/manufacturer/products/new` | Standard route to enroll a new product. |
+| **Asset Enrollment** | `/manufacturer/products/new` | Start the process for a new product SKU. |
 
-**AI Rule:** When a manufacturer asks to "add a new SKU" or "register a product," provide the link to the [Enrollment Form](/manufacturer/products/new).
+**AI Rule:** When a manufacturer asks "How do I add a new medicine?", provide the link to the [Enrollment Wizard](/manufacturer/products/new).
 
 ---
 
@@ -29,18 +30,18 @@ The agent can identify this route for manufacturers starting their catalog journ
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "I want to add a new model." | `get_page_guide` | Explain the catalog enrollment flow. |
-| "Which category should I use?" | `list_products` | Help the user identify existing categorization patterns. |
+| "Help me register a medication." | `get_page_guide` | Explain the field requirements for the **Identity Hub**. |
+| "What categories are available?" | `get_view_data` | Reference the manufacturer dashboard or existing catalog for category inspiration. |
 
 ---
 
 ## 🚨 Error & Empty States
-- **SKU Conflict**: If a duplicate Product ID is entered, a red "SKU already exists" error banner appears. AI should suggest a unique identifier.
-- **Incomplete Metadata**: Field-level validation highlights missing required entries in red.
+- **ID Collision**: If a duplicate Product ID is submitted, the UI displays a "SKU already registered" error notification.
+- **Validation Blocks**: Mandatory fields (Name, ID, Category) show red outlines if left blank during submission.
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Data Integrity**: Advise the user to provide a high-resolution Packaging Image to assist customers in visual verification.
-- **High-Fidelity Branding**: Mention that the product description and brand name are displayed directly to customers on the **Verify** results.
-- **Link Comparison**: Always offer a link to the [Catalog](/manufacturer/products) to see existing registrations.
+- **Visual Verification**: Remind the user that the first image uploaded will be the "Face of the Product" for customers during scan verification.
+- **Naming Standards**: Advise using Title Case for both the **Product Name** and **Brand** to maintain professional catalog standards.
+- **Catalog Review**: Always offer a link to the [Catalog](/manufacturer/products) to allow the user to review their existing assets before adding duplicates.

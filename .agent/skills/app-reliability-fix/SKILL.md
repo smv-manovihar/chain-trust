@@ -1,5 +1,5 @@
 ---
-name: reliability-fix-implementation
+name: app-reliability-fix
 description: >
   Use this skill after a reliability audit has been completed and the user wants
   to implement the fixes.
@@ -9,7 +9,7 @@ description: >
   This skill reads audit findings from audit_progress.md, builds a structured
   implementation plan, presents it for user review, incorporates feedback, then
   executes fixes one at a time with a checkpoint after every change.
-  Use native artifacts to manage these phases for maximum visibility and persistence.
+  Use native artifacts (referenced here as fix_plan.md) to manage these phases for maximum visibility and persistence.
   Do NOT begin editing files until the plan has been reviewed and approved.
   Do NOT use this skill to run a new audit — that is the reliability-audit
   skill's job.
@@ -23,7 +23,7 @@ compatibility: >
 depends_on: reliability-audit
 ---
 
-# Reliability Fix Implementation Skill
+# App Reliability Fix Skill
 
 ---
 
@@ -78,10 +78,11 @@ Do not attempt to audit and fix in the same run of this skill.
 | Phase | Name | Output |
 |---|---|---|
 | 0 | Ingest & Understand | Internal notes; no files written |
-| 1 | Build the Implementation Plan | `implementation_plan.md` (Artifact) |
+| 1 | Build the Implementation Plan | `fix_plan.md` (Native Artifact) |
 | 2 | Present for Review | User feedback incorporated into Plan |
 | **—** | **HARD STOP** | **No file may be modified until Phase 2 clears** |
-| 3 | Execute, Checkpoint, Repeat | `task.md` (Artifact) updated; source files edited |
+| 3 | Execute, Checkpoint, Repeat | `task.md` (Native Artifact) updated; source files edited |
+| 4 | Finalize & Verify | `walkthrough.md` (Native Artifact) created |
 
 There is exactly one hard stop: between Phase 2 and Phase 3.
 
@@ -102,6 +103,9 @@ finding, note:
 - Whether it was marked as systemic (affecting multiple files)
 - Whether it has an `**Updated:**` block (higher-confidence findings — seen from
   multiple angles during the audit)
+
+Also note the **Total Project Files** and the audit's coverage percentage (Z%) to
+understand the scale and representative depth of the findings.
 
 Also copy the **Project Patterns** section verbatim. It is the style contract
 every fix — and every approach — must satisfy.
@@ -155,7 +159,7 @@ the primary thing the user will review and amend before execution begins.
 
 ## Phase 1 — Build the Implementation Plan
 
-Create a file named `fix_plan.md` in the project root.
+Create a file named `fix_plan.md` in the project root (acting as the native Implementation Plan).
 
 This file is the single source of truth for the implementation. It will be
 updated as the user provides feedback (Phase 2) and as fixes are completed
@@ -163,18 +167,18 @@ updated as the user provides feedback (Phase 2) and as fixes are completed
 
 ### fix_plan.md Structure
 
-```markdown
+````markdown
 # Fix Implementation Plan
 
-> **Status:** Draft — Awaiting User Review
-> **Source audit:** `audit_progress.md`
-> **Last updated:** [note what changed and why, on every update]
+> - **Status:** Draft — Awaiting User Review
+> - **Source audit:** `audit_progress.md`
+> - **Last updated:** [note what changed and why, on every update]
 
-***
+---
 
 ## Project Patterns (from audit)
 
-*(Copied verbatim from audit_progress.md — every fix must match these)*
+_(Copied verbatim from audit_progress.md — every fix must match these)_
 
 - **Error handling pattern:**
 - **Logging pattern:**
@@ -182,62 +186,69 @@ updated as the user provides feedback (Phase 2) and as fixes are completed
 - **Return conventions:**
 - **Documentation style:**
 
-***
+---
 
 ## Fix Inventory
 
-*(All findings from the audit, normalised into fixable units. Each finding
+_(All findings from the audit, normalised into fixable units. Each finding
 becomes one Fix Item. Systemic findings that span multiple files become one
-Fix Item with multiple targets.)*
+Fix Item with multiple targets.)_
 
-| ID | Severity | Title | File(s) | Category | Depends On | Status |
-|---|---|---|---|---|---|---|
-| FIX-001 | 🚨 CRITICAL | Missing transaction on order creation | `orderService.ts:88` | Database | FIX-004 | Pending |
-| FIX-002 | 🚨 CRITICAL | Swallowed exception in payment handler | `paymentController.ts:34` | Exception Handling | — | Pending |
-| FIX-003 | 🔴 HIGH | N+1 query in user list endpoint | `userRepository.ts:112` | Database | — | Pending |
-| FIX-004 | 🔴 HIGH | DB client instantiated per-request | `db.ts:8` | Database | — | Pending |
-| FIX-005 | 🟠 MEDIUM | Missing timeout on OpenAI call | `aiService.ts:56` | Timeout | — | Pending |
+| ID | Audit Issue ID(s) | Severity | Title | File(s) | Category | Depends On | Status |
+|---|---|---|---|---|---|---|---|
+| FIX-001 | ISSUE-012, ISSUE-013 | 🚨 CRITICAL | Missing transaction on order creation | `orderService.ts:88` | Database | FIX-004 | Pending |
+| FIX-002 | ISSUE-015 | 🚨 CRITICAL | Swallowed exception in payment handler | `paymentController.ts:34` | Exception Handling | — | Pending |
+| FIX-003 | ISSUE-031 | 🔴 HIGH | N+1 query in user list endpoint | `userRepository.ts:112` | Database | — | Pending |
+| FIX-004 | ISSUE-004 | 🔴 HIGH | DB client instantiated per-request | `db.ts:8` | Database | — | Pending |
+| FIX-005 | ISSUE-007 | 🟠 MEDIUM | Missing timeout on OpenAI call | `aiService.ts:56` | Timeout | — | Pending |
 
-***
+---
 
 ## Approach Details
 
-*(This is the section to review carefully before approving the plan.
+_(This is the section to review carefully before approving the plan.
 Each Fix Item has its own subsection describing exactly what will be changed,
 which project-pattern constructs will be used, and what risks the approach
 accounts for. Comment on any subsection — wrong library, wrong error class,
 different architectural preference — and the plan will be updated before a
-single file is touched.)*
+single file is touched.)_
 
 ### FIX-001 — Missing transaction on order creation
-**File:** `orderService.ts` lines 85–102
-**Approach:**
+
+- **Audit Issue ID(s):** ISSUE-012, ISSUE-013
+- **File:** `orderService.ts` lines 85–102
+- **Approach:**
 Wrap the `insertOrder()` + `decrementInventory()` calls in a single
 `db.transaction(async (trx) => { ... })` block using the project's shared `db`
 singleton (fixed by FIX-004). Both calls will receive `trx` as their connection
 argument. If either throws, the transaction rolls back automatically.
-**Error handling:** On transaction failure, catch the error and throw
+- **Error handling:** On transaction failure, catch the error and throw
 `new ServiceError('ORDER_CREATION_FAILED', 'Order could not be saved')`; log
 with `logger.error({ userId, orderId, cause: error.message })`.
-**What will not change:** The function's public signature
+- **What will not change:** The function's public signature
 `createOrder(userId, items): Promise<Order>` remains identical.
-**Risk accounted for:** Without FIX-004, `db` would be a per-request instance
+- **Risk accounted for:** Without FIX-004, `db` would be a per-request instance
 and the transaction would only cover one of the two writes. FIX-004 must land
 first — see Execution Order.
 
-***
+---
 
 ### FIX-002 — Swallowed exception in payment handler
-**File:** `paymentController.ts` lines 34–51
-**Approach:**
+
+- **Audit Issue ID(s):** ISSUE-015
+- **File:** `paymentController.ts` lines 34–51
+- **Approach:**
 Wrap the `stripe.charges.create()` call in a `try/catch`. The existing bare
 `catch (e) {}` block will be replaced with:
+
 ```ts
 catch (error) {
   logger.error({ userId, orderId, stripeError: error.message }, 'Payment failed');
   throw new ServiceError('PAYMENT_FAILED', 'Payment could not be processed');
 }
 ```
+````
+
 **What will not change:** No new imports needed — `ServiceError` and `logger`
 are already imported in this file. Function signature unchanged.
 **Risk accounted for:** The current silent swallow means callers assume success
@@ -245,53 +256,59 @@ even on Stripe failure. After this fix, callers receive a thrown `ServiceError`
 and must handle it — verify no caller is relying on the silent-success behaviour
 before approving this approach.
 
-***
+---
 
 ### FIX-003 — N+1 query in user list endpoint
-**File:** `userRepository.ts` lines 110–125
-**Approach:**
+
+- **Audit Issue ID(s):** ISSUE-031
+- **File:** `userRepository.ts` lines 110–125
+- **Approach:**
 Replace the `for` loop that calls `getUserById()` per user with a single
 `getUsersByIds(ids: string[])` call using `WHERE id = ANY($1)`. The new batch
 method will be added to `userRepository.ts` directly above the existing
 `getUserById()` function, following the same JSDoc + return-type conventions.
-**What will not change:** `getUserById()` is left in place (other callers depend
+- **What will not change:** `getUserById()` is left in place (other callers depend
 on it). Only the list-building loop in `listUsers()` changes.
-**Risk accounted for:** If the `ids` array is empty, `ANY($1)` returns zero rows
+- **Risk accounted for:** If the `ids` array is empty, `ANY($1)` returns zero rows
 safely — no special-case guard needed.
 
-***
+---
 
 ### FIX-004 — DB client instantiated per-request
-**File:** `db.ts` lines 6–14
-**Approach:**
+
+- **Audit Issue ID(s):** ISSUE-004
+- **File:** `db.ts` lines 6–14
+- **Approach:**
 Move `new Pool(config)` out of the request handler and into module-level scope
 so that a single `Pool` instance is exported. The exported name stays `db` to
 avoid touching every import site.
-**What will not change:** No other file needs to change for this fix.
+- **What will not change:** No other file needs to change for this fix.
 **Risk accounted for:** Node's module cache guarantees the module-level `Pool`
 is initialised once per process. Verify that `db.ts` is not dynamically
 `require()`'d in tests with `jest.resetModules()` — if it is, note this in the
 checkpoint so the test suite can be reviewed.
 
-***
+---
 
 ### FIX-005 — Missing timeout on OpenAI call
-**File:** `aiService.ts` line 56
-**Approach:**
+
+- **Audit Issue ID(s):** ISSUE-007
+- **File:** `aiService.ts` line 56
+- **Approach:**
 Add `timeout: 30_000` to the options object passed to `openai.chat.completions
 .create()`. If the project's OpenAI client version supports `signal`, use
 `AbortSignal.timeout(30_000)` instead for cleaner cancellation semantics.
-**What will not change:** Function signature and return type unchanged.
-**Risk accounted for:** A 30-second default is a starting point — if the project
+- **What will not change:** Function signature and return type unchanged.
+- **Risk accounted for:** A 30-second default is a starting point — if the project
 has a documented SLA shorter than that, flag the value to the user at the
 checkpoint and let them adjust.
 
-***
+---
 
 ## Execution Order
 
-*(Sorted by: dependencies first, then severity, then blast radius. Non-obvious
-ordering decisions are explained.)*
+_(Sorted by: dependencies first, then severity, then blast radius. Non-obvious
+ordering decisions are explained.)_
 
 1. **FIX-004** — DB singleton must exist before any transaction wrapper can work
 2. **FIX-002** — CRITICAL with no dependencies; safe to fix immediately after infrastructure
@@ -299,21 +316,34 @@ ordering decisions are explained.)*
 4. **FIX-003** — HIGH, isolated, no cross-dependencies
 5. **FIX-005** — MEDIUM; scheduled last to avoid interrupting critical fixes
 
-***
+---
 
 ## Deferred / Excluded Items
 
-*(Empty until user review. Items the user asks to skip or defer are moved here
-with a reason.)*
+_(Empty until user review. Items the user asks to skip or defer are moved here
+with a reason.)_
 
-***
+---
 
 ## Execution Log
 
-*(Append-only. One entry per completed fix. Never edit a completed entry.)*
+_(Append-only. One entry per completed fix. Never edit a completed entry.)_
 
 <!-- entries appear here as fixes are applied -->
-```
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Run `npm test` or `pytest` as applicable for each changed file.
+- Verify happy path and failure path for each fix.
+
+### Manual Verification
+- Manually trigger the affected flow in the browser or via API calls.
+- Verify that previous "silent" errors are now logged and handled.
+
+````
 
 ---
 
@@ -390,13 +420,15 @@ Before editing any file, post a short message that echoes the approved approach
 from Approach Details:
 
 ```
-Applying FIX-002 — Swallowed exception in payment handler
+
+Applying FIX-002 — Swallowed exception in payment handler (Issues: ISSUE-015)
 File: src/controllers/paymentController.ts lines 34–51
 Approach (as approved): Wrapping stripe.charges.create() in try/catch; on
 failure throw new ServiceError('PAYMENT_FAILED', ...) and log
 { userId, orderId, stripeError } via logger.error.
 (No other files touched in this step.)
-```
+
+````
 
 This gives the user a final chance to object before the file changes.
 
@@ -412,13 +444,15 @@ adjacent issues. The fix must:
   says so
 - Not add new package dependencies without announcing them in Step 3-A
 
-### Step 3-C. Write the Execution Log Entry
+### Step 3-C. Update task.md and Implementation Plan
 
-Immediately after applying the fix, append an entry to the Execution Log in
-`fix_plan.md`:
+Immediately after applying the fix, update the `task.md` (native Task artifact) checklist and append an entry to the Execution Log in `fix_plan.md`.
+
+For completed fixes:
+1. Append a log entry to `fix_plan.md`:
 
 ```markdown
-### ✅ FIX-002 — Swallowed exception in payment handler
+### ✅ FIX-002 — Swallowed exception in payment handler (Issues: ISSUE-015)
 **Completed**
 - **Files changed:** `src/controllers/paymentController.ts`
 - **What was done:** Wrapped `stripe.charges.create()` in try/catch. On failure,
@@ -430,12 +464,22 @@ Immediately after applying the fix, append an entry to the Execution Log in
 - **Approach deviation:** None — implemented exactly as described in Approach Details.
 ```
 
-> If the fix deviated from the approved approach for any reason (the real code
-> differed from the audit snippet, an import was missing, etc.), the
-> **Approach deviation** line must explain what changed and why. Do not silently
-> diverge from the approved approach.
+2. Update `task.md` to mark the fix as completed.
+3. Locate the issue in `audit_progress.md` and prepend `✅ FIXED — ` to its title.
 
-Update FIX-002's status in the Fix Inventory table from `Pending` to `✅ Done`.
+For deferred items (items moved to "Deferred / Excluded" in `fix_plan.md`):
+1. Locate the issue in `audit_progress.md`.
+2. Prepend `⏭️ DEFERRED — ` to its title.
+3. Replace the **Remediation** section with a **Deferred Reason** section using the user's reasoning from `fix_plan.md`.
+4. If an "Audit Legend" does not exist at the top of `audit_progress.md`, add one:
+
+```markdown
+## Audit Legend
+
+- `✅ FIXED` — Issue resolved in the codebase.
+- `🔴 CRITICAL` / `🔴 HIGH` / `🟠 MEDIUM` / `🟡 LOW` — Active audit findings.
+- `⏭️ DEFERRED` — Acknowledged by user but out of scope (e.g. intentional pattern, planned refactor, or low priority).
+```
 
 ### Step 3-D. The Checkpoint
 
@@ -443,12 +487,12 @@ After every single fix — not after every batch, after every single fix — pos
 
 ```
 Checkpoint after FIX-002
-✅ Done: FIX-002 — Swallowed exception in payment handler
+✅ Done: FIX-002 — Swallowed exception in payment handler (Issues: ISSUE-015)
 ⏳ Next: FIX-001 — Missing transaction on order creation (orderService.ts:88)
         Planned approach: wrap insertOrder() + decrementInventory() in
         db.transaction(trx => ...); throw ServiceError on failure.
 
-fix_plan.md has been updated. Review the change before I continue.
+fix_plan.md and task.md have been updated. Review the change before I continue.
 Reply 'continue' to apply FIX-001, 'pause' to stop here, or share feedback
 to adjust the approach before the next fix.
 ```
@@ -465,45 +509,56 @@ Then stop. Do not proceed until the user responds.
 | "change the approach to X" | Update the Approach Details subsection for the next Fix Item; re-announce (Step 3-A) with the revised approach; wait |
 | "actually add this other fix first" | Add to Fix Inventory + Approach Details; insert before current next item in Execution Order; announce; wait |
 
-### Step 3-F. Pause / Completion Summary
+### Step 3-F. Finalize (walkthrough.md)
 
-If the user pauses or all fixes are complete, write a summary at the top of
-`fix_plan.md`:
+Once all fixes are complete, create a `walkthrough.md` (native Walkthrough artifact) summarizing the changes, the tests performed, and the final state of the codebase. Include code snippets of the most significant fixes.
+
+### Step 3-G. Pause Summary
+
+If the user pauses, write a summary at the top of `fix_plan.md`:
 
 ```markdown
 <!-- ═══════════════════════════════════════════════════════════════════ -->
+
 ## 📋 Implementation Summary — [Paused | Complete]
 
-**Paused by:** User request / All fixes applied  *(keep one)*
+**Paused by:** User request / All fixes applied _(keep one)_
 **Fixes completed:** N of M total planned
 
 ### Applied Fixes
-| ID | Title | File(s) | Approach deviation? |
-|---|---|---|---|
-| FIX-002 | Swallowed exception in payment handler | `paymentController.ts` | None |
-| FIX-004 | DB client singleton | `db.ts` | None |
+
+| ID | Title | File(s) | Audit Issue ID(s) | Approach deviation? |
+|---|---|---|---|---|
+| FIX-002 | Swallowed exception in payment handler | `paymentController.ts` | ISSUE-015 | None |
+| FIX-004 | DB client singleton | `db.ts` | ISSUE-004 | None |
 
 ### Remaining Fixes
-| ID | Severity | Title | Reason not yet applied |
-|---|---|---|---|
-| FIX-001 | 🚨 CRITICAL | Missing transaction on order creation | Paused by user |
-| FIX-003 | 🔴 HIGH | N+1 in user list | Paused by user |
+
+| ID | Severity | Title | Audit Issue ID(s) | Reason not yet applied |
+|---|---|---|---|---|
+| FIX-001 | 🚨 CRITICAL | Missing transaction on order creation | ISSUE-012, ISSUE-013 | Paused by user |
+| FIX-003 | 🔴 HIGH | N+1 in user list | ISSUE-031 | Paused by user |
 
 ### Deferred / Excluded
-| ID | Title | Reason |
-|---|---|---|
-| FIX-005 | Missing timeout on OpenAI call | User: defer until post-release |
+
+| ID | Title | Audit Issue ID(s) | Reason |
+|---|---|---|---|
+| FIX-005 | Missing timeout on OpenAI call | ISSUE-007 | User: defer until post-release |
 
 ### Follow-up Gaps Noted During Implementation
-*(Issues noticed while applying fixes that are not in the original audit and
-have not been fixed — for the next audit run or manual review.)*
+
+_(Issues noticed while applying fixes that are not in the original audit and
+have not been fixed — for the next audit run or manual review.)_
+
 - `paymentController.ts` — no test for the payment failure path
 - `orderService.ts` — `updatedAt` set in application code rather than DB
   trigger; risk of drift if a write bypasses the service layer
 
 ### To Resume
+
 Open a new session, reference `fix_plan.md`, and say:
 "Resume implementation from FIX-001 — the plan is already approved."
+
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 ```
 
@@ -512,7 +567,7 @@ Open a new session, reference `fix_plan.md`, and say:
 ## What a Fix Must Never Do
 
 | Rule | Reasoning |
-|---|---|
+|---|---|---|
 | Never fix more than one Fix Item in a single edit | Mixing two fixes makes the checkpoint meaningless |
 | Never deviate from the approved Approach Details without announcing it | Silent deviations break the review contract |
 | Never change a public function's signature without it being in the Fix Item | Signature changes break callers |
@@ -520,7 +575,7 @@ Open a new session, reference `fix_plan.md`, and say:
 | Never rewrite surrounding code not part of the fix | "While I'm here" rewrites introduce unplanned changes |
 | Never mark a Fix Item Done if the fix is partial | Mark it ⚠️ Partially Applied and note what remains |
 | Never skip the checkpoint | "Trivial" fixes have caused production incidents |
-| Never edit `audit_progress.md` | That file belongs to the audit skill |
+| Never edit `audit_progress.md` beyond status synchronization | The fixer may prepend `✅ FIXED — ` or `⏭️ DEFERRED — ` to titles and update the body ONLY for Deferred items to include the user's reasoning. |
 
 ---
 
@@ -530,9 +585,9 @@ Open a new session, reference `fix_plan.md`, and say:
 |---|---|
 | Status line | Overwrite on every phase transition |
 | Last updated field | Overwrite; always describe what changed and why |
-| Project Patterns | Overwrite if user corrects a pattern; mark *(user-corrected)* |
+| Project Patterns | Overwrite if user corrects a pattern; mark _(user-corrected)_ |
 | Fix Inventory table | Status column overwrites; all other columns fixed once written |
-| **Approach Details** | **Overwrite per subsection if user revises an approach; mark *(user-revised)* and note what changed** |
+| **Approach Details** | **Overwrite per subsection if user revises an approach; mark _(user-revised)_ and note what changed** |
 | Execution Order | Overwrite when reordering; note the reason |
 | Deferred / Excluded | Append-only |
 | Execution Log | Append-only; never edit a completed entry |
@@ -552,5 +607,5 @@ Open a new session, reference `fix_plan.md`, and say:
 | Writing fixes that don't match the project's error class or logger | The team rejects the fix; the vulnerability stays open | Re-read Project Patterns before every fix |
 | Marking a fix Done before verifying it is syntactically valid | A fix with a syntax error is worse than no fix | Read the changed file back after editing |
 | Adding "bonus fixes" not in the plan | Unreviewed changes bypass the safety model | Add to Fix Inventory + Approach Details; get it reviewed at a checkpoint |
-| Editing `audit_progress.md` | That file is the audit record | Read it; never write it |
+| Illegally editing `audit_progress.md` | Altering audit data destroys the project record | Only edit `audit_progress.md` to synchronize status (Fixed/Deferred) and reasons; never rewrite trace payloads or other metadata. |
 | Vague Execution Log entries ("fixed the issue") | Makes the log useless for understanding what changed | Always specify files, lines, what was added, what was not changed, tests affected, approach deviation |

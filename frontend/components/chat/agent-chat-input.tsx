@@ -36,7 +36,7 @@ export function AgentChatInput({
     if (textareaRef.current) {
       // Reset height to calculate scrollHeight correctly
       textareaRef.current.style.height = "auto";
-      
+
       const newHeight = textareaRef.current.scrollHeight;
       textareaRef.current.style.height = `${Math.min(newHeight, 200)}px`;
 
@@ -45,7 +45,7 @@ export function AgentChatInput({
       textareaRef.current.style.overflowY = newHeight > 200 ? "auto" : "hidden";
     }
   }, [input]);
-  
+
   // Auto-focus on initial mount and new sessions
   useEffect(() => {
     if (textareaRef.current) {
@@ -67,10 +67,9 @@ export function AgentChatInput({
         compact && "px-2 pt-2 pb-1 sm:p-2",
       )}
     >
-      <div className={cn(
-        "mx-auto relative",
-        compact ? "max-w-full" : "max-w-3xl"
-      )}>
+      <div
+        className={cn("mx-auto relative", compact ? "max-w-full" : "max-w-3xl")}
+      >
         {showScrollDown && scrollToBottom && (
           <div className="absolute -top-10 sm:-top-12 left-1/2 -translate-x-1/2 pointer-events-auto">
             <Tooltip>
@@ -127,7 +126,11 @@ export function AgentChatInput({
                   {isSending ? (
                     <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
                   ) : (
-                    <ArrowUp className={cn(compact ? "h-3.5 w-3.5" : "h-4 w-4 sm:h-5 sm:w-5")} />
+                    <ArrowUp
+                      className={cn(
+                        compact ? "h-3.5 w-3.5" : "h-4 w-4 sm:h-5 sm:w-5",
+                      )}
+                    />
                   )}
                 </Button>
               </TooltipTrigger>

@@ -23,9 +23,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
 import { updateProfile } from "@/api";
-import { 
-  getNotificationPreferences, 
-  updateNotificationPreferences 
+import {
+  getNotificationPreferences,
+  updateNotificationPreferences,
 } from "@/api/notification.api";
 import {
   Form,
@@ -36,6 +36,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { PageHeader } from "@/components/ui/page-header";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -49,6 +51,9 @@ const profileSchema = z.object({
 
 export default function CustomerSettingsPage() {
   const { user, refreshUser } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(false);
   const [notificationPrefs, setNotificationPrefs] = useState<any>(null);
   const [prefsLoading, setPrefsLoading] = useState(false);
@@ -95,17 +100,21 @@ export default function CustomerSettingsPage() {
     fetchPrefs();
   }, []);
 
-  const handlePrefToggle = async (key: string, channel: 'inApp' | 'email', enabled: boolean) => {
+  const handlePrefToggle = async (
+    key: string,
+    channel: "inApp" | "email",
+    enabled: boolean,
+  ) => {
     if (!notificationPrefs) return;
-    
+
     const newPrefs = {
       ...notificationPrefs,
-      [key]: { 
+      [key]: {
         ...notificationPrefs[key],
-        [channel]: enabled 
-      }
+        [channel]: enabled,
+      },
     };
-    
+
     setNotificationPrefs(newPrefs);
     try {
       await updateNotificationPreferences(newPrefs);
@@ -134,6 +143,14 @@ export default function CustomerSettingsPage() {
     }
   };
 
+  const currentTab = searchParams.get("tab") || "general";
+
+  const handleTabChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", value);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
   if (!user) return null;
 
   return (
@@ -143,7 +160,11 @@ export default function CustomerSettingsPage() {
         description="Manage your personal details, security preferences, and account activity."
       />
 
-      <Tabs defaultValue="general" className="w-full">
+      <Tabs
+        value={currentTab}
+        onValueChange={handleTabChange}
+        className="w-full"
+      >
         <TabsList className="mb-8 bg-muted/50 p-1.5 rounded-2xl border border-border/50 h-auto w-full flex justify-start sm:w-auto sm:inline-flex overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <TabsTrigger
             value="general"
@@ -175,140 +196,46 @@ export default function CustomerSettingsPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent
-          value="general"
-          className="space-y-6"
-        >
-          <Card className="border border-border overflow-hidden rounded-[2rem] shadow-sm">
-            <CardHeader className="bg-muted/30 pb-8">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-primary/10 rounded-xl text-primary">
-                  <User className="h-5 w-5" />
-                </div>
-                <CardTitle className="text-xl font-black tracking-tight">
-                  Personal Profile
-                </CardTitle>
-              </div>
-              <CardDescription className="text-sm font-medium">
-                Update your basic information and contact details
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 pt-8">
-              <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit(onProfileSubmit)}
-                  className="space-y-6"
-                >
-                  <div className="grid md:grid-cols-2 gap-x-8 gap-y-6">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
-                            Full Name
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              className="rounded-xl h-12 bg-muted/10 font-medium"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
-                            Email Address
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              disabled
-                              className="bg-muted/50 rounded-xl h-12 border-dashed font-medium"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="phoneNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
-                            Phone Number
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="+1 (555) 000-0000"
-                              className="rounded-xl h-12 bg-muted/10 font-medium"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="city"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
-                            City
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              className="rounded-xl h-12 bg-muted/10 font-medium"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+        <TabsContent value="general" className="space-y-6 outline-none">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="space-y-6"
+          >
+            <Card className="border border-border overflow-hidden rounded-[2rem] shadow-sm">
+              <CardHeader className="bg-muted/30 pb-8">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                    <User className="h-5 w-5" />
                   </div>
-
-                  <div className="grid md:grid-cols-2 gap-x-8 gap-y-6 pt-6 border-t border-border/50">
-                    <FormField
-                      control={form.control}
-                      name="address"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
-                            Street Address
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="123 Main St"
-                              className="rounded-xl h-12 bg-muted/10 font-medium"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <CardTitle className="text-xl font-black tracking-tight">
+                    Personal Profile
+                  </CardTitle>
+                </div>
+                <CardDescription className="text-sm font-medium">
+                  Update your basic information and contact details
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6 pt-8">
+                <Form {...form}>
+                  <form
+                    onSubmit={form.handleSubmit(onProfileSubmit)}
+                    className="space-y-6"
+                  >
+                    <div className="grid md:grid-cols-2 gap-x-8 gap-y-6">
                       <FormField
                         control={form.control}
-                        name="postalCode"
+                        name="name"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
-                              Postal Code
+                              Full Name
                             </FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
-                                className="rounded-xl h-12 bg-muted/10 font-bold"
+                                className="rounded-xl h-12 bg-muted/10 font-medium"
                               />
                             </FormControl>
                             <FormMessage />
@@ -317,11 +244,49 @@ export default function CustomerSettingsPage() {
                       />
                       <FormField
                         control={form.control}
-                        name="country"
+                        name="email"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
-                              Country
+                              Email Address
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                disabled
+                                className="bg-muted/50 rounded-xl h-12 border-dashed font-medium"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="phoneNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
+                              Phone Number
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="+1 (555) 000-0000"
+                                className="rounded-xl h-12 bg-muted/10 font-medium"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="city"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
+                              City
                             </FormLabel>
                             <FormControl>
                               <Input
@@ -334,126 +299,243 @@ export default function CustomerSettingsPage() {
                         )}
                       />
                     </div>
-                  </div>
 
-                  <div className="flex justify-end pt-6 border-t border-border mt-8">
-                    <Button
-                      disabled={isLoading}
-                      className="rounded-full w-full sm:w-auto px-10 h-12 shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
-                    >
-                      {isLoading && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      )}
-                      Save Profile Changes
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
+                    <div className="grid md:grid-cols-2 gap-x-8 gap-y-6 pt-6 border-t border-border/50">
+                      <FormField
+                        control={form.control}
+                        name="address"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
+                              Street Address
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="123 Main St"
+                                className="rounded-xl h-12 bg-muted/10 font-medium"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="postalCode"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
+                                Postal Code
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  className="rounded-xl h-12 bg-muted/10 font-bold"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="country"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
+                                Country
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  className="rounded-xl h-12 bg-muted/10 font-medium"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-6 border-t border-border mt-8">
+                      <Button
+                        disabled={isLoading}
+                        className="rounded-full w-full sm:w-auto px-10 h-12 shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                      >
+                        {isLoading && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Save Profile Changes
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          </motion.div>
         </TabsContent>
 
         <TabsContent
           value="security"
-          className="space-y-6"
+          className="space-y-6 outline-none"
         >
-          <GoogleConnection redirectPath="/customer/settings" />
-          <PasswordSettings />
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="space-y-6"
+          >
+            <GoogleConnection redirectPath="/customer/settings" />
+            <PasswordSettings />
 
-          <Card className="border border-border opacity-50 bg-muted/[0.02]">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-muted-foreground" />
-                <CardTitle className="text-lg font-black">
-                  Privacy Controls
-                </CardTitle>
-              </div>
-              <CardDescription>
-                Coming soon: biometric login and identity masking features.
-              </CardDescription>
-            </CardHeader>
-          </Card>
+            <Card className="border border-border opacity-50 bg-muted/[0.02]">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-muted-foreground" />
+                  <CardTitle className="text-lg font-black">
+                    Privacy Controls
+                  </CardTitle>
+                </div>
+                <CardDescription>
+                  Coming soon: biometric login and identity masking features.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </motion.div>
         </TabsContent>
 
-        <TabsContent
-          value="notifications"
-          className="space-y-6"
-        >
-          <Card className="border border-border rounded-[2rem] overflow-hidden shadow-sm">
-            <CardHeader className="bg-muted/30 pb-8">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-primary/10 rounded-xl text-primary">
-                  <Bell className="h-5 w-5" />
+        <TabsContent value="notifications" className="space-y-6 outline-none">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="space-y-6"
+          >
+            <Card className="border border-border rounded-[2rem] overflow-hidden shadow-sm">
+              <CardHeader className="bg-muted/30 pb-8">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                    <Bell className="h-5 w-5" />
+                  </div>
+                  <CardTitle className="text-xl font-black tracking-tight">
+                    Notification Hub
+                  </CardTitle>
                 </div>
-                <CardTitle className="text-xl font-black tracking-tight">
-                  Notification Hub
-                </CardTitle>
-              </div>
-              <CardDescription className="text-sm font-medium">
-                Customize how and where you receive critical medicine alerts
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-border/50 bg-muted/5">
-                      <th className="text-left py-6 px-8 text-xs font-black uppercase tracking-widest text-muted-foreground/60 w-full">Alert Type</th>
-                      <th className="py-6 px-6 text-xs font-black uppercase tracking-widest text-muted-foreground/60 text-center">In-App</th>
-                      <th className="py-6 px-8 text-xs font-black uppercase tracking-widest text-muted-foreground/60 text-center">Email</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {[
-                      { key: 'batch_recall', label: 'Safety Recalls', desc: 'Immediate alerts if a medicine is recalled.' },
-                      { key: 'medicine_expiry', label: 'Expiry Alerts', desc: 'Notifications before your medicine expires.' },
-                      { key: 'dose_reminder', label: 'Dose Reminders', desc: 'Daily schedule tracking reminders.' },
-                      { key: 'low_stock', label: 'Low Stock', desc: 'Alerts when your stock drops below threshold.' },
-                      { key: 'system', label: 'System Updates', desc: 'New features and security improvements.' },
-                    ].map((type) => (
-                      <tr key={type.key} className="group hover:bg-muted/5 transition-colors">
-                        <td className="py-6 px-8">
-                          <div className="space-y-1">
-                            <Label className="text-sm font-black">{type.label}</Label>
-                            <p className="text-xs text-muted-foreground/70 font-medium max-w-sm line-clamp-1 group-hover:line-clamp-none transition-all">
-                              {type.desc}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="py-6 px-6">
-                          <div className="flex justify-center">
-                            <Switch 
-                              checked={notificationPrefs?.[type.key]?.inApp || false}
-                              onCheckedChange={(checked) => handlePrefToggle(type.key, 'inApp', checked)}
-                              disabled={prefsLoading || !notificationPrefs}
-                              className="scale-90 data-[state=checked]:bg-primary"
-                            />
-                          </div>
-                        </td>
-                        <td className="py-6 px-8">
-                          <div className="flex justify-center">
-                            <Switch 
-                              checked={notificationPrefs?.[type.key]?.email || false}
-                              onCheckedChange={(checked) => handlePrefToggle(type.key, 'email', checked)}
-                              disabled={prefsLoading || !notificationPrefs}
-                              className="scale-90 data-[state=checked]:bg-primary"
-                            />
-                          </div>
-                        </td>
+                <CardDescription className="text-sm font-medium">
+                  Customize how and where you receive critical medicine alerts
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-border/50 bg-muted/5">
+                        <th className="text-left py-6 px-8 text-xs font-black uppercase tracking-widest text-muted-foreground/60 w-full">
+                          Alert Type
+                        </th>
+                        <th className="py-6 px-6 text-xs font-black uppercase tracking-widest text-muted-foreground/60 text-center">
+                          In-App
+                        </th>
+                        <th className="py-6 px-8 text-xs font-black uppercase tracking-widest text-muted-foreground/60 text-center">
+                          Email
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+                    </thead>
+                    <tbody className="divide-y divide-border/50">
+                      {[
+                        {
+                          key: "batch_recall",
+                          label: "Safety Recalls",
+                          desc: "Immediate alerts if a medicine is recalled.",
+                        },
+                        {
+                          key: "medicine_expiry",
+                          label: "Expiry Alerts",
+                          desc: "Notifications before your medicine expires.",
+                        },
+                        {
+                          key: "dose_reminder",
+                          label: "Dose Reminders",
+                          desc: "Daily schedule tracking reminders.",
+                        },
+                        {
+                          key: "low_stock",
+                          label: "Low Stock",
+                          desc: "Alerts when your stock drops below threshold.",
+                        },
+                        {
+                          key: "system",
+                          label: "System Updates",
+                          desc: "New features and security improvements.",
+                        },
+                      ].map((type) => (
+                        <tr
+                          key={type.key}
+                          className="group hover:bg-muted/5 transition-colors"
+                        >
+                          <td className="py-6 px-8">
+                            <div className="space-y-1">
+                              <Label className="text-sm font-black">
+                                {type.label}
+                              </Label>
+                              <p className="text-xs text-muted-foreground/70 font-medium max-w-sm line-clamp-1 group-hover:line-clamp-none transition-all">
+                                {type.desc}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="py-6 px-6">
+                            <div className="flex justify-center">
+                              <Switch
+                                checked={
+                                  notificationPrefs?.[type.key]?.inApp || false
+                                }
+                                onCheckedChange={(checked) =>
+                                  handlePrefToggle(type.key, "inApp", checked)
+                                }
+                                disabled={prefsLoading || !notificationPrefs}
+                                className="scale-90 data-[state=checked]:bg-primary"
+                              />
+                            </div>
+                          </td>
+                          <td className="py-6 px-8">
+                            <div className="flex justify-center">
+                              <Switch
+                                checked={
+                                  notificationPrefs?.[type.key]?.email || false
+                                }
+                                onCheckedChange={(checked) =>
+                                  handlePrefToggle(type.key, "email", checked)
+                                }
+                                disabled={prefsLoading || !notificationPrefs}
+                                className="scale-90 data-[state=checked]:bg-primary"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         </TabsContent>
 
         <TabsContent
           value="advanced"
-          className="space-y-6"
+          className="space-y-6 outline-none"
         >
-          <DangerZoneSettings role="customer" />
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="space-y-6"
+          >
+            <DangerZoneSettings role="customer" />
+          </motion.div>
         </TabsContent>
       </Tabs>
     </div>

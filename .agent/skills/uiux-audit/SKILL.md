@@ -1,24 +1,28 @@
 ---
-name: ui-ux-audit
+name: uiux-audit
 description: >
-  Use this skill when asked to audit, review, or scan a codebase or design system for UI/UX
-  consistency, component correctness, accessibility baseline, and interaction reliability.
-  Triggers: "audit the UI", "check component consistency", "review the design system usage",
-  "find icon inconsistencies", "check button styles", "audit terminology", "review user flows",
-  "check accessibility", "is the UI consistent?". The agent traces complete end-to-end user
-  flows (not single files), learns the project's design system and component conventions before
-  writing anything, maintains a living audit_progress.md and a separate audit_traces.md, and
-  terminates cleanly when the scan budget is exhausted.
-  Do NOT use for backend reliability, security, or performance profiling — those are separate concerns.
+  Use this skill when asked to audit, review, or scan a codebase for UI/UX problems,
+  design inconsistencies, user flow breakdowns, or interface clutter. Triggers: "audit my UI",
+  "review my UX", "find design inconsistencies", "check my user flows", "audit my frontend",
+  "find UI clutter", "UX review", "is my interface consistent?", "review my components for
+  design issues". The agent FIRST discovers and inventories every real frontend file in the
+  report. It FIRST discovers and inventories every real frontend file in the project,
+  traces actual user flows through the interface, and produces a structured finding
+  report. It maintains two living artifacts: `uiux_audit.md` (status/findings) and
+  `audit_traces.md` (low-level execution traces). It NEVER guesses which files exist —
+  it reads the project tree and confirms every file before auditing it. It audits only —
+  it does NOT fix, rewrite, or refactor anything.
+  Do NOT use for backend reliability, security pen-testing, performance profiling,
+  accessibility (WCAG) compliance scanning, or SEO — those are separate concerns.
 compatibility: >
   Tool-agnostic. Works in any AI code editor or agent runtime: Cursor, Windsurf, GitHub Copilot
-  Workspace, Zed, JetBrains AI, Cline, Continue, Aider, Claude Code, or any environment with
-  read-file and search capabilities. When specialized search or grep tools are available they
-  MUST be used instead of manual scanning to stay within token budget. Every step is framed
-  as a reading and reasoning task, not a terminal command.
+  Workspace, Zed, JetBrains AI, Cline, Continue, Aider, Claude Code, or any environment with the
+  ability to read files and write markdown. If the environment provides file-tree or search tools,
+  these MUST be used to discover files rather than guessing paths. Every step is described as a
+  reading and reasoning task — never a command to execute and never a guess.
 ---
 
-# UI/UX Consistency Audit Skill
+# UI/UX Audit Skill
 
 ---
 
@@ -26,770 +30,668 @@ compatibility: >
 
 Before learning any procedure, internalize this:
 
-**UI inconsistency is a trust problem before it is an aesthetic problem.**
+**Bad UI/UX is almost never one broken component.**
+It is a slow accumulation — a button that says "Submit" on one screen and "Continue" on the next,
+a modal that opens from the left on desktop but slides from the bottom on mobile only sometimes,
+a loading state that shows a spinner on three flows and nothing on the fourth — that individually
+feel like minor polish issues but compound into an interface that users don't trust.
 
-A user who clicks a blue "Confirm" button on page A and then encounters a green "Submit" button
-on page B doing the exact same action does not think *"the design team is sloppy."* They think
-*"am I on the right page? Is this a different action?"* Inconsistency creates doubt. Doubt kills
-conversion. At scale, it increases support tickets and erodes brand trust.
-
-Your job is not to redesign the product. Your job is to trace the paths *real users actually
-take* through this UI and find the places where: the same concept is named differently in two
-screens, an icon means one thing here and another thing there, a primary button appears in the
-bottom-right on every screen except one, or a component is built from scratch when a shared
-component already exists.
+Your job is not to flag every pixel that is off. Your job is to trace the paths that
+_real users actually take_ through this interface and identify the gaps, contradictions,
+and friction points that will cause confusion, abandonment, or silent failure.
 
 There are two failure modes to avoid:
 
-- **Nitpick fatigue**: flagging every spacing inconsistency as CRITICAL. Developers stop trusting
-  the report and the real issues are buried.
-- **Surface-level pass**: calling the UI consistent after only reading three component files.
-  The worst inconsistencies live in the edge-case flows — error states, empty states, mobile
-  breakpoints — that nobody tests manually.
+- **Over-flagging**: marking every `margin: 12px` vs `margin: 8px` discrepancy as HIGH.
+  Users stop trusting the report.
+- **Surface-only scanning**: reading only the landing page component and declaring the UI
+  consistent. The worst clutter and flow breakages live in secondary screens — settings,
+  error states, empty states, and edge-case modals that nobody demos.
 
-This skill keeps you between those failure modes with a bounded method, a severity rubric with
-concrete examples, dual persistent files for findings vs. traces, and explicit rules for when to stop.
-
----
-
-## Definitions
-
-### What is a Flow?
-
-> **A flow is a complete end-to-end user journey — from the moment a user lands on a trigger
-> surface to the moment they receive a terminal outcome (success, error, or exit).**
-
-A flow is **not**:
-- A single component file
-- A single page render
-- A single function inside a component
-
-A flow **is**:
-- User opens app → navigates to Settings → changes email → sees confirmation toast → dismissed
-- User clicks "Add to Cart" → cart drawer opens → user adjusts quantity → checks out → sees
-  order confirmation screen
-- User's session expires → sees session-expired modal → clicks "Log in again" → is redirected
-  back to where they were
-
-**Why this definition matters:** A button label inconsistency only becomes a real problem when
-you see it across the two screens a user visits in sequence. A loading state bug only matters
-when you trace the actual async flow from trigger to resolution. File-level reading produces
-file-level observations. Flow-level tracing produces user-level reliability findings.
-
-Each flow gets a `FLOW-NNN` ID and lives in `audit_traces.md`. Every issue found is linked
-to the flow(s) in which it was observed.
-
-### What is an Issue?
-
-An issue is a finding that a user can observe or be harmed by. It gets an `ISSUE-NNN` ID.
-A single issue can surface across multiple flows — if the same broken pattern appears in two
-different flows, both `FLOW-NNN` IDs are listed on the issue. The issue is written once, and
-the flow trace log records where it appeared.
+This skill keeps you between those failure modes by giving you a bounded discovery method,
+a severity rubric with concrete examples, and explicit rules about when to stop.
 
 ---
 
-## Phase 0 — Learn the Project Before You Touch Anything
+## What is a Flow?
 
-> **This phase is not optional. Do not open a component file until Phase 0 is complete.**
+A **flow** in this UI/UX audit context is a complete, end-to-end user journey — from the moment a user intends to perform a task to its final confirmation state. 
 
-You are about to write findings that will be read by the people who built this UI. If your
-remediations reference component names that don't exist, import paths that are wrong, or
-styling conventions the team abandoned, they will not trust the report.
+A UI/UX flow **MUST**:
+1.  **Start at an Entry Point**: A Landing page, a Dashboard link, or an incoming deep-link.
+2.  **Path through the Interaction**: Trace through all intermediate screens, form steps, modals, and conditional states.
+3.  **End at the Terminal State**: Reach a success confirmation, a dashboard redirect, or an error recovery state.
 
-Phase 0 has three parts.
-
----
-
-### 0-A. Build the Design System Map
-
-Read only landmark files — files that describe the project's design shape, not its logic.
-Answer these four questions:
-
-**Q1: What is the UI stack?**
-Look for: `package.json` (identify: React/Vue/Svelte/Angular, CSS framework, component
-library, icon library, animation library). Note: Tailwind, shadcn/ui, MUI, Chakra, Radix,
-Framer Motion, Lucide, HeroIcons, Font Awesome, etc. Each has its own consistency risks.
-
-**Q2: Is there a design token layer?**
-Look for: `tailwind.config.*`, `tokens.ts`, `theme.ts`, `variables.css`, `globals.css`,
-`design-system/`, `styles/`. Read the color palette, spacing scale, font sizes, border radii,
-shadow levels. These are the ground truth for visual consistency. Every hardcoded hex value
-you find in a component that isn't in this token file is a potential inconsistency.
-
-**Q3: What shared components exist?**
-Look for: `components/ui/`, `components/common/`, `src/ui/`, `design-system/`, `shared/`.
-Build a list of: Button, Input, Modal, Toast, Badge, Card, Dropdown, Select, Table, Icon,
-Spinner, Empty state, Error boundary. These are the building blocks. Any custom re-implementation
-of a component that already exists in this list is a `ISSUE-NNN` waiting to be written.
-
-**Q4: What are the page/screen boundaries?**
-Look for: `pages/`, `app/` (Next.js App Router), `views/`, `screens/`, `routes/`. Read
-just the routing config first — every route is a potential screen in a user flow.
-
-Write your answers into the "Project Profile" section of `audit_progress.md`.
+Tracing "just a component" (e.g., only the button without its modal, or only the form without its validation feedback) is an audit failure. You haven't audited the UI/UX until you've experienced the transition, the feedback, and the perceived duration of the entire journey.
 
 ---
 
-### 0-B. Learn the Project's UI Conventions
+This skill is a **read-only diagnostic instrument**.
 
-Read 2–3 well-built screens or components — not to find bugs, but to understand how this team
-writes UI. You are cataloguing:
+At no point will you:
 
-- **Naming conventions**: Are props named `onClick` or `handleClick` or `onPress`? Are
-  boolean props `isLoading` or `loading`? Is the cancel action labelled "Cancel", "Dismiss",
-  "Close", or "Go back"?
-- **Button hierarchy**: What does a primary button look like? Secondary? Destructive? Ghost?
-  How are they composed — variant prop on a shared `<Button>`, or separate components?
-- **Icon usage pattern**: Is there a single `<Icon name="..." />` wrapper, or are icons
-  imported directly from the icon library? Are sizes standardized?
-- **Spacing and layout pattern**: Flex or Grid? Are gaps hardcoded or token-based?
-- **Loading states**: Skeleton screens, spinners, or disabled states? Are they consistent?
-- **Error and empty states**: Are these handled inline, in a shared component, or ad-hoc?
-- **Typography pattern**: Are text styles composed via a `<Text>` component, via Tailwind
-  classes, or inline `style`?
+- Rewrite a component
+- Refactor a file
+- Suggest a code change with a diff or before/after snippet
+- Create new files (except `uiux_audit.md`)
+- Rename, move, or delete anything
 
-Record what you find in the "Project Patterns" section of `audit_progress.md`.
+Every finding ends with a plain-language **Recommendation** — a description of _what should
+change_ and _why_, written for a designer or developer to act on. It does NOT include code.
 
-> **Why this matters:** If you write a remediation that imports `<Spinner />` when the
-> codebase always uses `<LoadingIndicator />`, or recommends adding `className="text-red-500"`
-> when the project uses a `<Text variant="error">` component, the fix will be rejected and
-> it introduces a new inconsistency while reporting an old one. Your remediations must be
-> written *in the language this team already speaks*.
+If you find yourself writing JSX, CSS, or any implementation — stop. Delete it. Replace it
+with a plain-English description of the problem and the desired outcome.
 
 ---
 
-### 0-C. Calibrate the Consistency Baseline
+## Phase 0 — Discover the Real Project. Touch Nothing Else.
 
-Before flagging anything, read one complete flow from entry point to terminal state without
-writing any issues. Ask:
+> **This phase is not optional. Do not open a single UI component until Phase 0 is complete.**
+> **Do not guess file paths. Do not assume directory names. Read the actual tree.**
 
-- Is inconsistency widespread and systemic, or localized to specific screens?
-- Are there signals of a recent library migration (e.g., old MUI components coexisting with
-  new shadcn/ui components)?
-- Are there comments like `// TODO: replace with shared Button` or `// legacy — do not copy`?
-- Is responsive design handled consistently, or is mobile clearly an afterthought?
+You are about to audit a project built by a real team. That team has opinions about structure,
+naming, and design systems. If your findings reference files that don't exist or miss entire
+subsystems because you assumed a standard layout, the report is worthless.
+
+Phase 0 has four parts.
+
+---
+
+### 0-A. Build the Real File Inventory
+
+**Step 1: Read the project root.**
+List the top-level contents of the repository. Note every directory and every config file.
+Do not assume what is inside a directory — open it.
+
+**Step 2: Locate the frontend root.**
+Look for directories commonly named: `src/`, `app/`, `pages/`, `views/`, `frontend/`,
+`client/`, `web/`, `ui/`, `components/`. If the project is a monorepo, there may be
+multiple frontend packages — find all of them.
+
+**Step 3: Recursively inventory frontend files.**
+Inside every frontend directory you found, list all files. For each file, record:
+
+- Its full relative path
+- Its file type (`.tsx`, `.jsx`, `.vue`, `.svelte`, `.html`, `.css`, `.scss`, `.module.css`, etc.)
+- A one-line guess at its role based solely on its name and location
+
+Write every discovered file into the **File Inventory** section of `uiux_audit.md`.
+This is your ground truth. You will only audit files that appear in this inventory.
+You will never audit a file you have not listed here first.
+
+**Step 4: Count your inventory.**
+Run `git ls-files --cached --others --exclude-standard <frontend-dir> | measure-object -line` (or equivalent for the OS) to count the total number of files in the frontend project(s). Record this as your **Total Discovered Frontend Files**. Every file you read during the audit increments the **Audited File Count**. Both numbers are updated live in the progress header of `uiux_audit.md`.
+
+> ⚠️ **If you cannot list a directory's contents, say so explicitly in the audit file.**
+> Never fabricate a file path. Never audit a file you have not confirmed exists.
+
+---
+
+### 0-B. Identify the Design System (or Its Absence)
+
+Read the following landmark files — if they exist — to understand what design language
+this project is operating in:
+
+| Look for | What it tells you |
+|---|---|
+| `package.json` | Is there a UI library? (MUI, Chakra, shadcn/ui, Ant Design, Tailwind, Bootstrap, etc.) |
+| `tailwind.config.*` | What custom colors, spacing, and typography tokens are defined? |
+| `theme.*`, `tokens.*`, `variables.css`, `_variables.scss` | What are the official design tokens? |
+| A dedicated `components/` or `ui/` folder | Is there a shared component library? What's in it? |
+| `globals.css`, `index.css`, `app.css` | Are there global style overrides that might conflict? |
+| Any Storybook, Figma export, or `design-system/` folder | Is there a reference spec to compare against? |
+
+Record your findings in the **Design System Profile** section of `uiux_audit.md`.
+
+If no design system exists, note that explicitly — it means every consistency finding is
+potentially systemic rather than isolated.
+
+---
+
+### 0-C. Map the User Flows
+
+Read the routing layer to understand what screens exist and how they connect.
+
+| Look for | What it tells you |
+|---|---|
+| `App.tsx`, `App.jsx`, `app/layout.tsx` | Top-level route structure |
+| `router.tsx`, `routes.tsx`, `routes/index.*` | All registered routes and their nesting |
+| `pages/` or `app/` directory (Next.js / Nuxt / SvelteKit) | File-based routes — each file is a screen |
+| `navigation/`, `nav/`, `sidebar.*`, `header.*` | How users move between screens |
+| `BottomNav.*`, `Tabs.*`, `Drawer.*` | Mobile navigation patterns |
+
+Build a **User Flow Map** — a numbered list of every distinct flow a user can take:
+
+```
+Flow 1: Onboarding       → Landing → Sign Up → Verify Email → Dashboard
+Flow 2: Authentication   → Sign In → Dashboard / Forgot Password → Reset
+Flow 3: Core Feature     → Dashboard → Feature Entry → [Steps] → Confirmation
+Flow 4: Settings         → Profile → Edit → Save
+Flow 5: Error Recovery   → Any screen → Error State → Recovery Action
+```
+
+You will audit flows in this order: highest-traffic first, error states last.
+If you cannot determine traffic priority, audit in the order the router registers them.
+
+Record the flow map in `uiux_audit.md` before auditing any component.
+
+---
+
+### 0-D. Calibrate the Baseline
+
+Before flagging any finding, silently read one complete user flow — from the entry screen
+component through to the confirmation or terminal screen — without writing any findings yet.
+
+Ask yourself:
+
+- How visually consistent is this flow on its own? (Spacing, typography, color usage)
+- Does the interaction pattern feel deliberate or ad-hoc?
+- Are there signs of multiple authors — components that use different styling approaches?
+- Are there obviously unfinished screens or placeholder content in production paths?
+- Does the navigation make it clear where the user is and how to go back?
 
 This baseline determines whether a finding is an isolated anomaly or a systemic pattern.
-A systemic pattern is always higher severity — because it means every new screen a developer
-adds will repeat the mistake without the audit flag.
+A systemic pattern is always higher severity. Set your calibration before your first finding.
 
 ---
 
-## Phase 1 — Initialize the Audit Files
+## Phase 1 — Initialize `uiux_audit.md`
 
-Create both files before tracing any flow.
-
----
-
-### `audit_progress.md` — Summary + Living Index
-
-This file is optimized for **human readability and token efficiency**. It contains:
-- Project profile (filled once in Phase 0)
-- Running issue index (one line per issue, append-only)
-- Finding details (one block per issue, append-only with rare updates per mutation rules)
+Create this file before auditing any component.
+Update it after every file you read. It is your only persistent state.
 
 ```markdown
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- FINAL SUMMARY block will be prepended here when the audit ends    -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+
 # UI/UX Audit — Progress
 
-_Last updated: after file [X] / flow [FLOW-NNN]_
+## Artifacts
+- **Findings Log**: `uiux_audit.md` (This file)
+- **Execution Traces**: [audit_traces.md](file:///absolute/path/to/audit_traces.md)
+
+## Current Status
+
+| Field | Value |
+|---|---|
+| **Status** | Phase 0 — Discovering Files / Auditing Flow N of 5 / ⛔ Terminated |
+| **Status** | Phase 0 — Discovering Files / Auditing Flow N of [Total] / ⛔ Terminated |
+| **Files Discovered** | X |
+| **Files Audited** | Y / X (Z%) |
+| **Flows Completed** | Z / [Total] |
+| **Completed Flow IDs** | `FLOW-001` → `FLOW-00Z` |
+| **Budget Limit Hit** | — |
 
 ---
 
-## Status
+## File Inventory
 
-| Field         | Value                              |
-|---------------|------------------------------------|
-| Status        | Phase 0 / Scanning / ⛔ Terminated |
-| Flows Done    | Y / 5                              |
-| Files Read    | X / 25                             |
-| Issues Found  | N (C: N · H: N · M: N · L: N)     |
+_(Every frontend file confirmed to exist — populated during Phase 0-A. Never modified after Phase 0.)_
 
----
+| # | Path | Type | Role (inferred from name/location) | Audited? |
+|---|---|---|---|---|
+| 1 | `src/pages/Login.tsx` | TSX | Authentication screen | ✅ |
+| 2 | `src/components/Button.tsx` | TSX | Shared button primitive | ✅ |
+| 3 | `src/components/Modal.tsx` | TSX | Shared modal wrapper | ❌ |
+| … | … | … | … | … |
 
-## Project Profile
-
-| Field              | Value |
-|--------------------|-------|
-| UI Stack           |       |
-| Component Library  |       |
-| Icon Library       |       |
-| CSS Approach       |       |
-| Token File         |       |
-| Router             |       |
-| Animation Library  |       |
-| Key Risk Areas     |       |
+**Total Discovered: X | Total Audited: Y**
 
 ---
 
-## Project Patterns
+## Design System Profile
 
-| Pattern            | Convention Observed |
-|--------------------|---------------------|
-| Button hierarchy   |                     |
-| Icon usage         |                     |
-| Loading states     |                     |
-| Error states       |                     |
-| Empty states       |                     |
-| Typography         |                     |
-| Spacing/Layout     |                     |
-| Action labels      |                     |
-| Naming (props)     |                     |
+_(Filled during Phase 0-B)_
+
+- **UI Library / Framework:**
+- **CSS Approach:**
+- **Design Tokens defined:** (colors, spacing, typography — list them or note absence)
+- **Shared Component Library:** (path, what's in it, or "none found")
+- **Official Brand/Style Reference:** (Figma link, Storybook URL, or "none found")
+- **Known Inconsistency Risks from Phase 0-B:**
 
 ---
 
-## Shared Component Inventory
+## User Flow Map
 
-| Component     | File Path          | Notes             |
-|---------------|--------------------|-------------------|
-| Button        |                    |                   |
-| Input         |                    |                   |
-| Modal         |                    |                   |
-| Toast/Snack   |                    |                   |
-| Icon          |                    |                   |
-| Spinner       |                    |                   |
-| Badge         |                    |                   |
-| Empty State   |                    |                   |
-| Error State   |                    |                   |
+_(Filled during Phase 0-C — drives audit order)_
 
-_(Append rows as discovered. This is the ground truth for "does a shared component exist?"
-checking during the audit.)_
+| Flow # | Name | Entry Point | Terminal Screen | Files Involved |
+|---|---|---|---|---|
+| 1 | Onboarding | `pages/Landing.tsx` | `pages/Dashboard.tsx` | [list] |
+| 2 | Authentication | `pages/Login.tsx` | `pages/Dashboard.tsx` | [list] |
+| … | … | … | … | … |
 
 ---
 
 ## Execution Queue
 
-_(Strike through completed items. Mark next item with `← NEXT`.)_
-_(Never delete struck-through items — they are the coverage audit trail.)_
+### ✅ Completed Flows
+- `FLOW-001`: [Description]
 
-- `src/app/page.tsx` ← NEXT
+### 🔍 Current Flow: `FLOW-002` - [Description]
+_(Strike through (text styling) audited files in the current flow inventory. Mark the next file with `← NEXT`.)_
+- `src/pages/Login.tsx` (Struck through)
+- `src/components/LoginForm.tsx` ← NEXT
 
----
-
-## Issue Index
-
-_(One line per issue, append-only. Full details in the Findings section below.)_
-
-| ID        | Sev | Category             | Short Title                        | Flows          |
-|-----------|-----|----------------------|------------------------------------|----------------|
-| ISSUE-001 | 🔴H | Terminology          | "Submit" vs "Confirm" mismatch     | FLOW-001       |
+### ⏭️ Next Upcoming Flows
+- `FLOW-003`: [Description]
 
 ---
 
-## Findings
+## Audit Log
 
-_(Full finding blocks. Append-only. See mutation rules for the one exception.)_
-```
+_(One finding block per issue, appended as discovered)_
 
----
-
-### `audit_traces.md` — Flow Trace Log
-
-This file is **append-only, always**. No exceptions. It records every flow traced —
-the screens visited, files read within the flow, and issues surfaced. It is not a summary;
-it is the raw audit trail.
-
-```markdown
-# UI/UX Audit — Flow Traces
-
-_This file is append-only. Never edit existing entries._
-
----
-
-## FLOW-001 — [Short Flow Name]
-
-**Entry point:** `src/app/checkout/page.tsx`
-**Exit condition:** User sees order confirmation screen
-**Status:** Complete / Dead End at [file]
-**Issues found in this flow:** ISSUE-001, ISSUE-003
-
-### Trace
-
-| # | File / Screen                        | Finding summary                          |
-|---|--------------------------------------|------------------------------------------|
-| 1 | `src/app/checkout/page.tsx`          | Custom spinner instead of shared        |
-| 2 | `src/components/checkout/Summary.tsx`| "Confirm Order" vs "Place Order" labels |
-| 3 | `src/app/confirmation/page.tsx`      | No loading state on page transition     |
-
----
-```
-
-> **Why two files?** `audit_progress.md` is token-efficient for reasoning — the agent reads
-> it at the start of every step. `audit_traces.md` is the full audit trail — the agent
-> **looks it up by searching for a FLOW-NNN or ISSUE-NNN ID** rather than reading it in full,
-> preventing context window bloat on long audits.
+[findings appear here]
 
 ---
 
 ## Document Mutation Rules
 
-Both files have strict mutation rules. Violating these corrupts the audit trail.
+`uiux_audit.md` is a **living document**, not a log file and not a scratch pad.
+Different sections have different mutation rules. Violating these rules is the most
+common way an agent destroys the audit trail mid-run.
 
-### `audit_traces.md` — Always Append, Never Edit
+### What each section is allowed to do
 
-| Rule | Reason |
-|------|--------|
-| Every new flow gets a new `## FLOW-NNN` section appended at the end | Flows are facts, not drafts |
-| Rows are added to the trace table as files are read within a flow | The trace is built live |
-| Existing entries are **never edited** under any condition | The trace is the source of truth |
-| If a flow is resumed in a later run, a new `FLOW-NNN` entry is created referencing the prior one | Continuation is a new trace, not a mutation |
+| Section | Rule | Reasoning |
+|---|---|---|
+| **Current Status table** | Always overwrite on every file read | It is a live counter, not a history |
+| **File Inventory** | List once in Phase 0-A; mark rows with ✅ as audited; never delete discovered files | Ground truth for coverage tracking |
+| **Design System Profile** | Fill once in Phase 0-B; overwrite if a deeper read corrects an earlier assumption | Structural facts can be revised |
+| **User Flow Map** | Fill once in Phase 0-C; drives the audit order | Sequence of user journeys to be audited |
+| **Execution Queue** | Maintain three sub-sections: Completed Flows, Current Flow (with file trace), and Upcoming Flows. Strike through files in the Current Flow as they are read; never delete completed flows or files. | Provides a clear view of audited vs. pending end-to-end journeys. |
+| **Audit Log** | **Append only by default.** Only update to escalate severity or expand blast radius. | Preserves the record of what was found, when, and in what state |
 
-### `audit_progress.md` — Mostly Append, Rare Overwrite
+---
 
-| Section | Rule |
-|---------|------|
-| Status table | Overwrite on every file read — it is a live counter |
-| Project Profile & Patterns | Fill once in Phase 0; overwrite if a deeper read corrects an assumption. Mark corrections with `*(revised)*` |
-| Shared Component Inventory | Append rows as discovered; never remove |
-| Execution Queue | Strike through completed items; append newly discovered files; never delete |
-| Issue Index | **Append-only** — one row per issue, forever |
-| Findings section | **Append-only** with one exception (see below) |
+## Phase 1.5 — The Trace Log (`audit_traces.md`)
 
-### The One Finding Update Exception
+Before starting Phase 2, initialize or update `audit_traces.md`. This file contains the "Ground Truth" for every flow. It is a separate file to keep `uiux_audit.md` clean and scannable.
 
-A finding block may be updated **only** when:
-
-1. A later flow reveals the issue affects more surfaces than originally described (blast radius expanded)
-2. A later flow reveals the issue is more severe than originally assessed (severity escalation)
-3. A later flow reveals the issue is partially fixed — it exists in some screens but not others
-
-**When updating:** append an `**Updated:**` block *below* the original text. Never rewrite
-the original. Show old and new severity explicitly if it changed.
+**Rules for the Trace Log:**
+1. **Flow IDs are Primary Keys**: Every trace header **MUST** include a unique ID (e.g., `### FLOW-001`).
+2. **Atomic Steps**: Every screen transition must be logged with the specific component and logic traced.
+3. **ID-Based Retrieval**: When you need to revisit a trace, use `grep_search` or `view_file` on a specific range containing the Flow ID. **NEVER** read the entire `audit_traces.md` file if it exceeds 100 lines; use the ID to jump to the relevant section.
 
 ```markdown
-### ISSUE-007 · 🔴 HIGH — Custom spinner used instead of shared `<Spinner />`
-*(original finding text stays exactly as written)*
+# Reliability Audit — Flow Traces
 
-**Updated — Blast radius expanded**
-After tracing FLOW-004, the same custom spinner appears in `src/app/settings/page.tsx`
-and `src/components/profile/AvatarUpload.tsx`. Systemic upgrade rule applied.
-**Severity: HIGH → CRITICAL.** Now affects 5+ screens. See also: FLOW-004.
+### 🔍 Trace — FLOW-001: [Description]
+(Follow the Flow Trace Template from Phase 2)
 ```
-
-**Never:**
-- Silently rewrite severity, file path, or code snippet
-- Delete a finding because you later thought it was minor
-- Merge two findings into one without preserving both entries
-- Update a finding with context from a flow it was not linked to
-
----
-
-## Phase 2 — The Execution Loop
-
-Repeat these four steps until a budget limit is reached.
-
----
-
-### Step 2-A. Select the Next File
-
-At the start of every step, read only the **Status table** and **Execution Queue** from
-`audit_progress.md` — not the full file. Take the top unmarked item.
-
-Files must be chosen by following the actual user journey — the next screen or component
-that the user would encounter — not alphabetically and not by gut feel.
-
-If you cannot locate the next file in the user journey after genuine effort, that is a
-**Dead End**. Three consecutive Dead Ends → trigger budget termination.
-
----
-
-### Step 2-B. Read and Analyze
-
-Read the file. Check all eight audit categories below. Apply all eight to every file —
-skipping a category because a screen "looks consistent" is how the worst inconsistencies
-survive audits.
-
----
-
-### Step 2-C. Record
-
-For each issue found:
-1. Append a row to the Issue Index in `audit_progress.md`
-2. Append the full finding block to the Findings section of `audit_progress.md`
-3. Append a row to the current flow's trace table in `audit_traces.md`
-
-For each downstream screen or component discovered: add to Execution Queue if not already
-present. Strike through the current file. Update Status table.
-
----
-
-### Step 2-D. Looking Up Flows for an Issue
-
-When the agent needs to recall what screens are involved in a specific issue's flows —
-for example, to check blast radius before writing a remediation — it **must use search
-or grep** to locate the `FLOW-NNN` entry in `audit_traces.md` by ID. It must **not**
-re-read the entire `audit_traces.md` file. This is the primary mechanism for keeping
-context size bounded on long audits.
-
-```
-search "FLOW-002" in audit_traces.md  →  jump to that section only
 ```
 
 ---
 
-### Step 2-E. Check Budget
+## Phase 2 — Conduct the Audit
 
-```
-flows_completed  >= 5   →  TERMINATE (Max Flows)
-files_read       >= 25  →  TERMINATE (Max Files)
-dead_ends_in_row >= 3   →  TERMINATE (Dead End)
-otherwise               →  return to Step 2-A
-```
+Audit flows in the order established in the User Flow Map.
+For each flow, read every component file involved (confirmed in the File Inventory).
+After reading each file, mark it ✅ in the File Inventory, update the current flow entry in
+`audit_traces.md`, strike it through in the Execution Queue, and increment **Files Audited**.
 
-**A flow is complete** when the trace has reached the terminal UI state for that journey
-(success screen, error message, empty state, or modal dismissed), or when it hits a Dead End.
+### What to Look For
 
----
-
-## The Eight Audit Categories
-
-Ordered from most-commonly-missed to most-commonly-checked. Apply all eight to every file.
+For every file you read, check all of the following dimensions:
 
 ---
 
-### Category 1 — Terminology & Label Consistency
+#### Dimension 1: Visual Consistency
 
-> *The single most common source of user confusion. Often invisible in code review because
-> it requires reading two screens simultaneously.*
-
-Every action the user can take has a name. That name must be identical across every surface
-where the action appears.
-
-**Check every label in this file against the Project Patterns record:**
-
-| Label type | What inconsistency looks like |
-|------------|-------------------------------|
-| **Confirmation actions** | "Submit" on form A, "Confirm" on form B, "Save" on form C — all doing the same operation |
-| **Cancellation actions** | "Cancel", "Dismiss", "Close", "Go back", "Never mind" — mixed across modals |
-| **Destructive actions** | "Delete" on one screen, "Remove" on another for the same domain object |
-| **Empty state copy** | "No items found" vs "Nothing here yet" vs "You have no items" — inconsistent tone |
-| **Error message tone** | Formal in some places ("An error occurred"), casual in others ("Oops! Something went wrong") |
-| **Field labels** | "Email Address" on sign-up, "Email" on sign-in, "Your email" in settings |
-| **Domain object names** | The same entity called "order", "purchase", and "transaction" in different screens |
-
-**How to check without tooling:**
-- Read every visible label, button text, heading, placeholder, and helper text in the file.
-- Cross-reference against the Project Patterns record for "Action labels."
-- Use search to find all other occurrences of the same concept in other files.
-- Ask: "If a user read this label on this screen after reading the other screen, would they
-  pause and wonder if these are the same action?"
+- **Typography**: Are heading levels, font sizes, weights, and line-heights used consistently
+  across screens? Does `<h1>` always mean the same thing visually?
+- **Color usage**: Are colors applied from the design token set? Are there hard-coded hex
+  values that differ from the defined palette?
+- **Spacing**: Are margin/padding values drawn from a consistent scale
+  (e.g., multiples of 4px or 8px) or are they arbitrary?
+- **Iconography**: Is one icon library used, or are multiple icon sets mixed?
+  Are icon sizes consistent for the same semantic role (e.g., all action icons 20px)?
+- **Border radius**: Are card corners, buttons, inputs, and modals using the same radius value?
+- **Shadow/elevation**: Is the elevation system consistent — does a modal always sit higher
+  than a card, does a tooltip always sit above a modal?
+- **Button styles**: Is there one primary button style? One secondary? Are destructive actions
+  always red? Are disabled states visually consistent across all button instances?
 
 ---
 
-### Category 2 — Component Usage Consistency
+#### Dimension 2: User Flow Coherence
 
-> *Custom components built next to a shared component that already exists are a maintenance
-> time-bomb. They diverge silently and create two sources of truth.*
-
-**Check every UI element in this file against the Shared Component Inventory:**
-
-- Is a `<Button>` being built from a raw `<button>` or `<div onClick>` when a shared
-  `<Button>` component exists?
-- Is a loading indicator built inline (custom `animate-spin` div) when a `<Spinner>` exists?
-- Is a modal built with `useState` + inline JSX when a shared `<Modal>` exists?
-- Is a toast notification triggered via `setState` when a shared `useToast()` hook or
-  `<Toast>` system exists?
-- Are form inputs built as raw `<input>` when shared `<Input>`, `<Select>`, or `<Textarea>`
-  components exist?
-
-**Also check within this file:**
-- Is the same visual element implemented twice in the same file with different markup?
-- Are there props passed to a shared component that override its design tokens (e.g.,
-  `className="bg-blue-700"` on a component that has its own color system)?
+- **Labels and CTAs**: Does the same action have the same label everywhere?
+  (e.g., "Save" vs "Save Changes" vs "Update" vs "Apply" — pick one)
+- **Step progression**: In multi-step flows, is the user always shown where they are
+  and how many steps remain?
+- **Back navigation**: Can the user always get back to where they came from?
+  Is the back behavior consistent (browser back, in-app back button, breadcrumb)?
+- **Confirmation patterns**: Are destructive actions (delete, cancel subscription) always
+  gated by a confirmation step? Is the confirmation pattern consistent?
+- **Success states**: After a user completes an action, are they always shown a success
+  confirmation? Is the success pattern (toast, banner, inline, redirect) consistent?
+- **Form flow**: Are forms submitted the same way everywhere? (Enter key, button click, auto-save)
+  Do all forms validate before submission? Is the validation feedback placement consistent?
 
 ---
 
-### Category 3 — Icon Consistency
+#### Dimension 3: Loading and Async State Handling
 
-> *Icon libraries grow organically. A codebase that starts with Lucide often acquires
-> HeroIcons and Font Awesome as developers copy-paste examples. The user sees visual chaos.*
-
-**Check every icon in this file:**
-
-| Check | What inconsistency looks like |
-|-------|-------------------------------|
-| **Library mixing** | `lucide-react` icons on most buttons, `@heroicons/react` on two others, an inline SVG for one special case |
-| **Size inconsistency** | Icons at `w-4 h-4`, `w-5 h-5`, `w-6 h-6`, and `size={20}` in the same file, without a documented sizing scale |
-| **Semantic inconsistency** | Trash icon used for both "Delete" and "Archive"; Pencil icon used for both "Edit" and "Rename" |
-| **Style inconsistency** | Outline icons mixed with filled icons in the same menu or toolbar |
-| **Missing icon wrapper** | Icon used directly from library when project has an `<Icon>` wrapper component that handles sizing and ARIA |
-| **Decorative icons without aria-hidden** | An icon beside a text label that is purely decorative but has no `aria-hidden="true"` |
-| **Interactive icons without aria-label** | A standalone icon button (no visible label) missing an `aria-label` |
+- **Loading indicators**: When data is being fetched, is a loading state always shown?
+  Is it always the same component (spinner, skeleton, shimmer) or mixed?
+- **Skeleton screens**: If skeletons are used in some places, are they used everywhere
+  data is async? Or do some screens just render empty and shift layout?
+- **Partial loading**: Do components ever render with some data but show blank spaces
+  for data that hasn't arrived yet?
+- **Stale data**: Is there a clear indicator when displayed data might be out of date?
+- **Infinite scroll vs pagination**: Is one pattern used consistently, or does the app
+  mix them depending on the screen?
 
 ---
 
-### Category 4 — Button & Interactive Element Consistency
+#### Dimension 4: Empty States
 
-> *Buttons are the primary contract between the UI and the user. Inconsistent button hierarchy
-> tells the user nothing about what is primary and what is secondary.*
-
-**Check every interactive element in this file:**
-
-| Check | What inconsistency looks like |
-|-------|-------------------------------|
-| **Variant misuse** | A destructive action (e.g., "Delete Account") using a primary/CTA button style instead of a destructive variant |
-| **Hierarchy violation** | Two primary-styled buttons in the same view, giving the user two equally-weighted calls to action |
-| **Placement inconsistency** | "Cancel" left / "Confirm" right in one modal; reversed in another modal on the same screen |
-| **Size inconsistency** | Buttons at different sizes in the same action group without a clear reason |
-| **Loading state absent** | A button that triggers an async action with no loading state — the user can click twice |
-| **Disabled state missing** | A submit button active when the form is invalid; no visual indication the action is unavailable |
-| **Raw div/span as button** | `<div onClick={...}>Click me</div>` — not keyboard-navigable, no role, not accessible |
-| **Inconsistent affordance** | Some clickable cards/rows have hover states; others don't, despite the same interaction |
+- **Always present**: Does every list, table, feed, search result, and dashboard widget
+  have an empty state — a message and ideally an action — for when there is no data?
+- **Consistent design**: Do all empty states use the same visual pattern
+  (illustration + heading + subtext + CTA, or just text)?
+- **Actionable**: Do empty states give the user something to do next, or do they just
+  say "No results found" and stop?
 
 ---
 
-### Category 5 — Visual & Styling Consistency
+#### Dimension 5: Error States and Validation
 
-> *Hardcoded values and one-off overrides compound over time into a visual system that
-> nobody owns and nobody trusts.*
-
-**Check every style value in this file:**
-
-| Check | What inconsistency looks like |
-|-------|-------------------------------|
-| **Hardcoded colors** | `bg-[#3B82F6]` instead of `bg-primary`; `color: "#FF0000"` instead of a semantic token |
-| **Off-scale spacing** | `p-[13px]` or `mt-[7px]` instead of a spacing scale value; arbitrary values in brackets |
-| **Inconsistent border-radius** | `rounded`, `rounded-md`, `rounded-lg`, and `rounded-full` mixed without a documented rule |
-| **Shadow inconsistency** | `shadow`, `shadow-md`, `shadow-xl`, `drop-shadow` mixed without a visual hierarchy rationale |
-| **Font size off-scale** | `text-[15px]` instead of `text-sm` or `text-base` |
-| **Z-index chaos** | Magic numbers (`z-[999]`, `z-[9999]`) instead of a documented z-index scale |
-| **Dark mode partial coverage** | Light mode classes present, dark mode variants absent on interactive states |
-| **Responsive breakpoint gap** | A layout correct at desktop with no mobile breakpoint handling |
+- **Inline validation**: Are form field errors always shown inline, below the field,
+  using consistent color (red) and iconography?
+- **Error message voice**: Are error messages written in a consistent tone?
+  ("Invalid email" vs "Please enter a valid email address" — pick one style)
+- **Page-level errors**: When a page fails to load, is there always an error state
+  with a retry action? Or do some screens just go blank?
+- **Network error handling**: Is there a consistent pattern for connection failures?
+- **Error boundary coverage**: Are errors contained locally (component-level) or do
+  they crash the entire page?
 
 ---
 
-### Category 6 — Navigation & Layout Consistency
+#### Dimension 6: Responsive and Adaptive Behavior
 
-> *Navigation is the user's map. Inconsistent nav structure means the user is perpetually
-> re-learning the application.*
-
-**Check every navigation element and layout structure in this file:**
-
-| Check | What inconsistency looks like |
-|-------|-------------------------------|
-| **Active state inconsistency** | Active nav items styled differently across different pages |
-| **Breadcrumb inconsistency** | Present on some nested pages, absent on others at the same depth |
-| **Back navigation inconsistency** | A back button on page A, a breadcrumb on page B, nothing on page C — same depth in the hierarchy |
-| **Page title inconsistency** | Some pages have an `<h1>` heading, others use the nav label, others have nothing |
-| **Layout shift on load** | Content reflows after data loads because no skeleton/placeholder holds the space |
-| **Scroll position inconsistency** | Page scrolls to top on route change in some flows, preserves position in others |
-| **Modal vs page for same intent** | Some confirmation flows open a modal; others navigate to a new page |
-| **Empty state missing** | A list or grid view with no empty state — the user sees a blank screen when there's no data |
+- **Breakpoint consistency**: Are the same breakpoints used everywhere, or do some
+  components define their own custom breakpoints?
+- **Navigation adaptation**: Does the nav change form consistently between mobile and
+  desktop? (hamburger menu, bottom bar, sidebar — is the switch always at the same breakpoint?)
+- **Touch targets**: On mobile, are all interactive elements at least 44×44px?
+- **Content reflow**: Does content reflow gracefully at narrow widths, or do elements
+  overflow, overlap, or disappear?
+- **Modal behavior on mobile**: Do modals that open as center-screen dialogs on desktop
+  switch to bottom sheets or full-screen on mobile — consistently?
 
 ---
 
-### Category 7 — Loading, Error & Empty State Coverage
+#### Dimension 7: Information Hierarchy and Clutter
 
-> *Edge states are the most commonly skipped in development and the most visible to users
-> when something goes wrong. A loading state is not a nice-to-have.*
-
-**For every data-fetching component in this file, check:**
-
-| State | What a missing state looks like |
-|-------|---------------------------------|
-| **Loading** | Data area is blank or flickers while loading; no spinner, skeleton, or placeholder |
-| **Error** | Caught error is not shown to the user; component renders as if nothing happened |
-| **Empty** | Query returns zero results; component renders an empty container with no message |
-| **Partial data** | Some fields arrive null/undefined and crash the render instead of gracefully degrading |
-| **Stale data** | User edits data in one tab, returns, sees old data — no refetch-on-focus or cache invalidation |
-| **Optimistic update failure** | Optimistic update applied, backend rejects, UI stuck in updated state |
-
-**Also check transitions:**
-- Does the transition from loading → content cause a layout shift?
-- Is the error state dismissable, or does it lock the user out of the screen?
-- Does the empty state give the user a next action (e.g., "Add your first item" button)?
+- **Visual weight**: Is the most important action on each screen visually dominant?
+  Or are all elements competing equally for attention?
+- **Too many CTAs**: Does any screen have more than 2–3 primary actions visible
+  at once without a clear hierarchy?
+- **Cognitive overload**: Do any screens present more information than a user can
+  reasonably process in a single view? Is progressive disclosure used where it should be?
+- **Redundant labels**: Are there labels that repeat information already visually obvious
+  from context (e.g., a search bar inside a "Search" section with a "Search:" label)?
+- **Dead zones**: Are there large areas of white space that serve no visual or structural
+  purpose, leaving the layout feeling unbalanced?
+- **Icon-only actions**: Are there icon buttons with no label or tooltip that would be
+  ambiguous to new users?
 
 ---
 
-### Category 8 — Accessibility Baseline
+## Phase 3 — Efficient Context Retrieval
 
-> *Accessibility issues double as usability issues. A missing focus ring hurts keyboard users
-> and power users equally. This audit checks baseline — it is not a full WCAG audit.*
+As the audit grows, the `audit_traces.md` file will become large. To maintain speed and accuracy:
 
-**Check every interactive and semantic element in this file:**
+1. **Grep the ID**: If a finding refers to `FLOW-005`, search for `### FLOW-005` in `audit_traces.md` to find the line number.
+2. **Targeted View**: Read a 50-line window around that line number to understand the context.
+3. **The Progress Map**: Always keep `uiux_audit.md` open as your primary dashboard for "where am I?".
 
-| Check | What a violation looks like |
-|-------|-----------------------------|
-| **Focus visibility** | `:focus` style removed or invisible; user cannot tell what is focused |
-| **Keyboard navigation order** | Tab order does not follow visual reading order |
-| **Missing ARIA roles** | `<div onClick>` without `role="button"`; `<ul>` menu without `role="menu"` |
-| **Missing ARIA labels** | Icon buttons, icon-only nav items, form inputs without `<label>` or `aria-label` |
-| **Color-only information** | Status communicated only by color ("red = error") with no text or icon |
-| **Contrast** | Low-contrast text noted when visually obvious (do not run a contrast calculator — flag only clear violations) |
-| **Modal focus trap** | Modal opens but focus is not moved into it; user can Tab behind the modal |
-| **Modal escape** | Modal cannot be closed with the Escape key |
-| **Alt text** | `<img>` without `alt`; decorative images without `alt=""` |
-| **Skip link** | Long pages or apps with no skip-to-content link for keyboard users |
+---
+
+#### Dimension 8: Interaction and Feedback Consistency
+
+- **Hover states**: Do all interactive elements have hover states? Are they consistent
+  in style (background change, underline, color shift)?
+- **Focus states**: Are keyboard focus rings visible and consistent?
+  (This is also an accessibility concern, but flag it as a UX consistency issue here)
+- **Click feedback**: Do buttons give immediate visual feedback on click?
+  Are there actions that feel unresponsive because no feedback is shown?
+- **Transition and animation**: Are page transitions and micro-animations consistent
+  in duration and easing? Or do some screens animate and others cut abruptly?
+- **Toast and notification placement**: Are toasts always in the same screen position?
+  Same duration before auto-dismissal?
 
 ---
 
 ## The Finding Template
 
-Every finding appended to the Findings section of `audit_progress.md` must use this format.
-Token efficiency matters — be specific, not verbose.
+Every finding appended to the Audit Log must use this exact format.
+Do not deviate. Do not add code. Do not write implementations.
 
 ```markdown
----
+### 🔴 [CRITICAL | HIGH | MEDIUM | LOW] — <Short, specific title>
 
-### ISSUE-NNN · [🚨CRIT | 🔴HIGH | 🟠MED | 🟡LOW] — <Short, specific title>
-
-| Field     | Detail |
-|-----------|--------|
-| Category  | Terminology / Component Usage / Icons / Buttons / Styling / Navigation / State Coverage / Accessibility |
-| Flows     | FLOW-001, FLOW-003 |
-| Files     | `src/components/Checkout/Summary.tsx` lines 34–41 |
-| Systemic? | Yes — also in `FileA.tsx`, `FileB.tsx` / No — isolated |
+| Field | Detail |
+|---|---|
+| **Issue ID** | `ISSUE-NNN` (Sequential, e.g. ISSUE-001) |
+| **Flow** | Flow 2: Authentication → `pages/Login.tsx` → `pages/Dashboard.tsx` |
+| **Files** | `src/pages/Login.tsx`, `src/pages/SignUp.tsx` (lines noted where relevant) |
+| **Dimension** | Visual Consistency / Flow Coherence / Loading States / Empty States / Error States / Responsive / Information Hierarchy / Interaction Feedback |
+| **Systemic?** | Yes — also in `FileA`, `FileB`, `FileC` / No — isolated to this screen |
 
 **The Problem**
-One paragraph. What is wrong and why does it harm the user. Paste the specific markup
-or code (≤ 12 lines) that demonstrates the issue. Do not paraphrase code — show it.
+Describe exactly what is wrong and why it creates friction or confusion for the user.
+Be specific: name the screen, the element, and the conflicting behavior.
+Do NOT include code or implementation details.
+
+Example of good specificity:
+
+> The "Continue" button on `SignUp.tsx` uses a filled primary style. The equivalent
+> action button on `Onboarding/Step2.tsx` uses a ghost/outlined style for the same
+> semantic role. Users who sign up organically and users who are invited experience
+> different visual language for the same action, creating inconsistency in learned behavior.
 
 **User Impact**
-One sentence. What does a real user experience when this issue fires?
+State concretely: what does this cause the user to experience?
+(Confusion, hesitation, false confidence, abandonment, inability to complete a task,
+cognitive overload, inability to recover from an error.)
+State how many screens or flows are affected.
 
-**Remediation**
-Write the fix using this project's component names, class conventions, and prop patterns
-as recorded in Phase 0-B. Show before/after. If the fix must be applied to multiple files,
-show it once and list all affected files.
+**Recommendation**
+Plain English only. Describe what should change and why, without writing any code.
+If this is a systemic finding, describe the single principle that should be applied
+across all listed files.
+
+Example:
+
+> Standardize all primary forward-progression CTAs to use the filled primary button
+> style as defined in `components/Button.tsx`. Ghost buttons should be reserved for
+> secondary or optional actions. Audit all flow terminal actions for this rule.
 ```
 
 ---
 
 ## Severity Rubric
 
-Consult this table for every issue. Never assign severity from intuition alone.
-If a finding spans rows, use the higher severity.
+Assign severity using this table. Consult it for every finding. Do not use intuition alone.
 
-| Severity | Condition | Concrete examples |
-|----------|-----------|-------------------|
-| **🚨 CRITICAL** | User cannot complete a core flow, or is actively misled into a destructive action. No workaround. | Destructive button styled as primary CTA with no confirmation; form submission silently swallows an error and shows "Success"; navigation link routes to wrong screen |
-| **🔴 HIGH** | Significant user confusion or friction on a primary flow. User may abandon or make errors. Hard to catch without a walkthrough. | "Submit" vs "Confirm" on two screens in the same checkout flow; missing loading state on the primary CTA; icon meaning reversed between two adjacent screens |
-| **🟠 MEDIUM** | Visible inconsistency that breaks trust but does not block the user. Degrades experience at scale or for returning users. | Custom spinner coexisting with shared Spinner on different screens; off-scale spacing visible at desktop; error state has no dismiss action; hardcoded color that diverges from token in dark mode |
-| **🟡 LOW** | Minor inconsistency or code smell. No immediate user impact; accumulates technical debt. | Commented-out component import; unused prop on a shared component; aria-hidden missing on a decorative icon; slightly different border-radius on a non-interactive card |
+| Severity | Condition | Concrete UI/UX examples |
+|---|---|---|
+| **CRITICAL** | A user cannot complete a core task. Flow is broken or misleading in a way that causes failure, data loss, or irrecoverable confusion. | A "Back" button that skips a step and loses unsaved form data; a confirmation modal with no "Cancel" option; a required field that is hidden below the fold with no scroll indicator; an error state with no message and no way to retry |
+| **HIGH** | Significant friction that will cause measurable abandonment or repeated user errors on a high-traffic flow. | CTA labels that contradict between steps (e.g., "Next" → "Continue" → "Submit" → "Finish" in a single 4-step flow); no loading state on a form submission that takes 3+ seconds; empty state with no actionable next step on the main dashboard; form resets entirely on a validation error |
+| **MEDIUM** | Noticeable inconsistency or clutter that degrades trust and professionalism but does not block task completion. | Two different icon libraries mixed on the same screen; spacing values that alternate between 12px and 16px with no pattern; three different modal animation styles across the app; inline error messages that use different colors on different forms |
+| **LOW** | Minor inconsistency, cosmetic rough edge, or small deviation from the design system with no user impact. | A heading that is 1px too large relative to the scale; a tooltip on desktop that has no mobile equivalent; an empty state illustration used on one screen but absent from an otherwise identical screen elsewhere |
 
-**Systemic upgrade rule:** if the same issue appears across 3+ screens or components,
-escalate one level. Systemic 🟠 MEDIUM → 🔴 HIGH. Systemic 🟡 LOW → 🟠 MEDIUM.
-State the upgrade reason explicitly.
+**Systemic escalation rule**: if the same dimension fails in **four or more files**,
+escalate the finding by one severity level. State the escalation reason explicitly.
+A systemic MEDIUM becomes HIGH. A systemic LOW becomes MEDIUM.
 
 ---
 
-## Final Summary Block
+## Audit Budget and Termination
 
-When any budget limit is reached, prepend this block to the very top of `audit_progress.md`.
+The audit runs until one of three limits is hit:
+
+| Limit | Default | When to adjust |
+|---|---|---|
+| **Max Flows** | 6 complete user flows | Increase for very large apps; decrease for focused audits |
+| **Max Files** | `max(30, 10% of Discovered Files)` | Never count non-frontend files toward this budget |
+| **Dead End** | All discovered files have been audited | Natural completion |
+
+When a limit is hit, stop auditing immediately and write the Final Summary.
+
+---
+
+## Phase 3 — The Final Summary Block
+
+When any budget limit is reached, prepend this block to the very top of `uiux_audit.md`.
 
 ```markdown
 <!-- ══════════════════════════════════════════════════════════════════ -->
-## ⛔ FINAL SUMMARY — Audit Complete
 
-**Terminated by:** Max Flows / Max Files / Dead End
-**Files read:** X / 25  |  **Flows completed:** Y / 5
+## ⛔ FINAL SUMMARY — UI/UX Audit Complete
 
-### Overall Health: 🔴 Critical Risk / 🟠 High Risk / 🟡 Moderate / 🟢 Healthy
+**Terminated by:** Max Flows / Max Files / All Files Audited _(keep one)_
+**Files discovered:** X | **Files audited:** Y / X (Z%) | **Flows completed:** Z / [total]
 
-*(One paragraph: (a) the most dangerous single issue and what user action it will
-corrupt; (b) the most pervasive pattern across flows and how many files it appears in;
-(c) which audit category had the highest finding density; (d) whether the issues are
-isolated or systemic.)*
+### Overall UX Health: 🔴 Broken / 🟠 High Friction / 🟡 Moderate / 🟢 Polished
+
+_(One paragraph. State: (a) the single most damaging finding and what user behavior it
+causes; (b) the most pervasive inconsistency across flows and how many files it affects;
+(c) which dimension — consistency, flow coherence, loading states, etc. — had the highest
+finding density; (d) whether the issues are isolated anomalies or reflect a systemic
+absence of a shared design language.)_
 
 ### Finding Counts
 
-| Severity    | Count |
-|-------------|-------|
-| 🚨 CRITICAL | N     |
-| 🔴 HIGH     | N     |
-| 🟠 MEDIUM   | N     |
-| 🟡 LOW      | N     |
-| **Total**   | **N** |
+| Severity | Count |
+|---|---|
+| 🔴 CRITICAL | N |
+| 🟠 HIGH | N |
+| 🟡 MEDIUM | N |
+| ⚪ LOW | N |
+| **Total** | **N** |
 
-### Top 3 Fixes — In Priority Order
+### Dimension Breakdown
 
-1. **ISSUE-NNN** `[file, lines]` — what it is. Fix: what to do.
-2. **ISSUE-NNN** `[file, lines]` — what it is. Fix: what to do.
-3. **ISSUE-NNN** `[file, lines]` — what it is. Fix: what to do.
+| Dimension | Finding Count | Most Affected Flow |
+|---|---|---|
+| Visual Consistency | N | Flow X |
+| Flow Coherence | N | Flow X |
+| Loading & Async States | N | Flow X |
+| Empty States | N | Flow X |
+| Error States | N | Flow X |
+| Responsive Behavior | N | Flow X |
+| Information Hierarchy | N | Flow X |
+| Interaction Feedback | N | Flow X |
 
-### Entry Points for the Next Audit Run
+### Top 5 Issues — In Priority Order
 
-*(Files still in the Execution Queue not reached in this run.)*
+1. **[Screen / Component]** — [what it is and what it causes the user to experience]
+2. **[Screen / Component]** — [what it is and what it causes the user to experience]
+3. **[Screen / Component]** — [what it is and what it causes the user to experience]
+4. **[Screen / Component]** — [what it is and what it causes the user to experience]
+5. **[Screen / Component]** — [what it is and what it causes the user to experience]
 
-- `path/to/screen.tsx` — why it is high-priority to scan next
+### Files Not Yet Audited
+
+_(Files in the inventory that were not reached in this run — for the next audit session.)_
+
+| Path | Type | Why High Priority Next |
+|---|---|---|
+| `src/pages/Settings.tsx` | TSX | Settings flows not audited; common source of UX debt |
+| … | … | … |
 
 <!-- ══════════════════════════════════════════════════════════════════ -->
 ```
 
-After writing the summary, send this notification:
+After writing the summary, send the user one notification message in this format:
 
-> **Audit paused — [limit name] reached.**
-> `audit_progress.md` has [N] issues across [Y] flows ([X] files). `audit_traces.md` has the
-> full flow trace log. Most urgent: **ISSUE-NNN** — [one sentence on the issue and user impact].
-> To continue: start a new run; the Execution Queue in `audit_progress.md` lists remaining files.
+> **Audit complete — [limit name] reached.**
+> `uiux_audit.md` contains [N] findings across [Z] flows ([Y] of [X] discovered files audited).
+> Most urgent: [one sentence on the highest-severity finding and its user impact].
+> Files not reached this run are listed in the summary for the next session.
 
 ---
 
 ## Anti-Patterns That Invalidate an Audit
 
+If you catch yourself doing any of these, stop and correct before continuing.
+
 | Anti-Pattern | Why It Is Wrong | Correction |
 |---|---|---|
-| Tracing a single component file and calling it a "flow" | Misses the cross-screen inconsistencies that matter most | A flow ends at a terminal UI state — success, error, or exit |
-| Reading `audit_traces.md` in full to recall a flow | Blows the context window on long audits | Search for `FLOW-NNN` by ID to jump to that section only |
-| Writing a remediation that uses a component not in the Shared Component Inventory | Creates a new inconsistency while fixing an old one | Cross-check the inventory in `audit_progress.md` before writing any fix |
-| Flagging a design preference as an issue | Wastes developer attention and erodes trust | Ask: "Does this cause user confusion or block a flow?" If no, skip it |
-| Assigning CRITICAL to a visual inconsistency that doesn't affect interaction | Destroys trust in the severity system | Use the rubric; when unsure between CRITICAL and HIGH, choose HIGH |
-| Reading the same file twice | Wastes budget and double-counts in Max Files | Check the Execution Queue before opening any file |
-| Writing a finding without a code or markup snippet | Makes findings unverifiable | Always include ≤ 12 lines of the offending markup |
-| Updating `audit_traces.md` in-place | Corrupts the audit trail | `audit_traces.md` is always append-only, no exceptions |
-| Assigning a new ISSUE-NNN to a problem already found in a different flow | Creates duplicate findings | Search `audit_progress.md` Issue Index before writing a new finding |
-| Appending a new flow entry that edits a prior flow's trace table | Cross-flow contamination | New flow = new `## FLOW-NNN` block; prior blocks are immutable |
+| Auditing a file path you have not confirmed exists | Fabricated findings destroy trust in the report | Only audit files listed in the Phase 0-A File Inventory |
+| Writing code or diffs in a finding | This skill audits — it does not implement | Replace all code with plain-English descriptions of the problem |
+| Flagging a missing feature as a UX finding | Audits assess existing flows, not absent ones | Ask: "Does this cause an existing flow to fail or confuse?" If no, skip |
+| Reading only the homepage / landing screen | The worst UX debt lives in settings, error states, and edge flows | Always trace at least one non-happy-path flow |
+| Assigning CRITICAL to a cosmetic issue | Destroys severity calibration | Re-read the rubric; cosmetic = LOW unless it blocks a task |
+| Not updating the File Inventory after each file                | Makes the Audited count unreliable                                | Mark every file ✅ immediately after reading it                             |
+| Counting a file as audited without reading it                  | Inflates the audited count                                        | A file is audited only if you read its content and checked all 8 dimensions |
+| Flagging the same root cause as multiple findings              | Inflates finding count; masks the real systemic issue             | Consolidate into one systemic finding with all affected files listed        |
+| Stopping after the happy path                                  | Error states and empty states are where most UX debt hides        | Every flow audit must include its failure path                              |
+| Assuming a design system exists without reading `package.json` | May audit against a system that isn't there                       | Always complete Phase 0-B before writing any finding                        |
 
 ---
 
 ## Per-File Mental Checklist
 
-Run this silently before marking any file done. Do not include verbatim in `audit_progress.md`.
+Run through this silently for every file before marking it ✅ in the inventory.
+Do not include this checklist verbatim in `uiux_audit.md`.
 
 ```
-Terminology
-  [ ] Every action label consistent with Project Patterns record
-  [ ] Every domain object name consistent with Project Patterns record
-  [ ] Error and empty state copy tone consistent
+Visual Consistency
+  [ ] Typography uses defined scale (no arbitrary font sizes)
+  [ ] Colors drawn from token set (no unexplained hard-coded hex values)
+  [ ] Spacing follows a consistent scale (multiples of 4 or 8, or defined tokens)
+  [ ] Iconography from one library only; sizes consistent per semantic role
+  [ ] Button variants used semantically (primary = primary action, ghost = secondary)
+  [ ] Border radius and shadow match the rest of the system
 
-Component Usage
-  [ ] No shared component re-implemented from scratch in this file
-  [ ] No design token overrides on shared components (hardcoded className overrides)
-  [ ] Shared component used with correct props, not hacked via className
+Flow Coherence
+  [ ] CTA labels match equivalent actions on other screens
+  [ ] Multi-step flows show position and total steps
+  [ ] Back / cancel navigation exists and works predictably
+  [ ] Destructive actions have a confirmation gate
+  [ ] Success state is always shown after a completed action
 
-Icons
-  [ ] Icons from same library as Project Patterns record
-  [ ] Icon sizes on-scale or documented
-  [ ] Decorative icons have aria-hidden; interactive icon buttons have aria-label
-  [ ] No semantic reversal (same icon, different meaning vs. adjacent screens)
+Loading & Async States
+  [ ] Every async data fetch has a loading indicator
+  [ ] Loading indicator type is consistent with the rest of the app
+  [ ] No empty-then-shift layout caused by missing skeleton
 
-Buttons & Interactives
-  [ ] Only one primary-hierarchy CTA per view
-  [ ] Destructive actions use destructive variant
-  [ ] Confirm/Cancel placement matches Project Patterns record
-  [ ] Async actions have loading state; form submits have disabled state while loading
-  [ ] No raw <div> or <span> used as a button
+Empty States
+  [ ] Every list and data surface has an empty state
+  [ ] Empty state includes an actionable next step
+  [ ] Empty state visual pattern is consistent with others in the app
 
-Styling
-  [ ] No hardcoded color values outside the token file
-  [ ] No off-scale spacing (arbitrary bracket values)
-  [ ] Border-radius and shadow on-scale
-  [ ] Dark mode variants present if the project supports dark mode
-  [ ] Mobile breakpoints handled
+Error States
+  [ ] Every form field has inline validation feedback
+  [ ] Error messages use a consistent tone and placement
+  [ ] Page-level errors have a retry action
+  [ ] Error does not crash the whole page when it should be contained
 
-Navigation & Layout
-  [ ] Active states consistent with Project Patterns record
-  [ ] Empty states present on all list/grid views
-  [ ] Page has an h1 heading consistent with other pages at the same level
+Responsive Behavior
+  [ ] Breakpoints consistent with the rest of the app
+  [ ] Navigation adapts correctly at mobile breakpoint
+  [ ] Touch targets meet minimum size on mobile
+  [ ] No content overflow or overlap at narrow widths
 
-State Coverage
-  [ ] Loading state present on every async data fetch
-  [ ] Error state present and user-dismissable
-  [ ] Empty state present and actionable
+Information Hierarchy & Clutter
+  [ ] One dominant primary action per screen
+  [ ] No more than 2–3 primary CTAs visible simultaneously
+  [ ] Progressive disclosure used where information density is high
+  [ ] No redundant or self-describing labels
 
-Accessibility
-  [ ] All interactive elements keyboard-reachable
-  [ ] All inputs have visible labels
-  [ ] No color-only information conveyance
-  [ ] Modal has focus trap and Escape-to-close
-  [ ] Images have alt text (or alt="" if decorative)
+Interaction Feedback
+  [ ] All interactive elements have hover states
+  [ ] Keyboard focus rings visible
+  [ ] Buttons give immediate click feedback
+  [ ] Animations consistent in timing and easing
+  [ ] Toasts and notifications appear in consistent position
 ```

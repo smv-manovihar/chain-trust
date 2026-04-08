@@ -1,28 +1,26 @@
 # Agent Chat (AI Assistant) — Operational Manual
 **Route:** `/customer/agent`
 
-The Agent Chat is the high-performance interface for ChainTrust's role-aware AI. It provides the user with an intelligent, conversational assistant that has real-time visibility into the patient's records and the global blockchain ledger.
+The Agent Chat is the high-performance interface for ChainTrust's role-aware AI. It provides the user with an intelligent, conversational assistant that has real-time visibility into the patient's records, prescriptions, and the global blockchain ledger.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Full-Viewport Chat Aperture**: A sleek, h-screen (minus header) interface designed for focused conversation.
-- **Dynamic Session Hub**:
-  - **Identified Session Management**: A h-12 rounded-full search bar for finding past sessions.
-  - **Threaded Conversations**: High-fidelity chat bubbles with glassmorphic tints (Emerald for AI, Card for User).
-- **Situational Awareness Feed**: A persistent, unobtrusive indicator showing that the AI is "Synchronized with current view."
-- **Action Targets**: Quick "Copy" and "Share" buttons (h-9 rounded-xl) for individual agent responses.
+- **Glassmorphic Converse Aperture**: A focused, high-fidelity chat experience with translucent message bubbles.
+- **Dynamic Context Bar**: A subtle, top-level indicator showing "Synchronized with [Page Name]" to confirm situational awareness.
+- **Session Sidebar**: (Desktop) A retractable panel for navigating historical conversation threads.
+- **Aesthetic Flourishes**: Smooth scrolling transitions, real-time typing indicators, and high-visibility action buttons for "Regenerate" and "Stop".
 
 ---
 
 ## 🔗 URL & Navigation (Link Generation)
-The agent can generate links to specific chat sessions:
+The agent can generate links to specific conversation threads:
 
-| Parameter | Type | Description | Example Link |
-| :--- | :--- | :--- | :--- |
-| `session` | String | Opens a specific historical chat session ID. | `/customer/agent?session=507f1...` |
+| Filter | Route | Description |
+| :--- | :--- | :--- |
+| **Active Session** | `/customer/agent?session=[id]` | Resumes a specific historical conversation. |
 
-**AI Rule:** When a user asks to "resume" or "view" a previous conversation, generate the link with the `session` parameter.
+**AI Rule:** When asked to "remember our last talk," provide the active [Session Link](/customer/agent?session=...).
 
 ---
 
@@ -30,19 +28,17 @@ The agent can generate links to specific chat sessions:
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "I want to chat with you." | `get_page_guide` | Explain the situational awareness and available tools. |
-| "What were we talking about?" | `get_view_data` | Reference the active session's message history. |
-| "Show me my sessions." | `get_view_data` | Use the session list from the current context. |
+| "What are we talking about?" | `get_view_data` | Aggregates the message history and current situational context. |
+| "Start fresh." | `get_page_guide` | Explain the assistant's capabilities and offer to clear the active buffer. |
 
 ---
 
 ## 🚨 Error & Empty States
-- **Session Not Found**: If an invalid `session` ID is provided, the UI shows a "New Chat" empty state. AI should offer to start fresh.
-- **Offline Mode**: A subtle "Connectivity Lost" banner. AI should mention it's unable to reach the blockchain/DB.
+- **Synchronization Offline**: Displays a "Neural Link Interrupted" status. AI should clarify that it's currently unable to "see" your active page data due to connectivity issues.
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Self-Awareness**: Acknowledge that the AI is the "ChainTrust Agent" and has "situational awareness" of the user's current portal view.
-- **Deep-Link Generation**: Always provide a link to the [Agent Portal](/customer/agent) if the user is asking complex questions from another page.
-- **Session Continuity**: Encourage users to use the `session` deep-link to preserve conversation context when switching devices.
+- **Role Continuity**: Always maintain the persona of an "Advanced Medical Security Agent."
+- **Contextual Recall**: Use `get_view_data` before answering any question about "this page" or "my medicines."
+- **Direct Linkage**: If the user is on mobile, guide them to the [Agent Portal](/customer/agent) for a full-screen conversational experience.

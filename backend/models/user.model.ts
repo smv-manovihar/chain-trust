@@ -141,8 +141,8 @@ const userSchema = new Schema<IUser>(
 		// Force password change
 		mustChangePassword: { type: Boolean, default: false },
 
-		// Security: Admin approval state (FIX-007) - Currently AUTO-APPROVING per user request
-		isApprovedByAdmin: { type: Boolean, default: true },
+		// Security: Admin approval state (FIX-007) - Defaulting to FALSE for security (FIX-006)
+		isApprovedByAdmin: { type: Boolean, default: false },
 	},
 	{
 		timestamps: true,

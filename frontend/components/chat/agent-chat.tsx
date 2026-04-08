@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useChatScroll } from "@/hooks/use-chat-scroll";
 import {
   History,
   Sparkles,
@@ -120,11 +121,13 @@ export function AgentChat({
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editSessionName, setEditSessionName] = useState("");
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
-  const [showScrollButton, setShowScrollButton] = useState(false);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const lastScrolledSessionId = useRef<string | null>(null);
-  const wasAtBottomRef = useRef(true);
+  const {
+    scrollContainerRef: scrollRef,
+    handleScroll,
+    scrollToBottom,
+    showScrollButton,
+  } = useChatScroll(currentSessionId);
 
   // Sync session change to parent if needed
   useEffect(() => {
@@ -132,80 +135,6 @@ export function AgentChat({
       onSessionChange?.(currentSessionId);
     }
   }, [currentSessionId, onSessionChange]);
-
-  // Scroll management
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior,
-      });
-    }
-  }, []);
-
-  const scrollToLastAssistant = useCallback(() => {
-    if (scrollRef.current && messages.length > 0) {
-      // Small timeout to ensure DOM is updated
-      setTimeout(() => {
-        const assistantMessages = scrollRef.current?.querySelectorAll(
-          '[data-role="assistant"]',
-        );
-        if (assistantMessages && assistantMessages.length > 0) {
-          const lastAssistant = assistantMessages[assistantMessages.length - 1];
-          lastAssistant.scrollIntoView({ behavior: "smooth", block: "start" });
-        } else {
-          scrollToBottom("smooth");
-        }
-      }, 100);
-    }
-  }, [messages, scrollToBottom]);
-
-  const handleScroll = useCallback(() => {
-    if (!scrollRef.current) return;
-
-    window.requestAnimationFrame(() => {
-      const el = scrollRef.current;
-      if (!el) return;
-
-      const { scrollTop, scrollHeight, clientHeight } = el;
-      const atBottom = scrollHeight - scrollTop - clientHeight < 100;
-
-      wasAtBottomRef.current = atBottom;
-
-      const showButton = !atBottom && scrollHeight > clientHeight;
-      setShowScrollButton((prev) => (prev !== showButton ? showButton : prev));
-    });
-  }, []);
-
-  useEffect(() => {
-    const scrollEl = scrollRef.current;
-    if (scrollEl) {
-      scrollEl.addEventListener("scroll", handleScroll);
-      return () => scrollEl.removeEventListener("scroll", handleScroll);
-    }
-  }, [handleScroll]);
-
-  // Handle auto-scroll on new messages using ResizeObserver for better performance
-  useEffect(() => {
-    if (!scrollRef.current) return;
-
-    const resizeObserver = new ResizeObserver(() => {
-      if (wasAtBottomRef.current && scrollRef.current) {
-        scrollRef.current.scrollTo({
-          top: scrollRef.current.scrollHeight,
-          behavior: "auto",
-        });
-      }
-    });
-
-    // Observe the content container (the first child of scrollRef)
-    const content = scrollRef.current.firstElementChild;
-    if (content) {
-      resizeObserver.observe(content);
-    }
-
-    return () => resizeObserver.disconnect();
-  }, []);
 
   const handleCreateSession = () => {
     resetChat();
@@ -217,35 +146,9 @@ export function AgentChat({
     setEditingSessionId(null);
   };
 
-  // Effect to scroll to last assistant message when session changes or messages load
-  useEffect(() => {
-    // Only trigger if we switch to a new session OR messages finish loading for a session we haven't scrolled for
-    if (currentSessionId && !isLoadingMessages && messages.length > 0) {
-      if (lastScrolledSessionId.current !== currentSessionId) {
-        // Only scroll to assistant if we aren't already at the bottom (to avoid fighting auto-scroll)
-        if (!wasAtBottomRef.current) {
-          scrollToLastAssistant();
-        } else {
-          scrollToBottom("auto");
-        }
-        lastScrolledSessionId.current = currentSessionId;
-      }
-    } else if (!currentSessionId) {
-      lastScrolledSessionId.current = null;
-    }
-  }, [
-    currentSessionId,
-    isLoadingMessages,
-    messages.length,
-    scrollToLastAssistant,
-    scrollToBottom,
-  ]);
-
   const handleSendMessage = useCallback(() => {
     sendMessage(currentContext);
-    // Force auto-scroll on next render
-    wasAtBottomRef.current = true;
-    scrollToBottom("smooth");
+    scrollToBottom({ behavior: "auto" });
   }, [sendMessage, currentContext, scrollToBottom]);
 
   const session = sessions.find((s) => s.id === currentSessionId);
@@ -253,15 +156,17 @@ export function AgentChat({
   const handleRetryMessage = useCallback(
     (id: string) => {
       retryMessage(id, currentContext);
+      scrollToBottom({ behavior: "auto" });
     },
-    [retryMessage, currentContext],
+    [retryMessage, currentContext, scrollToBottom],
   );
 
   const handleEditMessage = useCallback(
     (id: string, content: string) => {
       editMessage(id, content, currentContext);
+      scrollToBottom({ behavior: "auto" });
     },
-    [editMessage, currentContext],
+    [editMessage, currentContext, scrollToBottom],
   );
 
   const handleDeleteMessage = useCallback(
@@ -274,15 +179,16 @@ export function AgentChat({
   return (
     <div
       className={cn(
-        // Use 100dvh for mobile, fallback to h-full on larger screens
         "flex flex-col h-full relative overflow-hidden",
+        // On mobile the AppShell header is absolute (h-14 = 56 px).
+        // Push content below it; on lg+ the header is relative so no offset needed.
         compact
           ? "rounded-xl border shadow-2xl bg-background"
-          : "w-full max-w-5xl mx-auto bg-transparent",
+          : "w-full max-w-5xl mx-auto bg-transparent pt-14 lg:pt-0",
       )}
     >
-      {/* Floating Header — Offset to sit below AppShell Header */}
-      <div className="absolute top-0 left-0 right-0 z-[60] w-full px-2 sm:px-4 pt-2 sm:pt-4 pointer-events-none">
+      {/* Static Chat Header — flows naturally in the flex column */}
+      <div className="shrink-0 w-full px-2 sm:px-4 py-2 sm:py-3 z-20">
         <div className="flex items-center justify-between px-3 sm:px-4 py-1.5 sm:py-2 bg-card/50 backdrop-blur-xl border border-primary/10 shadow-lg rounded-xl sm:rounded-2xl pointer-events-auto w-full max-w-full">
           <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 pr-2">
             <div className="shrink-0 p-1 sm:p-1.5 rounded-full bg-primary/10 text-primary transition-colors duration-300">
@@ -734,12 +640,13 @@ export function AgentChat({
         {/* Chat Area Scroll Container */}
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth scroll-pt-20 sm:scroll-pt-24"
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth"
         >
           <div
             key={currentSessionId || "new"}
             className={cn(
-              "max-w-3xl mx-auto w-full pt-32 sm:pt-40 pb-0 sm:pb-8 flex flex-col min-h-full transition-all duration-300 animate-in fade-in fill-mode-both",
+              "max-w-3xl mx-auto w-full pt-4 sm:pt-6 pb-0 sm:pb-8 flex flex-col min-h-full transition-all duration-300 animate-in fade-in fill-mode-both",
               compact ? "px-1 sm:px-1.5" : "px-3 sm:px-6 md:px-8 lg:px-10",
             )}
           >

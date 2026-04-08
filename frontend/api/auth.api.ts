@@ -92,3 +92,17 @@ export async function changeEmail(oldEmail: string, newEmail: string): Promise<a
   const response = await client.post('/auth/change-email', { oldEmail, newEmail });
   return response.data;
 }
+
+export async function requestPasswordReset(email: string, signal?: AbortSignal): Promise<{ message: string }> {
+  const response = await client.post<{ message: string }>('/auth/forgot-password', { email }, { signal });
+  return response.data;
+}
+
+export async function resetPassword(data: {
+  email: string;
+  otp: string;
+  newPassword: string;
+}, signal?: AbortSignal): Promise<{ message: string }> {
+  const response = await client.post<{ message: string }>('/auth/reset-password', data, { signal });
+  return response.data;
+}

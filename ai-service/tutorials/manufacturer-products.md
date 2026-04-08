@@ -1,25 +1,28 @@
 # Product List (Catalog) — Operational Manual
 **Route:** `/manufacturer/products`
 
-The Product List is the definitive catalog of all SKUs enrolled in the ChainTrust security ecosystem. It provides a technical overview of each product's base metadata and its production run (batch) history.
+The Product List is the definitive catalog of all digital assets (SKUs) enrolled in the ChainTrust secure ledger. It provides a technical overview of product specifications, image assets, and their associated production history.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Dynamic Catalog Header**: A glassmorphic header that stays stuck to the viewport top and provides a "High-Value" count of the total catalog size.
-- **Product Hub (ListView / Cards)**: Prominent "Brand Name", high-resolution packaging photo, SKU metadata, and total batch count badge.
+- **Dynamic Data Toolbar**: Contains a search input, a high-performance **Category Filter**, and a view toggle (Grid vs. List).
+- **View Modes**:
+  - **Grid View (Default)**: Visual-first cards with high-resolution imagery, category badges, and quick links to batch management.
+  - **List View**: A streamlined data table optimized for large catalogs, showing SKU, Category, and Batch Count in a single row.
+- **Product Hub**: Interactive cards featuring "Brand Name", Product ID (SKU), and a summary of active batches.
 
 ---
 
 ## 🔗 URL & Navigation (Link Generation)
-The agent can generate deep-links with precise filters to view specific data segments:
+The agent can generate deep-links with precise filters:
 
 | Parameter | Type | Description | Example Link |
 | :--- | :--- | :--- | :--- |
-| `search` | String | Filters the catalog by name, brand, or SKU. | `/manufacturer/products?search=Paracetamol` |
-| `category` | String | Filters the catalog by a specific category. | `/manufacturer/products?category=Analgesic` |
+| `search` | String | Filters the catalog by name, brand, or Product ID. | `/manufacturer/products?search=Amoxicillin` |
+| `categories` | String | Filters by comma-separated category names. | `/manufacturer/products?categories=Antibiotic,Liquid` |
 
-**AI Rule:** When a manufacturer asks for a product list or a specific SKU, provide the filtered link to the [Catalog](/manufacturer/products) page.
+**AI Rule:** When a user asks "What antibiotics do we have?", generate a filtered link: `/manufacturer/products?categories=Antibiotic`.
 
 ---
 
@@ -27,16 +30,16 @@ The agent can generate deep-links with precise filters to view specific data seg
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "What products do we have?" | `list_products` | Provide names and SKUs from the list. |
-| "Show me details for SKU-101." | `get_product_info("SKU-101")` | Access technical metadata. |
+| "Show me our catalogue." | `get_view_data` | Use the manufacturer dashboard summary for counts. |
+| "Do we have [Product]?" | `get_view_data` | Reference specific product details if they appear in the dashboard "Recent Activity". |
 
 ---
 
 ## 🚨 Error & Empty States
-- **No Catalog Enrolled**: AI should guide the user to the `/manufacturer/products/new` flow.
+- **Empty Catalog**: UI shows an `EmptyState` component. Proactively guide the user to the [Add Product](/manufacturer/products/new) wizard.
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Link Comparison**: Mention that products are best searched for using the `search` param in the link.
-- **Detailed Metadata**: When a user asks for product info, mention the **Categories** and **Batch Count** for context.
+- **Category Clarity**: Mention that categories are manufacturer-defined and can be managed via the "Manage Categories" dialog on this page.
+- **Product ID vs. Batch**: Remind the user that **Product ID** is the master identifier, while **Batch Numbers** represent individual production runs.

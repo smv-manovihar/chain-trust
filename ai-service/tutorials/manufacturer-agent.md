@@ -1,28 +1,26 @@
 # Agent Command Center (AI Executive) — Operational Manual
 **Route:** `/manufacturer/agent`
 
-The Agent Command Center is the high-performance AI interface for manufacturers. It provides the executive with an intelligent, conversational assistant that has real-time visibility into the company's full production catalog and live scan analytics.
+The Agent Command Center is the high-performance AI interface for manufacturers. It provides the executive with an intelligent, conversational assistant that has real-time visibility into the company's full production catalog, live scan analytics, and supply chain security.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Full-Viewport Command Hub**: A sleek, h-screen (minus header) interface designed for focused strategic conversation.
-- **Dynamic Session Management**:
-  - **Identified Session Hub**: A h-12 rounded-full search bar for finding past sessions.
-  - **Threaded Conversations**: High-fidelity chat bubbles with glassmorphic tints (Blue for AI, Card for Executive).
-- **Situational Awareness Feed**: A persistent, unobtrusive indicator showing that the AI is "Synchronized with current production view."
-- **Action Targets**: Quick "Copy Analysis" and "Share Report" buttons (h-9 rounded-xl) for individual agent responses.
+- **Institutional Command Aperture**: A focused, strategic chat experience with glassmorphic message architecture.
+- **Dynamic Context Bar**: A persistent indicator showing "Synchronized with [Module Name]" to confirm real-time visibility into production data.
+- **Analytical Overlays**: (Desktop) Integrated side-panels for quick visualization of scan clusters or batch stats mentioned in chat.
+- **Executive Flourishes**: Sophisticated typing animations, multi-session navigation, and high-fidelity action targets for report generation.
 
 ---
 
 ## 🔗 URL & Navigation (Link Generation)
-The agent can generate links to specific chat sessions:
+The agent can generate links to specific strategic sessions:
 
-| Parameter | Type | Description | Example Link |
-| :--- | :--- | :--- | :--- |
-| `session` | String | Opens a specific historical chat session ID. | `/manufacturer/agent?session=507f1...` |
+| Filter | Route | Description |
+| :--- | :--- | :--- |
+| **Active Strategic Session** | `/manufacturer/agent?session=[id]` | Resumes a specific historical conversation. |
 
-**AI Rule:** When an executive asks to "resume" or "view" a previous conversation, generate the link with the `session` parameter.
+**AI Rule:** When asked to "retrieve our previous analysis," provide the active [Session Link](/manufacturer/agent?session=...).
 
 ---
 
@@ -30,18 +28,18 @@ The agent can generate links to specific chat sessions:
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "I want to chat with you." | `get_page_guide` | Explain the situational awareness and available tools. |
-| "Show me my sessions." | `get_view_data` | Use the session list from the current context. |
-| "Run a product scan analysis." | `get_scan_geography` | Contrast with the active session's message history. |
+| "What are our product categories?" | `list_categories` | Provides situational awareness of catalog organization. |
+| "Run a threat analysis." | `get_threat_intelligence` | Contrast with the active session's message history to identify risks. |
+| "Show me my global reach." | `get_scan_geography` | Generates geographic insights based on real-time scan data. |
 
 ---
 
 ## 🚨 Error & Empty States
-- **Session Not Found**: If an invalid `session` ID is provided, the UI shows a "New Strategy" empty state. AI should offer to start fresh.
+- **Neural Link Offline**: Displays a "Data Synchronization Interrupted" status. AI should reassure the executive: "I am unable to see the current dashboard live, but I still have access to the global ledger."
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Executive Self-Awareness**: Acknowledge that the AI is the "ChainTrust Executive Agent" and has "situational awareness" of the user's current manufacturer portal view.
-- **Analytical Depth**: Use analytical tools (`get_scan_geography`, `get_threat_intelligence`) to provide deep strategic insights during conversation.
-- **Deep-Link Generation**: Always provide a link to the [Agent Portal](/manufacturer/agent) if the user is asking complex questions from another page.
+- **Strategic Depth**: Always maintain the persona of an "Advanced Supply Chain Intelligence Agent."
+- **Proactive Registry Guidance**: If a manufacturer is adding a product, suggest using `list_categories` to ensure correct classification.
+- **Deep-Link Connectivity**: Provide a link to the [Agent Command Hub](/manufacturer/agent) for any complex analytical queries.

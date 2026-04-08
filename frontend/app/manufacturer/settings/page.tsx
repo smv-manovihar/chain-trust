@@ -12,14 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  User,
-  Bell,
-  Shield,
-  Wallet,
-  Loader2,
-  AlertCircle,
-} from "lucide-react";
+import { User, Bell, Shield, Wallet, Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { WalletSettings } from "@/components/layout/wallet-settings";
 import { GoogleConnection } from "@/components/settings/google-connection";
@@ -31,9 +24,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
 import { updateProfile } from "@/api";
-import { 
-  getNotificationPreferences, 
-  updateNotificationPreferences 
+import {
+  getNotificationPreferences,
+  updateNotificationPreferences,
 } from "@/api/notification.api";
 import {
   Form,
@@ -44,6 +37,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { PageHeader } from "@/components/ui/page-header";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 
 const profileSchema = z.object({
   companyName: z.string().min(2, "Company name is required"),
@@ -53,6 +48,9 @@ const profileSchema = z.object({
 
 export default function ManufacturerSettingsPage() {
   const { user, refreshUser } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(false);
   const [notificationPrefs, setNotificationPrefs] = useState<any>(null);
   const [prefsLoading, setPrefsLoading] = useState(false);
@@ -108,17 +106,21 @@ export default function ManufacturerSettingsPage() {
     }
   };
 
-  const handlePrefToggle = async (key: string, channel: 'inApp' | 'email', enabled: boolean) => {
+  const handlePrefToggle = async (
+    key: string,
+    channel: "inApp" | "email",
+    enabled: boolean,
+  ) => {
     if (!notificationPrefs) return;
-    
+
     const newPrefs = {
       ...notificationPrefs,
-      [key]: { 
+      [key]: {
         ...notificationPrefs[key],
-        [channel]: enabled 
-      }
+        [channel]: enabled,
+      },
     };
-    
+
     setNotificationPrefs(newPrefs);
     try {
       await updateNotificationPreferences(newPrefs);
@@ -130,6 +132,14 @@ export default function ManufacturerSettingsPage() {
     }
   };
 
+  const currentTab = searchParams.get("tab") || "general";
+
+  const handleTabChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", value);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
   if (!user) return null;
 
   return (
@@ -139,7 +149,11 @@ export default function ManufacturerSettingsPage() {
         description="Configure your corporate identity, security protocols, and blockchain connectivity."
       />
 
-      <Tabs defaultValue="general" className="w-full">
+      <Tabs
+        value={currentTab}
+        onValueChange={handleTabChange}
+        className="w-full"
+      >
         <TabsList className="mb-8 bg-muted/50 p-1.5 rounded-2xl border border-border/50 h-auto w-full flex justify-start sm:w-auto sm:inline-flex overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <TabsTrigger
             value="general"
@@ -178,227 +192,283 @@ export default function ManufacturerSettingsPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent
-          value="general"
-          className="space-y-6"
-        >
-          <Card className="border border-border overflow-hidden rounded-[2rem] shadow-sm">
-            <CardHeader className="bg-muted/30 pb-8">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-primary/10 rounded-xl text-primary">
-                  <User className="h-5 w-5" />
+        <TabsContent value="general" className="space-y-6 outline-none">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="space-y-6"
+          >
+            <Card className="border border-border overflow-hidden rounded-[2rem] shadow-sm">
+              <CardHeader className="bg-muted/30 pb-8">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                    <User className="h-5 w-5" />
+                  </div>
+                  <CardTitle className="text-xl font-black tracking-tight">
+                    Company Profile
+                  </CardTitle>
                 </div>
-                <CardTitle className="text-xl font-black tracking-tight">
-                  Company Profile
-                </CardTitle>
-              </div>
-              <CardDescription className="text-sm font-medium">
-                Update your registered corporate information
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 pt-8">
-              <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit(onProfileSubmit)}
-                  className="space-y-6"
-                >
-                  <div className="grid md:grid-cols-2 gap-x-8 gap-y-6">
-                    <FormField
-                      control={form.control}
-                      name="companyName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
-                            Corporate Name
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              className="rounded-xl h-12 bg-muted/10 font-medium"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="email"
-                        className="text-xs font-bold text-muted-foreground/70 px-1"
-                      >
-                        Primary Email
-                      </Label>
-                      <Input
-                        id="email"
-                        defaultValue={user.email}
-                        disabled
-                        className="bg-muted/50 rounded-xl h-12 border-dashed font-medium"
+                <CardDescription className="text-sm font-medium">
+                  Update your registered corporate information
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6 pt-8">
+                <Form {...form}>
+                  <form
+                    onSubmit={form.handleSubmit(onProfileSubmit)}
+                    className="space-y-6"
+                  >
+                    <div className="grid md:grid-cols-2 gap-x-8 gap-y-6">
+                      <FormField
+                        control={form.control}
+                        name="companyName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
+                              Corporate Name
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                className="rounded-xl h-12 bg-muted/10 font-medium"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="email"
+                          className="text-xs font-bold text-muted-foreground/70 px-1"
+                        >
+                          Primary Email
+                        </Label>
+                        <Input
+                          id="email"
+                          defaultValue={user.email}
+                          disabled
+                          className="bg-muted/50 rounded-xl h-12 border-dashed font-medium"
+                        />
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="phoneNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
+                              Contact Phone
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="+1 (555) 000-0000"
+                                className="rounded-xl h-12 bg-muted/10 font-medium"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="website"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
+                              Official Website
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="https://chaintrust.io"
+                                className="rounded-xl h-12 bg-muted/10 font-medium"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
                     </div>
-                    <FormField
-                      control={form.control}
-                      name="phoneNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
-                            Contact Phone
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="+1 (555) 000-0000"
-                              className="rounded-xl h-12 bg-muted/10 font-medium"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="website"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-bold text-muted-foreground/70 px-1">
-                            Official Website
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="https://chaintrust.io"
-                              className="rounded-xl h-12 bg-muted/10 font-medium"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="flex justify-end pt-6 border-t border-border mt-8">
-                    <Button
-                      disabled={isLoading}
-                      className="rounded-full w-full sm:w-auto px-10 h-12 font-bold text-xs sm:text-[10px] shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
-                    >
-                      {isLoading && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      )}
-                      Save Profile Changes
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
+                    <div className="flex justify-end pt-6 border-t border-border mt-8">
+                      <Button
+                        disabled={isLoading}
+                        className="rounded-full w-full sm:w-auto px-10 h-12 font-bold text-xs sm:text-[10px] shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                      >
+                        {isLoading && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Save Profile Changes
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          </motion.div>
         </TabsContent>
 
-        <TabsContent
-          value="security"
-          className="space-y-6"
-        >
-          <GoogleConnection redirectPath="/manufacturer/settings" />
-          <PasswordSettings />
+        <TabsContent value="security" className="space-y-6 outline-none">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="space-y-6"
+          >
+            <GoogleConnection redirectPath="/manufacturer/settings" />
+            <PasswordSettings />
 
-          <Card className="border border-border opacity-50 bg-muted/[0.02]">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-muted-foreground" />
-                <CardTitle className="text-lg font-black">
-                  Two-Factor Authentication
-                </CardTitle>
-              </div>
-              <CardDescription>
-                Coming soon: secure your account with hardware keys or auth
-                apps.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </TabsContent>
-
-        <TabsContent
-          value="notifications"
-          className="space-y-6"
-        >
-          <Card className="border border-border rounded-[2rem] overflow-hidden shadow-sm">
-            <CardHeader className="bg-muted/30 pb-8">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-primary/10 rounded-xl text-primary">
-                  <Bell className="h-5 w-5" />
+            <Card className="border border-border opacity-50 bg-muted/[0.02]">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-muted-foreground" />
+                  <CardTitle className="text-lg font-black">
+                    Two-Factor Authentication
+                  </CardTitle>
                 </div>
-                <CardTitle className="text-xl font-black tracking-tight">
-                  Notification Hub
-                </CardTitle>
-              </div>
-              <CardDescription className="text-sm font-medium">
-                Configure institutional alert channels for supply chain monitoring
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-border/50 bg-muted/5">
-                      <th className="text-left py-6 px-8 text-xs font-black uppercase tracking-widest text-muted-foreground/60 w-full">Alert Category</th>
-                      <th className="py-6 px-6 text-xs font-black uppercase tracking-widest text-muted-foreground/60 text-center">In-App</th>
-                      <th className="py-6 px-8 text-xs font-black uppercase tracking-widest text-muted-foreground/60 text-center">Email</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {[
-                      { key: 'suspicious_scan', label: 'Security Alerts', desc: 'Unusual scan velocities or geographic anomalies.' },
-                      { key: 'scan_milestone', label: 'Scan Milestones', desc: 'Alerts for batch reach and consumer engagement levels.' },
-                      { key: 'inventory_warning', label: 'Inventory Alerts', desc: 'Low-stock warnings for enrolled batches.' },
-                      { key: 'system', label: 'System Compliance', desc: 'Platform updates and regulatory requirement changes.' },
-                    ].map((type) => (
-                      <tr key={type.key} className="group hover:bg-muted/5 transition-colors">
-                        <td className="py-6 px-8">
-                          <div className="space-y-1">
-                            <Label className="text-sm font-black">{type.label}</Label>
-                            <p className="text-xs text-muted-foreground/70 font-medium max-w-sm line-clamp-1 group-hover:line-clamp-none transition-all">
-                              {type.desc}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="py-6 px-6">
-                          <div className="flex justify-center">
-                            <Switch 
-                              checked={notificationPrefs?.[type.key]?.inApp || false}
-                              onCheckedChange={(checked) => handlePrefToggle(type.key, 'inApp', checked)}
-                              disabled={prefsLoading || !notificationPrefs}
-                              className="scale-90 data-[state=checked]:bg-primary"
-                            />
-                          </div>
-                        </td>
-                        <td className="py-6 px-8">
-                          <div className="flex justify-center">
-                            <Switch 
-                              checked={notificationPrefs?.[type.key]?.email || false}
-                              onCheckedChange={(checked) => handlePrefToggle(type.key, 'email', checked)}
-                              disabled={prefsLoading || !notificationPrefs}
-                              className="scale-90 data-[state=checked]:bg-primary"
-                            />
-                          </div>
-                        </td>
+                <CardDescription>
+                  Coming soon: secure your account with hardware keys or auth
+                  apps.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-6 outline-none">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="space-y-6"
+          >
+            <Card className="border border-border rounded-[2rem] overflow-hidden shadow-sm">
+              <CardHeader className="bg-muted/30 pb-8">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                    <Bell className="h-5 w-5" />
+                  </div>
+                  <CardTitle className="text-xl font-black tracking-tight">
+                    Notification Hub
+                  </CardTitle>
+                </div>
+                <CardDescription className="text-sm font-medium">
+                  Configure institutional alert channels for supply chain
+                  monitoring
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-border/50 bg-muted/5">
+                        <th className="text-left py-6 px-8 text-xs font-black uppercase tracking-widest text-muted-foreground/60 w-full">
+                          Alert Category
+                        </th>
+                        <th className="py-6 px-6 text-xs font-black uppercase tracking-widest text-muted-foreground/60 text-center">
+                          In-App
+                        </th>
+                        <th className="py-6 px-8 text-xs font-black uppercase tracking-widest text-muted-foreground/60 text-center">
+                          Email
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+                    </thead>
+                    <tbody className="divide-y divide-border/50">
+                      {[
+                        {
+                          key: "suspicious_scan",
+                          label: "Security Alerts",
+                          desc: "Unusual scan velocities or geographic anomalies.",
+                        },
+                        {
+                          key: "scan_milestone",
+                          label: "Scan Milestones",
+                          desc: "Alerts for batch reach and consumer engagement levels.",
+                        },
+                        {
+                          key: "inventory_warning",
+                          label: "Inventory Alerts",
+                          desc: "Low-stock warnings for enrolled batches.",
+                        },
+                        {
+                          key: "system",
+                          label: "System Compliance",
+                          desc: "Platform updates and regulatory requirement changes.",
+                        },
+                      ].map((type) => (
+                        <tr
+                          key={type.key}
+                          className="group hover:bg-muted/5 transition-colors"
+                        >
+                          <td className="py-6 px-8">
+                            <div className="space-y-1">
+                              <Label className="text-sm font-black">
+                                {type.label}
+                              </Label>
+                              <p className="text-xs text-muted-foreground/70 font-medium max-w-sm line-clamp-1 group-hover:line-clamp-none transition-all">
+                                {type.desc}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="py-6 px-6">
+                            <div className="flex justify-center">
+                              <Switch
+                                checked={
+                                  notificationPrefs?.[type.key]?.inApp || false
+                                }
+                                onCheckedChange={(checked) =>
+                                  handlePrefToggle(type.key, "inApp", checked)
+                                }
+                                disabled={prefsLoading || !notificationPrefs}
+                                className="scale-90 data-[state=checked]:bg-primary"
+                              />
+                            </div>
+                          </td>
+                          <td className="py-6 px-8">
+                            <div className="flex justify-center">
+                              <Switch
+                                checked={
+                                  notificationPrefs?.[type.key]?.email || false
+                                }
+                                onCheckedChange={(checked) =>
+                                  handlePrefToggle(type.key, "email", checked)
+                                }
+                                disabled={prefsLoading || !notificationPrefs}
+                                className="scale-90 data-[state=checked]:bg-primary"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         </TabsContent>
 
-        <TabsContent
-          value="web3"
-          className="space-y-6"
-        >
-          <WalletSettings />
+        <TabsContent value="web3" className="space-y-6 outline-none">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="space-y-6"
+          >
+            <WalletSettings />
+          </motion.div>
         </TabsContent>
 
-        <TabsContent
-          value="advanced"
-          className="space-y-6"
-        >
-          <DangerZoneSettings role="manufacturer" />
+        <TabsContent value="advanced" className="space-y-6 outline-none">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="space-y-6"
+          >
+            <DangerZoneSettings role="manufacturer" />
+          </motion.div>
         </TabsContent>
       </Tabs>
     </div>

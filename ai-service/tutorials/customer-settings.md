@@ -1,25 +1,28 @@
 # Customer Settings — Operational Manual
 **Route:** `/customer/settings`
 
-The Settings page is where a customer manages their identity, security preferences, and account integrations. It emphasizes data privacy and streamlined authentication.
+The Settings page is the central hub for account identity, security configurations, and notification preferences. It is organized into a modular tabbed interface for precise management.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Unified Profile Header**: A prominently designed, rounded-2xl banner displaying the user's avatar and role.
-- **Settings Category Cards**: Grouped into modular, glassmorphic cards: "Personal Details", "Security Hub", and "External Integrations".
+- **Tabbed Navigation**:
+  - **General**: Personal profile details (Name, Phone, Address).
+  - **Security**: Authentication source (Email vs. Google) and password rotations.
+  - **Notifications**: Granular toggle matrix for **Safety Recalls**, **Expiry Alerts**, and **Dose Reminders**.
+  - **Advanced**: Account closure and data export options.
+- **Glassmorphic Cards**: Each section is wrapped in high-fidelity cards with subtle borders and clear section headers.
 
 ---
 
 ## 🔗 URL & Navigation (Link Generation)
-The agent can generate links to specific settings or actions:
+The agent can generate links to specific tabs:
 
 | Destination | Route | Description |
 | :--- | :--- | :--- |
-| **Settings Profile** | `/customer/settings` | Main settings overview. |
-| **Google Connect** | `/customer/settings?action=google_connect` | Triggers the Google connection flow. |
-
-**AI Rule:** Use the settings route to guide the user towards account security and profile management.
+| **Profile Settings** | `/customer/settings` | Main profile overview. |
+| **Notification Prefs** | `/customer/settings?tab=notifications` | Opens the notification matrix directly. |
+| **Account Security** | `/customer/settings?tab=security` | Opens authentication and security controls. |
 
 ---
 
@@ -27,16 +30,18 @@ The agent can generate links to specific settings or actions:
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "What's my profile info?" | `get_user_profile` | Check name, email, and Google status. |
-| "Is my Google account linked?" | `get_user_profile` | Check `isGoogleConnected` flag. |
+| "Check my contact info." | `get_user_profile` | Retrieves current name, email, and location. |
+| "Am I authenticated with Google?" | `get_user_profile` | Check the `auth_label` and `isGoogleConnected` flag. |
 
 ---
 
 ## 🚨 Error & Empty States
-- **Incomplete Profile Warning**: If a phone number or email is missing, a "Complete Your Profile" amber banner may appear. AI should proactively mention this.
+- **Incomplete Profile**: If critical fields are missing, an amber warning appears. AI should recommend completing the profile for "Enhanced Account Security".
+- **External Auth Constraints**: If using Google Auth, password change options are disabled. AI should explain this context clearly.
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Privacy Focus**: Provide a link to the [Settings](/customer/settings) page for any profile mutation requests.
-- **Authentication Source**: Use the `provider` field from `get_user_profile` to know the authentication context.
+- **Privacy-First**: Never state the user's password or sensitive security keys.
+- **Direct Guidance**: If a user is missing alerts, guide them specifically to the **Notifications** tab using [this link](/customer/settings?tab=notifications).
+- **Proactive Security**: If a user hasn't connected Google, suggest it for "One-tap secure access."

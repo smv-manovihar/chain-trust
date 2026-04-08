@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   Loader2,
   ChevronRight,
+  ChevronLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,21 +55,33 @@ export default function BatchesPage() {
   const router = useRouter();
 
   const [batches, setBatches] = useState<Batch[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
     searchParams.get("categories")?.split(",").filter(Boolean) || []
   );
+  const [page, setPage] = useState(parseInt(searchParams.get("page") || "1"));
   const [isRefreshing, setIsRefreshing] = useState(false);
   const fetchAbortRef = useRef<AbortController | null>(null);
 
   const debouncedSearch = useDebounce(searchTerm, 500);
   const debouncedCategories = useDebounce(selectedCategories, 500);
 
+  const PAGE_SIZE = 25;
+
   // Sync state to URL
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
+    
+    // Reset to page 1 on search or filter change
+    let targetPage = page;
+    if (params.get("search") !== debouncedSearch || params.get("categories") !== debouncedCategories.join(",")) {
+        targetPage = 1;
+        setPage(1);
+    }
+
     if (debouncedSearch) {
       params.set("search", debouncedSearch);
     } else {
@@ -81,6 +94,12 @@ export default function BatchesPage() {
       params.delete("categories");
     }
 
+    if (targetPage > 1) {
+      params.set("page", targetPage.toString());
+    } else {
+      params.delete("page");
+    }
+
     const queryString = params.toString();
     const currentQueryString = searchParams.toString();
 
@@ -89,7 +108,7 @@ export default function BatchesPage() {
       // Use replace to avoid polluting history with every debounce
       router.replace(url, { scroll: false });
     }
-  }, [debouncedSearch, debouncedCategories, pathname, router, searchParams]);
+  }, [debouncedSearch, debouncedCategories, page, pathname, router, searchParams]);
 
   const fetchBatches = useCallback(async () => {
     if (fetchAbortRef.current) fetchAbortRef.current.abort();
@@ -102,8 +121,11 @@ export default function BatchesPage() {
       const res = await listBatches({
         search: debouncedSearch,
         categories: debouncedCategories,
+        page,
+        limit: PAGE_SIZE
       }, controller.signal);
       setBatches(res.batches || []);
+      setTotal(res.total || 0);
     } catch (err: any) {
       if (err.name === 'AbortError') return;
       console.error("Failed to fetch batches:", err);
@@ -114,7 +136,7 @@ export default function BatchesPage() {
         setIsRefreshing(false);
       }
     }
-  }, [debouncedSearch, debouncedCategories]);
+  }, [debouncedSearch, debouncedCategories, page]);
 
   useEffect(() => {
     fetchBatches();
@@ -164,7 +186,7 @@ export default function BatchesPage() {
         stats={
           <Badge variant="secondary" className="font-normal border-primary/20 bg-primary/10 text-primary h-5 text-[10px]">
             <Boxes className="w-3 h-3 mr-1.5 inline-block" aria-hidden="true" />
-            {batches.filter((b) => !b.isRecalled).length} Active
+            {total} Total Batches
           </Badge>
         }
         actions={
@@ -347,6 +369,39 @@ export default function BatchesPage() {
                 }}
                 className="py-12 border rounded-xl"
               />
+            )}
+
+            {/* Pagination Controls */}
+            {total > PAGE_SIZE && (
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-6">
+                <p className="text-sm text-muted-foreground">
+                  Showing <span className="font-medium text-foreground">{((page - 1) * PAGE_SIZE) + 1}</span> to{" "}
+                  <span className="font-medium text-foreground">{Math.min(page * PAGE_SIZE, total)}</span> of{" "}
+                  <span className="font-medium text-foreground">{total}</span> batches
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="gap-1 rounded-full px-4"
+                  >
+                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => p + 1)}
+                    disabled={page * PAGE_SIZE >= total}
+                    className="gap-1 rounded-full px-4"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </div>
+              </div>
             )}
           </>
         )}

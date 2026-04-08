@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
+import RevokedToken from '../models/revoked-token.model.js';
 import { JWT_SECRET } from '../config/config.js';
 import { extractToken } from '../helpers/auth.helpers.js';
 
@@ -12,6 +13,16 @@ export const authenticateJWT = async (req: Request, res: Response, next: NextFun
 			res.status(401).json({
 				code: 'NO_TOKEN',
 				message: 'Access token required',
+			});
+			return;
+		}
+
+		// Blacklist check (FIX-005)
+		const isRevoked = await RevokedToken.findOne({ token });
+		if (isRevoked) {
+			res.status(401).json({
+				code: 'TOKEN_REVOKED',
+				message: 'This session has been revoked. Please login again.',
 			});
 			return;
 		}

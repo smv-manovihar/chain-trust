@@ -1,27 +1,28 @@
 # Enroll New Batch — Operational Manual
 **Route:** `/manufacturer/batches/new`
 
-The New Batch page is a multi-step enrollment wizard used to register a new production run on the ChainTrust blockchain. It handles cryptographic salt derivation and unit serialization.
+The New Batch page is a high-fidelity, multi-step enrollment wizard used to register a new production run on the ChainTrust blockchain. It handles deterministic unit serialization and ensures cryptographic integrity for each unit.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Multi-Step Wizard**: A high-fidelity, linear progress tracker spanning:
-  1. **Select Product**: A searchable dropdown for choosing the parent SKU.
-  2. **Run Details**: Inputs for **Batch Number**, **Quantity (units)**, and **Creation Date**.
-  3. **Blockchain Seal**: Final confirmation and salt derivation phase.
-- **Identified Security Actions**: A primary "Seal & Enroll" button (h-12 rounded-full) that triggers the Web3 wallet and blockchain transaction.
+- **Stepper Navigation**: A clean, linear progress tracker:
+  1. **Source Selection**: Search and select the parent **Product SKU**.
+  2. **Production Metadata**: Define **Batch Number**, **Quantity**, and **Expiry Date**.
+  3. **Blockchain Seal**: Final cryptographic phase where salts are derived and the blockchain transaction is signed.
+- **Glassmorphic Inputs**: Large, thumb-friendly inputs with real-time validation for batch uniqueness.
+- **Sealing Animation**: A high-fidelity "Secure Seal" animation sequence during the blockchain enrollment phase.
 
 ---
 
 ## 🔗 URL & Navigation (Link Generation)
-The agent can generate links to the enrollment wizard with pre-filled fields if possible:
+The agent can generate links to pre-fill the wizard:
 
-| Parameter | Type | Description | Example Link |
-| :--- | :--- | :--- | :--- |
-| **productId** | String | Auto-selects the product for the new batch. | `/manufacturer/batches/new?productId=SKU-101` |
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| `productId` | String | Pre-selects the product to accelerate enrollment. |
 
-**AI Rule:** When a manufacturer asks to "start a new run" for a specific product, provide the pre-filled link to the [Enrollment Wizard](/manufacturer/batches/new).
+**AI Rule:** When starting a new run for a known product, generate the [Pre-filled Wizard Link](/manufacturer/batches/new?productId=...).
 
 ---
 
@@ -29,18 +30,18 @@ The agent can generate links to the enrollment wizard with pre-filled fields if 
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "I want to start a new batch." | `get_page_guide` | Explain the 3-step wizard and guide to the [Wizard](/manufacturer/batches/new). |
-| "Which product should I use?" | `list_products` | Help the user identify the correct SKU first. |
+| "Help me start a new batch." | `list_products` | First, help the user find the correct SKU to link the batch to. |
+| "How do I secure this run?" | `get_page_guide` | Explain the **Blockchain Seal** step and the role of Web3 wallets. |
 
 ---
 
 ## 🚨 Error & Empty States
-- **Blockchain Denial**: If a transaction fails, a red "Transaction Rejected" alert appears. AI should suggest checking the Web3 wallet balance.
-- **Missing Product**: If no products exist, the wizard is disabled. Group them to the [Catalog](/manufacturer/products/new) first.
+- **Wallet Disconnected**: Displays a "Security Link Missing" state. AI should urge the user to "Connect your manufacturer wallet to proceed with enrollment."
+- **Duplicate Batch ID**: Red validation alert. AI should check `search_batches` to confirm if the ID is already in use.
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Wizard Sequence**: Mention that the batch is not secured until the final "Blockchain Seal" step is completed.
-- **Batch Uniqueness**: Advise the user to use unique Batch Numbers for each production run to ensure tracking integrity.
-- **SKU Pre-Selection**: Always offer a pre-filled link if the Product ID is already known.
+- **Deterministic Salts**: Remind the user that batch enrollment is immutable once sealed on the blockchain.
+- **Direct Catalog Integration**: If a user is on the [Product Catalog](/manufacturer/products), suggest they can start a batch directly from any product card.
+- **Post-Enrollment**: Once successful, guide the user to the [Batch Details](/manufacturer/batches/[id]) to download the QR code labels.

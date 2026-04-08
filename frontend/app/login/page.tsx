@@ -106,7 +106,10 @@ function LoginForm() {
           />
 
           <div className="flex justify-end items-center text-sm">
-            <Link href="#" className="text-primary hover:underline">
+            <Link
+              href="/forgot-password"
+              className="text-primary hover:underline"
+            >
               Forgot password?
             </Link>
           </div>
@@ -130,8 +133,8 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title="Secure verification"
-      subtitle="Access your dashboard and stay connected with the entire supply chain."
+      title="Welcome back"
+      subtitle="Sign in to your ChainTrust account and pick up right where you left off."
     >
       <div className="flex flex-col space-y-2 text-center mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>

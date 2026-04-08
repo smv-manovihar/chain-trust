@@ -280,7 +280,7 @@ def _extract_text_from_pdf(path: str):
             if len(text) > 50:
                 texts.append(text)
             else:
-                if pytesseract and Image and ocr_pages_done < 5:
+                if pytesseract and Image and ocr_pages_done < 50:
                     try:
                         pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
                         mode = "RGBA" if pix.alpha else "RGB"
@@ -292,6 +292,9 @@ def _extract_text_from_pdf(path: str):
                         ocr_pages_done += 1
                     except Exception:
                         pass
+                elif ocr_pages_done >= 50:
+                    texts.append("[NOTE: Image-heavy document truncated at 50 pages for performance.]")
+                    break
         return "\n\n--- Page Break ---\n\n".join(texts).strip(), None
     except Exception as fitz_err:
         if not PyPDF2:

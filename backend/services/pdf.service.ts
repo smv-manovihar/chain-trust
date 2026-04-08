@@ -69,6 +69,11 @@ export const generateBatchPDF = async (
         (async () => {
             try {
                 for (let i = 0; i < batch.quantity; i++) {
+                    // Yield to event loop every 50 units (FIX-001)
+                    if (i > 0 && i % 50 === 0) {
+                        await new Promise(resolve => setImmediate(resolve));
+                    }
+
                     // Derive salt locally to avoid passing huge arrays
                     const unitHash = crypto.createHash('sha256').update(`${batch.batchSalt}-${i}`).digest('hex');
                     const qrSalt = `${batch.batchSalt}:${i}:${unitHash}`;
