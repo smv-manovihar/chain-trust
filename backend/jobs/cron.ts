@@ -3,19 +3,27 @@ import CabinetItem from '../models/cabinet.model.js';
 import Notification from '../models/notification.model.js';
 import User from '../models/user.model.js';
 import { sendExpiryAlert, sendDoseReminder } from '../utils/email.utils.js';
+import { isOccurrenceOnDay } from '../utils/medicine.util.js';
 
 /**
  * Helper to check if a notification of a specific type has already been sent
  * for a specific cabinet item today.
  */
-async function wasRecentlyNotified(userId: any, cabinetItemId: any, type: string, hours = 23) {
+/**
+ * Helper to check if a notification of a specific type has already been sent
+ * for a specific cabinet item today.
+ */
+async function wasRecentlyNotified(userId: any, cabinetItemId: any, type: string, hours = 23, extraFilter: any = {}) {
 	const since = new Date(Date.now() - hours * 60 * 60 * 1000);
-	const existing = await Notification.findOne({
+	const query: any = {
 		user: userId,
 		type,
 		'metadata.cabinetItemId': cabinetItemId,
-		createdAt: { $gte: since }
-	});
+		createdAt: { $gte: since },
+		...extraFilter
+	};
+	
+	const existing = await Notification.findOne(query);
 	return !!existing;
 }
 
@@ -93,45 +101,63 @@ export const startCronJobs = () => {
 			});
 
 			for (const item of items) {
-				// Filter reminders matching current UTC time window
+				const user = await User.findById(item.userId);
+				if (!user) continue;
+
+				// Determine lead time (Preference: Medicine Override > User Default > 0)
+				const override = item.notificationOverrides?.dose_reminder;
+				const defaults = user.notificationDefaults?.dose_reminder;
+				const leadTime = override?.leadTimeMinutes !== undefined ? override.leadTimeMinutes : (defaults?.leadTimeMinutes ?? 0);
+
+				// Filter reminders matching current UTC time window + lead time + frequency rules
 				const matching = item.reminderTimes?.filter(r => {
 					const rDate = new Date(r.time);
-					return rDate.getUTCHours() === currentHour && 
-						   Math.abs(rDate.getUTCMinutes() - currentMinute) < 5;
+					// Subtract lead time from scheduled time to find 'trigger time'
+					const triggerDate = new Date(rDate.getTime() - leadTime * 60 * 1000);
+					
+					// 1. Check time window (Standard)
+					const timeMatches = triggerDate.getUTCHours() === currentHour && 
+						   Math.abs(triggerDate.getUTCMinutes() - currentMinute) < 5;
+					
+					if (!timeMatches) return false;
+
+					// 2. Check Frequency Rules
+					return isOccurrenceOnDay(r, now);
 				}) || [];
 
-				if (matching.length > 0) {
-					// Deduplicate: Don't repeat reminder within the same hour
-					if (await wasRecentlyNotified(item.userId, item._id, 'dose_reminder', 1)) continue;
+				for (const reminder of matching) {
+					const rDate = new Date(reminder.time);
+					const scheduledTime = `${rDate.getUTCHours().toString().padStart(2, '0')}:${rDate.getUTCMinutes().toString().padStart(2, '0')}`;
 
-					const user = await User.findById(item.userId);
-					if (!user) continue;
+					// Deduplicate: Don't repeat THE SAME specific reminder within the same hour
+					if (await wasRecentlyNotified(item.userId, item._id, 'dose_reminder', 1, { 'metadata.scheduledTime': scheduledTime })) {
+						continue;
+					}
 
-					for (const reminder of matching) {
-						const override = item.notificationOverrides?.dose_reminder;
-						const defaults = user.notificationDefaults?.dose_reminder;
+					const notifyInApp = override?.inApp !== undefined ? override.inApp : (defaults?.inApp ?? true);
+					const notifyEmail = override?.email !== undefined ? override.email : (defaults?.email ?? false);
+
+					if (notifyInApp) {
+						const mealText = reminder.mealContext ? ` (${reminder.mealContext.replace('_', ' ')})` : '';
+						const timeContext = leadTime > 0 ? `In ${leadTime} minutes: ` : '';
 						
-						const notifyInApp = override?.inApp !== undefined ? override.inApp : (defaults?.inApp ?? true);
-						const notifyEmail = override?.email !== undefined ? override.email : (defaults?.email ?? false);
+						await Notification.create({
+							user: user._id,
+							type: 'dose_reminder',
+							title: 'Time for your Medicine',
+							message: `${timeContext}It's time to take ${item.dosage || ''} of ${item.name}${mealText}.`,
+							link: `/customer/cabinet/${item._id}`,
+							metadata: {
+								cabinetItemId: item._id,
+								medicineName: item.name,
+								scheduledTime: scheduledTime,
+								leadTimeApplied: leadTime
+							}
+						});
+					}
 
-						if (notifyInApp) {
-							const mealText = reminder.mealContext ? ` (${reminder.mealContext.replace('_', ' ')})` : '';
-							await Notification.create({
-								user: user._id,
-								type: 'dose_reminder',
-								title: 'Time for your Medicine',
-								message: `It's time to take ${item.dosage || ''} of ${item.name}${mealText}.`,
-								link: `/customer/cabinet/${item._id}`,
-								metadata: {
-									cabinetItemId: item._id,
-									medicineName: item.name
-								}
-							});
-						}
-
-						if (notifyEmail && user.email) {
-							await sendDoseReminder(user.email, item.name, item.dosage, reminder.mealContext);
-						}
+					if (notifyEmail && user.email) {
+						await sendDoseReminder(user.email, item.name, item.dosage, reminder.mealContext, item.unit);
 					}
 				}
 			}

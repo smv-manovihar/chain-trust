@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 import re
 from urllib.parse import unquote
@@ -322,6 +322,10 @@ class ToolStore:
                 filter_query["$or"] = [
                     {"name": {"$regex": regex}},
                     {"brand": {"$regex": regex}},
+                    {"composition": {"$regex": regex}},
+                    {"doctorName": {"$regex": regex}},
+                    {"notes": {"$regex": regex}},
+                    {"productId": {"$regex": regex}},
                 ]
             except re.error:
                 return []
@@ -391,20 +395,26 @@ class ToolStore:
         user_id: str,
         name: str,
         brand: str,
+        expiry_date: str,
         composition: str = None,
         medicine_code: str = None,
         batch_number: str = None,
-        expiry_date: str = None,
-        prescription_ids: List[str] = None,
-        dosage: str = None,
+        prescription_ids: list = None,
+        dosage: float = None,
+        unit: str = "pills",
         frequency: str = None,
         quantity: int = None,
+        doctor_name: str = None,
         notes: str = None,
     ) -> bool:
-        """Manually add a medicine to the user's cabinet with explicit schema enforced (FIX-004)."""
+        """Manually add a medicine to the user's cabinet with explicit schema enforced."""
         u_id = self._to_obj_id(user_id)
         if not u_id:
             return False
+
+        # Generate slug-based productId matching backend's generateIdSlug(name)
+        import re as _re
+        product_id = _re.sub(r'^-+|-+$', '', _re.sub(r'[^a-z0-9]+', '-', name.lower().strip()))
 
         # Parse expiry date if provided
         parsed_expiry = None
@@ -425,7 +435,7 @@ class ToolStore:
             "brand": brand,
             "composition": composition or "N/A",
             "medicineCode": medicine_code or "N/A",
-            "productId": f"manual-{int(datetime.now().timestamp() * 1000)}",
+            "productId": product_id,
             "batchNumber": batch_number or "N/A",
             "expiryDate": parsed_expiry,
             "prescriptionIds": [
@@ -434,10 +444,12 @@ class ToolStore:
             if prescription_ids
             else [],
             "isUserAdded": True,
-            "dosage": dosage,
+            "dosage": dosage if dosage is not None else 1,
+            "unit": unit or "pills",
             "frequency": frequency,
             "currentQuantity": quantity or 0,
             "totalQuantity": quantity or 0,
+            "doctorName": doctor_name,
             "notes": notes,
             "status": "active",
             "createdAt": datetime.now(),
@@ -478,6 +490,100 @@ class ToolStore:
             {"$inc": {"currentQuantity": -1}, "$set": {"updatedAt": datetime.now()}},
         )
         return result.modified_count > 0
+
+    async def undo_dose(self, item_id: str, user_id: str) -> bool:
+        """Revert the last recorded dose log: restore inventory and delete the log."""
+        u_id = self._to_obj_id(user_id)
+        obj_id = self._to_obj_id(item_id)
+        if not u_id or not obj_id:
+            return False
+
+        item = await self.db["cabinet_items"].find_one({"_id": obj_id, "userId": u_id})
+        if not item:
+            return False
+
+        # Find the latest dosage log for this item
+        latest_log = await self.db["dosage_logs"].find_one(
+            {"cabinetItemId": obj_id, "userId": u_id},
+            sort=[("timestamp", -1)],
+        )
+        if not latest_log:
+            return False
+
+        # Delete the log and restore inventory
+        await self.db["dosage_logs"].delete_one({"_id": latest_log["_id"]})
+        dose_amount = latest_log.get("doseAmount", 1)
+        await self.db["cabinet_items"].update_one(
+            {"_id": obj_id},
+            {"$inc": {"currentQuantity": dose_amount}, "$set": {"updatedAt": datetime.now()}},
+        )
+        return True
+
+    async def add_reminder_to_cabinet_item(
+        self,
+        item_id: str,
+        user_id: str,
+        time: str,
+        meal_context: str = "no_preference",
+        frequency_type: str = "daily",
+        days_of_week: list = None,
+        interval: int = 1,
+    ) -> bool:
+        """Append a new reminder to the cabinet item's reminderTimes array."""
+        u_id = self._to_obj_id(user_id)
+        obj_id = self._to_obj_id(item_id)
+        if not u_id or not obj_id:
+            return False
+
+        # Parse HH:MM time into a full datetime stored as UTC today
+        try:
+            h, m = map(int, time.split(":"))
+            now = datetime.now()
+            reminder_dt = now.replace(hour=h, minute=m, second=0, microsecond=0)
+        except Exception:
+            return False
+
+        reminder = {
+            "time": reminder_dt,
+            "mealContext": meal_context,
+            "frequencyType": frequency_type,
+            "daysOfWeek": days_of_week or [],
+            "interval": interval or 1,
+        }
+
+        result = await self.db["cabinet_items"].update_one(
+            {"_id": obj_id, "userId": u_id},
+            {"$push": {"reminderTimes": reminder}, "$set": {"updatedAt": datetime.now()}},
+        )
+        return result.modified_count > 0
+
+    async def remove_reminder_from_cabinet_item(
+        self, item_id: str, user_id: str, reminder_index: int
+    ) -> bool:
+        """Remove a reminder from reminderTimes by its 0-based index."""
+        u_id = self._to_obj_id(user_id)
+        obj_id = self._to_obj_id(item_id)
+        if not u_id or not obj_id:
+            return False
+
+        item = await self.db["cabinet_items"].find_one({"_id": obj_id, "userId": u_id})
+        if not item:
+            return False
+
+        reminders = item.get("reminderTimes", [])
+        if reminder_index < 0 or reminder_index >= len(reminders):
+            return False
+
+        # MongoDB array element removal by index: set to null then pull
+        await self.db["cabinet_items"].update_one(
+            {"_id": obj_id},
+            {"$unset": {f"reminderTimes.{reminder_index}": 1}},
+        )
+        await self.db["cabinet_items"].update_one(
+            {"_id": obj_id},
+            {"$pull": {"reminderTimes": None}, "$set": {"updatedAt": datetime.now()}},
+        )
+        return True
 
     async def list_prescriptions(
         self, user_id: str, skip: int = 0, limit: int = 20
@@ -692,6 +798,8 @@ class ToolStore:
 
             if route.startswith("/manufacturer/batches/"):
                 identifier = unquote(route.split("/")[-1])
+                if identifier == "new":
+                    return "You are on the Batch Enrollment page. I can help you with regulatory naming, batch sizing, or salt derivation logic."
                 if identifier and identifier != "batches":
                     return await self.get_batch_summary_by_id_or_number(
                         identifier, user_id
@@ -699,13 +807,18 @@ class ToolStore:
 
             if route.startswith("/manufacturer/products/"):
                 identifier = unquote(route.split("/")[-1])
+                if identifier == "new":
+                    return "You are in the Product Catalog editor. Tell me about the medication's composition or brand to help you register it."
                 if identifier and identifier != "products":
                     return await self.get_product_summary_by_id_or_code(
                         identifier, user_id
                     )
 
-            if route.startswith("/manufacturer/analytics"):
+            if route == "/manufacturer/analytics":
                 return await self.get_manufacturer_analytics_summary(user_id, params)
+
+            if route == "/manufacturer/analytics/scans":
+                return await self.get_manufacturer_analytics_deep_dive(user_id, params)
 
             if route.endswith("/notifications"):
                 return await self.get_notifications_summary(user_id)
@@ -783,20 +896,35 @@ class ToolStore:
         manual_items = await self.db.cabinet_items.count_documents(
             {"userId": u_id, "isUserAdded": True}
         )
-        low_stock_count = await self.db.cabinet_items.count_documents(
-            {"userId": u_id, "currentQuantity": {"$lt": 5}}
-        )
+        # Backend Alignment: Expiring Soon (7 days)
+        now = datetime.now()
+        one_week_later = (now + timedelta(days=7)).strftime("%Y-%m-%d")
+        expiring_soon = await self.db.cabinet_items.count_documents({
+            "userId": u_id,
+            "expiryDate": {"$lte": one_week_later}
+        })
+
+        # Backend Alignment: Scheduled Today (Items with at least one reminder)
+        scheduled_today = await self.db.cabinet_items.count_documents({
+            "userId": u_id,
+            "reminderTimes.0": {"$exists": True}
+        })
+
+        
         
         # Get max streak
         max_streak_doc = await self.db.cabinet_items.find({"userId": u_id}).sort("currentStreak", -1).limit(1).to_list(length=1)
         max_streak = max_streak_doc[0].get("currentStreak", 0) if max_streak_doc else 0
 
-        # Get recalled items count
-        recalled_batches = await self.db.batches.find({"isRecalled": True}, {"batchNumber": 1}).to_list(length=100)
-        recalled_numbers = [b["batchNumber"] for b in recalled_batches]
-        recall_warnings = await self.db.cabinet_items.count_documents(
-            {"userId": u_id, "batchNumber": {"$in": recalled_numbers}}
-        )
+        # Optimized Recall Check: Only check batches associated with THIS user's cabinet
+        # 1. Get unique batch IDs from user's verified items
+        user_batch_ids = await self.db.cabinet_items.distinct("batchId", {"userId": u_id, "isUserAdded": False, "batchId": {"$ne": None}})
+        # 2. Count how many of those specific batches are recalled
+        recall_warnings = 0
+        if user_batch_ids:
+            recall_warnings = await self.db.batches.count_documents(
+                {"_id": {"$in": user_batch_ids}, "isRecalled": True}
+            )
 
         recent_cursor = (
             self.db.cabinet_items.find({"userId": u_id}).sort("updatedAt", -1).limit(3)
@@ -808,9 +936,10 @@ class ToolStore:
             f"- **Total Items in Cabinet:** {total_items}",
             f"- **Verified Authentic:** {verified_items}",
             f"- **Manually Added:** {manual_items}",
-            f"- **Low Stock Alerts:** {low_stock_count}",
+            f"- **Scheduled for Today:** {scheduled_today} Medications",
+            f"- **Expiring within 7 Days:** {expiring_soon}",
             f"- **Current Best Streak:** {max_streak} Days",
-            f"- **Safety Recall Alerts:** {recall_warnings}",
+            f"- **Safety Recall Alerts (DANGER):** {recall_warnings}",
             "\n### Recently Updated",
         ]
 
@@ -1047,15 +1176,66 @@ class ToolStore:
         if not active_items:
             return "No upcoming doses scheduled."
 
-        # Simplification for agent: list items and their reminder times
+        now = datetime.now()
+        start_of_day = datetime(now.year, now.month, now.day)
+        end_of_day = start_of_day + timedelta(days=1, microseconds=-1)
+
         summary = ["## Upcoming Medication Schedule"]
-        for item in active_items:
-            for r in item.get("reminderTimes", []):
-                summary.append(f"- **{item['name']}**: {r.get('time')} ({r.get('mealContext', 'No context')})")
         
-        # Sort by time string (crude but useful for the agent)
-        # In a real scenario, we'd use proper datetime objects.
-        return "\n".join(sorted(summary))
+        upcoming = []
+        for item in active_items:
+            # Get logs for this item today
+            logs_today_count = await self.db["dosage_logs"].count_documents({
+                "cabinetItemId": item["_id"],
+                "timestamp": {"$gte": start_of_day, "$lte": end_of_day}
+            })
+
+            # Sort reminder times for this item chronologically
+            reminders = sorted(item.get("reminderTimes", []), key=lambda x: x.get("time"))
+            for idx, r in enumerate(reminders):
+                # Logic: If index < logs_today_count, it's fulfilled
+                r_time_str = r.get("time")
+                
+                # Parse time parts
+                try:
+                    if "T" in r_time_str:
+                        # Full ISO
+                        dt = datetime.fromisoformat(r_time_str.replace("Z", "+00:00"))
+                        h, m = dt.hour, dt.minute
+                    else:
+                        # HH:MM
+                        h, m = map(int, r_time_str.split(":"))
+                    
+                    scheduled_today = start_of_day.replace(hour=h, minute=m)
+                except Exception:
+                    continue
+
+                status = "Upcoming"
+                if idx < logs_today_count:
+                    status = "✅ Fulfilled Today"
+                elif scheduled_today < now:
+                    # Past time and not fulfilled
+                    status = "⚠️ Missed?"
+                
+                upcoming.append({
+                    "time": scheduled_today,
+                    "display_time": f"{h:02d}:{m:02d}",
+                    "name": item["name"],
+                    "brand": item.get("brand", "N/A"),
+                    "status": status,
+                    "ctx": r.get("mealContext", "No context")
+                })
+
+        if not upcoming:
+            return "No doses scheduled or remaining for today."
+
+        # Sort all by actual time
+        upcoming.sort(key=lambda x: x["time"])
+        
+        for u in upcoming:
+            summary.append(f"- **{u['display_time']}**: {u['name']} ({u['brand']}) - {u['status']} [{u['ctx']}]")
+
+        return "\n".join(summary)
 
     async def get_cabinet_item_summary(self, identifier: str, user_id: str) -> str:
         """Fetch and format detailed summary for a specific cabinet item."""
@@ -1080,22 +1260,69 @@ class ToolStore:
         status = "RECALLED" if batch_info and batch_info.get("isRecalled") else "Active"
         verified = batch_info.get("isOnBlockchain", False) if batch_info else False
 
+        dosage_display = item.get("dosage", "N/A")
+        unit = item.get("unit", "pills") or "pills"
+        dosage_str = f"{dosage_display} {unit}" if dosage_display not in (None, "N/A") else "N/A"
+
         summary = [
             f"## Medication Details: {item['name']}",
             f"- **Brand:** {item['brand']}",
             f"- **Status:** {status}",
             f"- **Authenticity:** {'Blockchain Verified' if verified else 'Manually Added'}",
-            f"- **Current Storage:** {item.get('currentQuantity', 0)} {item.get('unit', 'Units')}",
-            f"- **Dosage:** {item.get('dosage', 'N/A')} ({item.get('frequency', 'N/A')})",
+            f"- **Composition:** {item.get('composition', 'N/A')}",
+            f"- **Doctor:** {item.get('doctorName', 'N/A')}",
+            f"- **Current Stock:** {item.get('currentQuantity', 0)} {unit}",
+            f"- **Dosage Per Intake:** {dosage_str}",
+            f"- **Frequency:** {item.get('frequency', 'N/A')}",
             f"- **Adherence Streak:** {item.get('currentStreak', 0)} Days",
             f"- **Expiry Date:** {item.get('expiryDate', 'N/A')}",
             f"- **Notes:** {item.get('notes', 'None')}",
         ]
 
-        if item.get("reminderTimes"):
-            summary.append("\n### Schedule")
-            for r in item["reminderTimes"]:
-                summary.append(f"- {r.get('time')} ({r.get('mealContext', 'No context')})")
+        reminders = item.get("reminderTimes", [])
+        if reminders:
+            summary.append(f"\n### Reminders ({len(reminders)} scheduled)")
+            freq_labels = {
+                "daily": "Daily",
+                "weekly": "Weekly",
+                "interval_days": "Every N days",
+                "interval_months": "Every N months",
+            }
+            meal_labels = {
+                "before_meal": "Before Meal",
+                "after_meal": "After Meal",
+                "with_meal": "With Meal",
+                "no_preference": "No meal preference",
+            }
+            for idx, r in enumerate(reminders):
+                r_time = r.get("time")
+                try:
+                    if hasattr(r_time, "strftime"):
+                        time_str = r_time.strftime("%H:%M")
+                    elif r_time and "T" in str(r_time):
+                        from datetime import datetime as _dt
+                        time_str = _dt.fromisoformat(str(r_time).replace("Z", "+00:00")).strftime("%H:%M")
+                    else:
+                        time_str = str(r_time)
+                except Exception:
+                    time_str = str(r_time)
+
+                freq = freq_labels.get(r.get("frequencyType", "daily"), r.get("frequencyType", "daily"))
+                meal = meal_labels.get(r.get("mealContext", "no_preference"), "No preference")
+                interval = r.get("interval", 1)
+                days = r.get("daysOfWeek", [])
+                
+                freq_detail = freq
+                if r.get("frequencyType") == "weekly" and days:
+                    day_names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                    freq_detail = f"Weekly ({', '.join(day_names[d] for d in days if 0 <= d <= 6)})"
+                elif r.get("frequencyType") in ("interval_days", "interval_months"):
+                    unit_label = "day" if r.get("frequencyType") == "interval_days" else "month"
+                    freq_detail = f"Every {interval} {unit_label}(s)"
+
+                summary.append(f"- **[{idx}]** {time_str} — {freq_detail} — {meal}")
+        else:
+            summary.append("\n### Reminders\n- No reminders set yet. Use `add_reminder` to schedule one.")
 
         return "\n".join(summary)
 
@@ -1120,32 +1347,6 @@ class ToolStore:
         
         return "\n".join(summary)
 
-    async def get_manufacturer_analytics_summary(self, user_id: str, params: dict = None) -> str:
-        """Aggregates geographic and threat intelligence into a situational summary."""
-        params = params or {}
-        geo = await self.get_scan_geography(user_id, **params)
-        threats = await self.get_threat_data(user_id, **params)
-        
-        summary = ["## Global Security Intelligence"]
-        summary.append(f"- **Top Threat Origin:** {geo[0]['city']}, {geo[0]['country']}" if geo else "- **Threat Locations:** Stable")
-        summary.append(f"- **Compromised Units Detected:** {len(threats)}")
-        
-        summary.append("\n### Top Scan Locations")
-        if geo:
-            for g in geo[:5]:
-                summary.append(f"- {g['city']}, {g['country']}: {g['count']} scans")
-        else:
-            summary.append("- No geographic data for this period.")
-
-        summary.append("\n### Security Threats & Anomalies")
-        if threats:
-            for t in threats[:3]:
-                summary.append(f"- **High Risk**: {t['visitorCount']} visitors for Batch {t['batchNumber']} (Unit {t['unit']})")
-        else:
-            summary.append("- No suspicious activity detected in this period.")
-
-        return "\n".join(summary)
-
     async def get_all_categories(self, user_id: str) -> List[str]:
         """Fetch all unique categories defined by the manufacturer."""
         u_id = self._to_obj_id(user_id)
@@ -1165,7 +1366,108 @@ class ToolStore:
             summary.append(f"- {cat}")
             
         return "\n".join(summary)
+    async def get_manufacturer_analytics_summary(
+        self, user_id: str, params: dict = None
+    ) -> str:
+        """Aggregates geographic and threat intelligence into a situational summary for the main analytics page."""
+        params = params or {}
+        u_id = self._to_obj_id(user_id)
 
+        # Get top-level summaries
+        geo = await self.get_scan_geography(user_id, **params)
+        threats = await self.get_threat_data(user_id, **params)
+
+        # Add Timeline Analytics (Scan volume over 30 days)
+        now = datetime.now()
+        thirty_days_ago = now - timedelta(days=30)
+
+        pipeline = [
+            {
+                "$match": {
+                    "manufacturer": u_id,
+                    "createdAt": {"$gte": thirty_days_ago},
+                }
+            },
+            {
+                "$group": {
+                    "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$createdAt"}},
+                    "count": {"$sum": 1},
+                }
+            },
+            {"$sort": {"_id": 1}},
+        ]
+        timeline = await self.db["scans"].aggregate(pipeline).to_list(length=31)
+
+        summary = ["## Manufacturer Analytics Overview"]
+
+        if timeline:
+            total_30d = sum(t["count"] for t in timeline)
+            summary.append(f"- **Total Scan Activity (Last 30 Days):** {total_30d} Scans")
+            peak = max(timeline, key=lambda x: x["count"])
+            summary.append(f"- **Peak Activity Day:** {peak['_id']} ({peak['count']} scans)")
+
+        if threats:
+            summary.append(f"\n### Cloned Unit Threats ({len(threats)})")
+            for t in threats[:3]:
+                summary.append(
+                    f"- **Batch {t['batchNumber']}**: Unit #{t['unit']+1} has {t['visitorCount']} unique visitors"
+                )
+
+        if geo:
+            summary.append("\n### Geographic Distribution")
+            for g in geo[:3]:
+                summary.append(f"- {g['city']}, {g['country']}: {g['count']} scans")
+
+        if not (timeline or threats or geo):
+            summary.append("- No scan data available for analysis yet.")
+
+        return "\n".join(summary)
+
+    async def get_manufacturer_analytics_deep_dive(
+        self, user_id: str, params: dict = None
+    ) -> str:
+        """Situational summary for the detailed scans analysis page filtered by batch."""
+        params = params or {}
+        batch_number = params.get("batchNumber")
+
+        if not batch_number:
+            return "You are on the Scans Analysis deep-dive. Please specify a Batch Number to see detailed threat patterns and location logs."
+
+        # Get batch info
+        u_id = self._to_obj_id(user_id)
+        batch = await self.db.batches.find_one(
+            {"batchNumber": batch_number, "createdBy": u_id}
+        )
+        if not batch:
+            return f"Error: Batch '{batch_number}' not found in your production records."
+
+        # Stats for this specific batch
+        total_scans = await self.db.scans.count_documents({"batch": batch["_id"]})
+        unique_units = len(
+            await self.db.scans.distinct("unitIndex", {"batch": batch["_id"]})
+        )
+        suspicious_count = await self.db.scans.count_documents(
+            {"batch": batch["_id"], "isSuspicious": True}
+        )
+
+        summary = [
+            f"## Analytics Deep Dive: Batch {batch_number}",
+            f"- **Product Linked:** {batch['productName']} ({batch['productId']})",
+            f"- **Total Verification Events:** {total_scans}",
+            f"- **Units Engaged:** {unique_units} out of {batch['quantity']} total units",
+            f"- **Security Flags:** {suspicious_count} High-Risk scans detected",
+        ]
+
+        if suspicious_count > 0:
+            summary.append(
+                "\n> [!CAUTION]\n> **Critical Risk**: Multiple units in this batch have triggered security filters (Impossible Travel or High Frequency). Review the log below for specific IP and location details."
+            )
+        else:
+            summary.append(
+                "\n- No security flags detected for this batch yet. All scans appear organic."
+            )
+
+        return "\n".join(summary)
 
 
 tool_store = ToolStore()

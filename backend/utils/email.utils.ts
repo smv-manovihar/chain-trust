@@ -234,17 +234,19 @@ export const sendExpiryAlert = async (
 export const sendDoseReminder = async (
 	email: string,
 	medicineName: string,
-	dosage?: string,
+	dosage?: number,
 	mealContext?: string,
+	unit?: string,
 ): Promise<boolean> => {
 	const mealText = mealContext ? `<p class="label label-blue">${mealContext.replace('_', ' ')}</p>` : '';
+	const unitText = unit ? ` ${unit}` : '';
 	const content = `
 		<p class="text">It's time to take your scheduled dose.</p>
 		
 		<div class="card card-blue">
 			<div class="label label-blue">Now Taking</div>
 			<div class="otp" style="font-size: 32px; color: #1d4ed8; letter-spacing: -0.02em;">${medicineName}</div>
-			${dosage ? `<p class="text" style="font-size: 18px; font-weight: 600; margin: 12px 0 0 0;">Dosage: ${dosage}</p>` : ''}
+			${dosage ? `<p class="text" style="font-size: 18px; font-weight: 600; margin: 12px 0 0 0;">Dosage: ${dosage}${unitText}</p>` : ''}
 			${mealText}
 		</div>
 

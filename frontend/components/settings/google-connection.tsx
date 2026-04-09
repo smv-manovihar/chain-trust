@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -41,10 +40,10 @@ export function GoogleConnection({
           Connect your Google account for faster, more secure access.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-between p-4 border rounded-2xl bg-background/50">
-          <div className="flex items-center gap-4">
-            <div className="p-2 bg-white dark:bg-zinc-800 rounded-full border border-border shadow-sm">
+      <CardContent className="p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-2xl bg-background/50 gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="shrink-0 p-2 bg-white dark:bg-zinc-800 rounded-full border border-border shadow-sm">
               <svg className="h-5 w-5" viewBox="0 0 24 24">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -64,9 +63,9 @@ export function GoogleConnection({
                 />
               </svg>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="font-bold text-sm">Google Account</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground truncate max-w-[200px] sm:max-w-none">
                 {isConnected
                   ? `Connected as ${user.email}`
                   : "Enable one-click login"}
@@ -77,7 +76,7 @@ export function GoogleConnection({
             <Button
               variant="outline"
               disabled
-              className="rounded-full h-10 px-5 gap-2 font-black text-[10px] bg-green-500/5 border-green-500/20 text-green-600 opacity-100"
+              className="rounded-full h-10 px-5 gap-2 font-black text-[10px] bg-green-500/5 border-green-500/20 text-green-600 opacity-100 w-full sm:w-auto"
             >
               <CheckCircle2 className="h-3.5 w-3.5" />
               Linked
@@ -85,7 +84,7 @@ export function GoogleConnection({
           ) : (
             <Button
               variant="outline"
-              className="rounded-full h-10 px-5 gap-2 font-bold text-[10px] shadow-sm hover:shadow-md transition-all active:scale-95"
+              className="rounded-full h-10 px-5 gap-2 font-bold text-[10px] shadow-sm hover:shadow-md transition-all active:scale-95 w-full sm:w-auto"
               onClick={() => googleLogin(redirectPath)}
               disabled={isLoading}
             >

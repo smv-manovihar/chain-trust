@@ -98,21 +98,30 @@ class AddMedicineArgs(BaseModel):
     batch_number: Optional[str] = Field(
         default=None, description="[Optional] Production Lot ID (often found on labels)"
     )
-    expiry_date: Optional[str] = Field(
-        default=None, description="[Optional] Expiry date in YYYY-MM-DD format"
+    expiry_date: str = Field(
+        description="[Required] Expiry date in YYYY-MM-DD format. Always ask the user for this before adding a medicine."
     )
     prescription_ids: Optional[List[str]] = Field(
         default=None,
         description="[Optional] List of string IDs for attached prescriptions",
     )
-    dosage: Optional[str] = Field(
-        default=None, description="[Optional] Specific dose (e.g. '1 pill')"
+    dosage: Optional[float] = Field(
+        default=None, description="[Optional] Dose amount as a number (e.g. 1, 2.5). Do not include units."
+    )
+    unit: Optional[str] = Field(
+        default="pills", description="[Optional] Dose unit (e.g. 'pills', 'ml', 'tablets', 'drops'). Defaults to 'pills'."
     )
     frequency: Optional[str] = Field(
-        default=None, description="[Optional] How often (e.g. 'Twice daily')"
+        default=None, description="[Optional] How often (e.g. 'Twice daily', 'Once a week')"
     )
     quantity: Optional[int] = Field(
-        default=None, description="[Optional] Initial inventory quantity"
+        default=None, description="[Optional] Initial inventory quantity (number of units/pills)"
+    )
+    doctor_name: Optional[str] = Field(
+        default=None, description="[Optional] Name of the prescribing doctor"
+    )
+    notes: Optional[str] = Field(
+        default=None, description="[Optional] Personal notes or instructions about this medicine"
     )
 
 
@@ -132,17 +141,23 @@ class UpdateMedicineArgs(BaseModel):
     expiry_date: Optional[str] = Field(
         default=None, description="[Optional] Updated expiry date (YYYY-MM-DD)"
     )
-    dosage: Optional[str] = Field(
-        default=None, description="[Optional] Updated dose (e.g. '2 pills')"
+    dosage: Optional[float] = Field(
+        default=None, description="[Optional] Updated dose amount as a number (e.g. 1, 2.5). Do not include units."
+    )
+    unit: Optional[str] = Field(
+        default=None, description="[Optional] Updated dose unit (e.g. 'pills', 'ml', 'tablets')"
     )
     frequency: Optional[str] = Field(
-        default=None, description="[Optional] Updated frequency (e.g. 'Once daily')"
+        default=None, description="[Optional] Updated frequency (e.g. 'Once daily', 'Twice weekly')"
     )
     quantity: Optional[int] = Field(
-        default=None, description="[Optional] Updated inventory count"
+        default=None, description="[Optional] Updated inventory count (number of units/pills)"
+    )
+    doctor_name: Optional[str] = Field(
+        default=None, description="[Optional] Updated prescribing doctor name"
     )
     notes: Optional[str] = Field(
-        default=None, description="[Optional] Personal notes or reminders"
+        default=None, description="[Optional] Updated personal notes or reminders"
     )
 
 
@@ -155,6 +170,72 @@ class RemoveMedicineArgs(BaseModel):
 class MarkDoseTakenArgs(BaseModel):
     medicine_id: str = Field(
         description="[Required] The unique string ID of the medicine to decrement quantity for"
+    )
+
+
+class UndoDoseArgs(BaseModel):
+    medicine_id: str = Field(
+        description="[Required] The unique string ID of the medicine whose last recorded dose should be reverted"
+    )
+
+
+class MealContext(str, Enum):
+    BEFORE_MEAL = "before_meal"
+    AFTER_MEAL = "after_meal"
+    WITH_MEAL = "with_meal"
+    NO_PREFERENCE = "no_preference"
+
+
+class FrequencyType(str, Enum):
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    INTERVAL_DAYS = "interval_days"
+    INTERVAL_MONTHS = "interval_months"
+
+
+class DayOfWeek(int, Enum):
+    SUNDAY = 0
+    MONDAY = 1
+    TUESDAY = 2
+    WEDNESDAY = 3
+    THURSDAY = 4
+    FRIDAY = 5
+    SATURDAY = 6
+
+
+class AddReminderArgs(BaseModel):
+    medicine_id: str = Field(
+        description="[Required] The unique string ID of the medicine to add a reminder for"
+    )
+    time: str = Field(
+        description="[Required] Time for the reminder in HH:MM format (24-hour), e.g. '08:00', '13:30', '21:00'"
+    )
+    meal_context: MealContext = Field(
+        default=MealContext.NO_PREFERENCE,
+        description="[Optional] Meal relationship: 'before_meal', 'after_meal', 'with_meal', or 'no_preference'",
+    )
+    frequency_type: FrequencyType = Field(
+        default=FrequencyType.DAILY,
+        description="[Optional] Recurrence pattern: 'daily' (every day), 'weekly' (specific days of week), 'interval_days' (every N days), 'interval_months' (every N months)",
+    )
+    days_of_week: Optional[List[int]] = Field(
+        default=None,
+        description="[Optional] Required if frequency_type is 'weekly'. List of day numbers (0=Sunday, 1=Monday, ..., 6=Saturday)",
+    )
+    interval: Optional[int] = Field(
+        default=1,
+        ge=1,
+        description="[Optional] Required if frequency_type is 'interval_days' or 'interval_months'. The N in 'every N days/months'. Default: 1.",
+    )
+
+
+class RemoveReminderArgs(BaseModel):
+    medicine_id: str = Field(
+        description="[Required] The unique string ID of the medicine to remove a reminder from"
+    )
+    reminder_index: int = Field(
+        ge=0,
+        description="[Required] The 0-based index of the reminder to remove (0 = first reminder, 1 = second, etc.). Use get_view_data first to see the current list of reminders.",
     )
 
 
@@ -356,7 +437,7 @@ class Tools:
         """Strict Markdown Return Template for Master Agentic Tool Architecture."""
         return f"STATUS: {status}\nMESSAGE: {message}\n\nDATA:\n{data if data else ''}"
 
-    def get_tool_message(
+    async def get_tool_message(
         self,
         name: str,
         args: dict,
@@ -404,6 +485,18 @@ class Tools:
             "mark_dose_taken": {
                 "present": "Recording dose taken...",
                 "past": "Recorded dose taken.",
+            },
+            "undo_dose": {
+                "present": "Reverting last recorded dose...",
+                "past": "Last dose reverted successfully.",
+            },
+            "add_reminder": {
+                "present": "Setting reminder for {name}...",
+                "past": "Reminder added for {name}.",
+            },
+            "remove_reminder": {
+                "present": "Removing reminder [{reminder_index}] from {name}...",
+                "past": "Reminder [{reminder_index}] removed from {name}.",
             },
             "list_prescriptions": {
                 "present": "Accessing prescriptions...",
@@ -486,6 +579,21 @@ class Tools:
                         doc_label = prescriptions[doc_id - 1].get("label")
 
             enriched_args["doc_name"] = doc_label or f"Document [{doc_id}]"
+
+        if name in ("add_reminder", "remove_reminder"):
+            medicine_id = args.get("medicine_id")
+            resolved_name = medicine_id  # default fallback
+            if medicine_id:
+                try:
+                    item = await tool_store.db["cabinet_items"].find_one(
+                        {"_id": tool_store._to_obj_id(medicine_id)},
+                        {"name": 1},
+                    )
+                    if item and item.get("name"):
+                        resolved_name = item["name"]
+                except Exception:
+                    pass
+            enriched_args["name"] = resolved_name or "medication"
 
         group = templates.get(
             name, {"present": f"Executing {name}...", "past": f"Executed {name}."}
@@ -725,6 +833,32 @@ class Tools:
     async def add_medicine(self, **kwargs) -> str:
         """Adds new med to cabinet. **IMPORTANT:** Confirm final details with the user before calling this. **Use** for creation. **Do NOT use** for updates."""
         try:
+            # Resolve prescription proxy IDs ([1], [2]...) to real MongoDB ObjectId strings.
+            # The agent always receives proxy integer IDs from list_prescriptions.
+            raw_ids = kwargs.get("prescription_ids")
+            if raw_ids:
+                await self.prescription_registry.build()
+                resolved_ids = []
+                unresolved = []
+                for pid in raw_ids:
+                    # Proxy IDs are integers; real IDs are hex strings (len 24)
+                    try:
+                        proxy_int = int(pid)
+                        doc = self.prescription_registry.get_by_id(proxy_int)
+                        if doc:
+                            resolved_ids.append(doc["real_id"])
+                        else:
+                            unresolved.append(pid)
+                    except (ValueError, TypeError):
+                        # Already a real ID string — pass through
+                        resolved_ids.append(str(pid))
+                if unresolved:
+                    return self._format_output(
+                        "ERROR",
+                        f"Prescription proxy ID(s) {unresolved} not found. Run list_prescriptions to see valid IDs.",
+                    )
+                kwargs["prescription_ids"] = resolved_ids
+
             success = await tool_store.add_medicine_to_cabinet(self.user_id, **kwargs)
             if success:
                 return self._format_output(
@@ -738,17 +872,32 @@ class Tools:
             return self._format_output("ERROR", f"Operation failed: {e}. Ask the user for any missing details if necessary.")
 
     async def update_medicine(self, medicine_id: str, **kwargs) -> str:
-        """Modifies existing med record. **IMPORTANT:** Confirm final details with the user before calling this. **Use** for dosage/notes. **Do NOT use** for removal."""
+        """Modifies existing med record. **IMPORTANT:** Confirm final details with the user before calling this. **Use** for dosage/unit/notes/doctor updates. **Do NOT use** for removal."""
         try:
             updates = {k: v for k, v in kwargs.items() if v is not None}
             if not updates:
                 return self._format_output(
                     "ERROR",
-                    "No update fields provided. Specify fields to modify (e.g. dosage, notes).",
+                    "No update fields provided. Specify fields to modify (e.g. dosage, unit, notes, doctor_name).",
                 )
 
+            # Remap snake_case arg names to camelCase MongoDB field names
+            field_remap = {
+                "medicine_code": "medicineCode",
+                "batch_number": "batchNumber",
+                "expiry_date": "expiryDate",
+                "prescription_ids": "prescriptionIds",
+                "doctor_name": "doctorName",
+            }
+            remapped = {field_remap.get(k, k): v for k, v in updates.items()}
+
+            # Remap quantity to currentQuantity
+            if "quantity" in remapped:
+                q = remapped.pop("quantity")
+                remapped["currentQuantity"] = q
+
             success = await tool_store.update_cabinet_item(
-                medicine_id, self.user_id, updates
+                medicine_id, self.user_id, remapped
             )
             if success:
                 return self._format_output("SUCCESS", f"Medication {medicine_id} updated.")
@@ -772,7 +921,7 @@ class Tools:
             return self._format_output("ERROR", f"Removal failed: {e}.")
 
     async def mark_dose_taken(self, medicine_id: str) -> str:
-        """Decrements med quantity. **IMPORTANT:** Confirm with the user before calling this. **Use** on dose confirmation. **Do NOT use** for inventory audits."""
+        """Decrements med quantity and logs a dose event. **IMPORTANT:** Confirm with the user before calling this. **Use** on dose confirmation. **Do NOT use** for inventory audits."""
         try:
             success = await tool_store.mark_dose_taken(medicine_id, self.user_id)
             if success:
@@ -781,10 +930,80 @@ class Tools:
                 )
             return self._format_output(
                 "ERROR",
-                "Could not mark dose. Verity the medication ID is correct and there is enough stock.",
+                "Could not mark dose. Verify the medication ID is correct and there is enough stock (currentQuantity > 0).",
             )
         except Exception as e:
             return self._format_output("ERROR", f"Action failed: {e}.")
+
+    async def undo_dose(self, medicine_id: str) -> str:
+        """Reverts the last recorded dose for a medication. **IMPORTANT:** Confirm with the user before calling this. **Use** only when user explicitly asks to undo a recent dose log."""
+        try:
+            success = await tool_store.undo_dose(medicine_id, self.user_id)
+            if success:
+                return self._format_output(
+                    "SUCCESS", "Last dose reverted. Inventory quantity restored."
+                )
+            return self._format_output(
+                "ERROR",
+                "Could not undo dose. No recent dose log found or the medication ID is incorrect.",
+            )
+        except Exception as e:
+            return self._format_output("ERROR", f"Undo action failed: {e}.")
+
+    async def add_reminder(
+        self,
+        medicine_id: str,
+        time: str,
+        meal_context: str = "no_preference",
+        frequency_type: str = "daily",
+        days_of_week: List[int] = None,
+        interval: int = 1,
+    ) -> str:
+        """Adds a dose reminder schedule to a medication. **IMPORTANT:** Confirm time and frequency with user before calling. **Use** when user asks to set a reminder, alarm, or schedule. **Do NOT use** for inventory or dose logging."""
+        try:
+            success = await tool_store.add_reminder_to_cabinet_item(
+                medicine_id,
+                self.user_id,
+                time=time,
+                meal_context=meal_context,
+                frequency_type=frequency_type,
+                days_of_week=days_of_week or [],
+                interval=interval,
+            )
+            if success:
+                freq_label = {
+                    "daily": "Daily",
+                    "weekly": f"Weekly (days: {days_of_week})",
+                    "interval_days": f"Every {interval} day(s)",
+                    "interval_months": f"Every {interval} month(s)",
+                }.get(frequency_type, frequency_type)
+                return self._format_output(
+                    "SUCCESS",
+                    f"Reminder set for {time} ({freq_label}, {meal_context.replace('_', ' ')}).",
+                )
+            return self._format_output(
+                "ERROR",
+                f"Could not add reminder to medication '{medicine_id}'. Verify the medication ID is correct.",
+            )
+        except Exception as e:
+            return self._format_output("ERROR", f"Failed to add reminder: {e}.")
+
+    async def remove_reminder(self, medicine_id: str, reminder_index: int) -> str:
+        """Removes a specific reminder from a medication by its position index. **IMPORTANT:** Confirm which reminder to remove with user first. Use get_view_data to see the reminder list with indices. **Do NOT use** without user confirmation."""
+        try:
+            success = await tool_store.remove_reminder_from_cabinet_item(
+                medicine_id, self.user_id, reminder_index
+            )
+            if success:
+                return self._format_output(
+                    "SUCCESS", f"Reminder at position {reminder_index} removed successfully."
+                )
+            return self._format_output(
+                "ERROR",
+                f"Could not remove reminder at index {reminder_index}. Verify the index is correct (use get_view_data to see current reminders).",
+            )
+        except Exception as e:
+            return self._format_output("ERROR", f"Failed to remove reminder: {e}.")
 
     async def list_prescriptions(self, skip: int = 0, limit: int = 10) -> str:
         """Lists docs with Proxy IDs. **Use** for file discovery. **Do NOT use** to read content."""
@@ -1208,6 +1427,24 @@ class Tools:
                         name="mark_dose_taken",
                         description=self.mark_dose_taken.__doc__,
                         args_schema=MarkDoseTakenArgs,
+                    ),
+                    StructuredTool.from_function(
+                        coroutine=self.undo_dose,
+                        name="undo_dose",
+                        description=self.undo_dose.__doc__,
+                        args_schema=UndoDoseArgs,
+                    ),
+                    StructuredTool.from_function(
+                        coroutine=self.add_reminder,
+                        name="add_reminder",
+                        description=self.add_reminder.__doc__,
+                        args_schema=AddReminderArgs,
+                    ),
+                    StructuredTool.from_function(
+                        coroutine=self.remove_reminder,
+                        name="remove_reminder",
+                        description=self.remove_reminder.__doc__,
+                        args_schema=RemoveReminderArgs,
                     ),
                     StructuredTool.from_function(
                         coroutine=self.list_prescriptions,

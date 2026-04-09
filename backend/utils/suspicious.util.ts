@@ -41,15 +41,14 @@ export const calculateSuspiciousness = async (
 		// If a single unit is scanned more than 5 times by different visitors, it's highly suspicious.
 		// (Assuming a medicine packet is only scanned by a manufacturer, distributor, pharmacy, and end-consumer)
 		const uniqueVisitors = new Set(recentScans.map(s => s.visitorId));
-		if (uniqueVisitors.size > 5) {
+		if (uniqueVisitors.size > 3) {
 			return { 
 				isSuspicious: true, 
 				reason: `Unit has an abnormally high number of scans by different users (${uniqueVisitors.size} unique users). Potential counterfeit.` 
 			};
 		}
 
-		// 3. Geographic Jump Check
-		// If the new scan has geo data, compare it against the last known scan with geo data.
+		// 3. Geographic Jump & Multi-Location Check
 		if (newScanLatitude !== undefined && newScanLongitude !== undefined) {
 			const lastGeoScan = recentScans.find(s => s.latitude !== undefined && s.longitude !== undefined);
 			
@@ -74,12 +73,31 @@ export const calculateSuspiciousness = async (
 			}
 		}
 
-		// 4. IP Velocity Check
+		// New: Multi-City logic (Last 24 hours)
+		const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+		const recentDayScans = recentScans.filter(s => new Date(s.createdAt) > twentyFourHoursAgo);
+		const uniqueCities = new Set(recentDayScans.map(s => s.city).filter(Boolean));
+		if (uniqueCities.size > 2) {
+			return {
+				isSuspicious: true,
+				reason: `Unit scans detected in more than 2 unique cities (${Array.from(uniqueCities).join(', ')}) within 24 hours. Highly indicative of counterfeit mass-production.`
+			};
+		}
+
+		// 4. IP Velocity & Frequency Check
 		// Multiple rapid scans from different IPs in a short window.
 		const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 		const recentHourScans = recentScans.filter(s => new Date(s.createdAt) > oneHourAgo);
-		const uniqueIPsInHour = new Set(recentHourScans.map(s => s.ip).filter(Boolean));
+		
+		// New: Frequency Threshold (regardless of IP)
+		if (recentHourScans.length >= 5) {
+			return {
+				isSuspicious: true,
+				reason: `Abnormal scan volume detected (${recentHourScans.length} unique scans in under 1 hour). Individual units are rarely scanned this frequently by consumers.`
+			};
+		}
 
+		const uniqueIPsInHour = new Set(recentHourScans.map(s => s.ip).filter(Boolean));
 		if (uniqueIPsInHour.size >= 3 && !uniqueIPsInHour.has(newScanIp)) {
 			// E.g., if we see 3 different IPs already in the last hour, and now a 4th IP.
 			return {

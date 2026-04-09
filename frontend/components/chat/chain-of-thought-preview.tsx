@@ -93,7 +93,7 @@ ChainStep.displayName = "ChainStep";
  * Premium chain-of-thought visualization
  * Simplified to show only messages and a dot-based execution flow.
  */
-export function ChainOfThoughtPreview({
+export const ChainOfThoughtPreview = memo(function ChainOfThoughtPreview({
   thoughts,
   isStreaming = false,
   hasContent = false,
@@ -239,4 +239,4 @@ export function ChainOfThoughtPreview({
       </Collapsible>
     </div>
   );
-}
+});

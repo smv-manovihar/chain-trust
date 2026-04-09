@@ -47,7 +47,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 const saveMedicineSchema = z.object({
-  dosage: z.string().optional(),
+  dosage: z.coerce.number().min(0).optional(),
   frequency: z.string().optional(),
   reminderTimes: z.array(z.object({
     time: z.date(),
@@ -97,7 +97,7 @@ export function SaveMedicineDialog({
       currentQuantity: 30,
       totalQuantity: 30,
       unit: "Pills",
-      dosage: "1 Pill",
+      dosage: 1,
       frequency: "Daily",
       reminderTimes: [],
       doctorName: "",
@@ -181,13 +181,15 @@ export function SaveMedicineDialog({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-[10px] font-black uppercase text-muted-foreground/60 ml-1">
-                          Take amount (e.g. 1 Pill)
+                          Take amount (e.g. 1)
                         </FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="1 Pill"
+                            type="number"
+                            placeholder="1"
                             className="h-11 rounded-2xl border-primary/10 bg-muted/20 font-bold"
                             {...field}
+                            onChange={(e) => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}
                           />
                         </FormControl>
                         <FormMessage />

@@ -90,6 +90,15 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { resolveMediaUrl } from "@/lib/media-url";
 
+const safeFormatTime = (time: any) => {
+  if (!time) return "";
+  // Check if it's already HH:mm
+  if (typeof time === "string" && /^\d{2}:\d{2}$/.test(time)) return time;
+  const d = new Date(time);
+  if (isNaN(d.getTime())) return "";
+  return format(d, "HH:mm");
+};
+
 export default function MedicineDetailPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
@@ -110,7 +119,13 @@ export default function MedicineDetailPage() {
     currentQuantity: 0,
     totalQuantity: 0,
     unit: "units",
-    reminderTimes: [] as { time: string; mealContext: string }[],
+    reminderTimes: [] as {
+      time: string;
+      mealContext: string;
+      frequencyType?: string;
+      daysOfWeek?: number[];
+      interval?: number;
+    }[],
     prescriptions: [] as { url: string; label: string; uploadedAt: string }[],
     prescriptionIds: [] as string[],
     notificationOverrides: {
@@ -145,12 +160,6 @@ export default function MedicineDetailPage() {
       ? formData.expiryDate.getTime()
       : undefined;
 
-    const safeFormatTime = (time: any) => {
-      if (!time) return "08:00";
-      const d = new Date(time);
-      return isNaN(d.getTime()) ? "08:00" : format(d, "HH:mm");
-    };
-
     return (
       formData.name !== (medicine.name || "") ||
       formData.brand !== (medicine.brand || "") ||
@@ -173,13 +182,10 @@ export default function MedicineDetailPage() {
           (medicine.reminderTimes || []).map((r: any) => ({
             time: safeFormatTime(r.time),
             mealContext: r.mealContext || "no_preference",
+            frequencyType: r.frequencyType || "daily",
+            daysOfWeek: r.daysOfWeek || [],
+            interval: r.interval || 1,
           })),
-        ) ||
-      JSON.stringify(formData.prescriptionIds) !==
-        JSON.stringify(
-          medicine.prescriptionIds?.map((p: any) =>
-            typeof p === "string" ? p : p._id,
-          ) || [],
         ) ||
       JSON.stringify(formData.notificationOverrides) !==
         JSON.stringify(medicine.notificationOverrides || {})
@@ -226,12 +232,6 @@ export default function MedicineDetailPage() {
           typeof p === "object" && p !== null ? p._id : p,
         );
 
-        const safeFormatTime = (time: any) => {
-          if (!time) return "08:00";
-          const d = new Date(time);
-          return isNaN(d.getTime()) ? "08:00" : format(d, "HH:mm");
-        };
-
         setFormData({
           name: item.name || "",
           brand: item.brand || "",
@@ -250,6 +250,9 @@ export default function MedicineDetailPage() {
           reminderTimes: (item.reminderTimes || []).map((r: any) => ({
             time: safeFormatTime(r.time),
             mealContext: r.mealContext || "no_preference",
+            frequencyType: r.frequencyType || "daily",
+            daysOfWeek: r.daysOfWeek || [],
+            interval: r.interval || 1,
           })),
           prescriptions: popPrescriptions,
           prescriptionIds: rawIds,
@@ -289,11 +292,40 @@ export default function MedicineDetailPage() {
     updatedData?:
       | Partial<typeof formData & { images: string[] }>
       | React.MouseEvent,
+    isPartial: boolean = false,
   ) => {
     if (!id) return;
     setIsSaving(true);
 
     const isDirectCall = updatedData && !(updatedData as any).nativeEvent;
+
+    // Handle partial updates (e.g., prescriptions, images) immediately and exclusively
+    if (isPartial && isDirectCall) {
+      const partialData = updatedData as Partial<
+        typeof formData & { images: string[] }
+      >;
+      try {
+        await updateCabinetItem(id, partialData as any);
+        toast.success("Treatment plan updated!");
+
+        // Sync local state
+        const medicineUpdate = { ...partialData } as any;
+        if (medicineUpdate.expiryDate instanceof Date) {
+          medicineUpdate.expiryDate = medicineUpdate.expiryDate.toISOString();
+        }
+
+        setMedicine((prev) =>
+          prev ? ({ ...prev, ...medicineUpdate } as any) : null,
+        );
+        setFormData((prev) => ({ ...prev, ...partialData }));
+      } catch (err: any) {
+        toast.error("Failed to save changes.");
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
     const actualData = isDirectCall
       ? { ...formData, ...(updatedData as any) }
       : formData;
@@ -307,6 +339,9 @@ export default function MedicineDetailPage() {
         return {
           time: date.toISOString(),
           mealContext: r.mealContext || "no_preference",
+          frequencyType: r.frequencyType || "daily",
+          daysOfWeek: r.daysOfWeek || [],
+          interval: r.interval || 1,
         };
       });
 
@@ -417,6 +452,33 @@ export default function MedicineDetailPage() {
     }
   };
 
+  const prefDefaults = {
+    medicine_expiry: { inApp: true, email: true },
+    batch_recall: { inApp: true, email: true },
+    dose_reminder: { inApp: true, email: false },
+  };
+
+  const handleNotificationOverride = (
+    type: string,
+    field: "inApp" | "email" | "leadTimeMinutes",
+    value: any,
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      notificationOverrides: {
+        ...prev.notificationOverrides,
+        [type]: {
+          ...(prev.notificationOverrides?.[type] || {
+            inApp: true,
+            email:
+              prefDefaults[type as keyof typeof prefDefaults]?.email ?? true,
+          }),
+          [field]: value,
+        },
+      },
+    }));
+  };
+
   const isDoseRecentlyTaken = useMemo(() => {
     if (!medicine?.lastDoseTaken) return false;
     const lastTaken = new Date(medicine.lastDoseTaken).getTime();
@@ -439,6 +501,44 @@ export default function MedicineDetailPage() {
     return format(lastTaken, "MMM d");
   }, [medicine?.lastDoseTaken]);
 
+  const isOccurrenceOnDay = (reminder: any, date: Date): boolean => {
+    const freq = reminder.frequencyType || "daily";
+    if (freq === "daily") return true;
+
+    const target = new Date(date);
+    target.setHours(0, 0, 0, 0);
+
+    const anchorTimeRaw = reminder._id
+      ? reminder.time
+      : typeof reminder.time === "string" && reminder.time.includes(":")
+        ? new Date()
+        : reminder.time;
+    const anchor = new Date(anchorTimeRaw);
+    anchor.setHours(0, 0, 0, 0);
+
+    if (target.getTime() < anchor.getTime()) return false;
+
+    if (freq === "weekly") {
+      return reminder.daysOfWeek?.includes(target.getDay());
+    }
+
+    if (freq === "interval_days") {
+      const diffMs = target.getTime() - anchor.getTime();
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+      return diffDays % (reminder.interval || 1) === 0;
+    }
+
+    if (freq === "interval_months") {
+      if (target.getDate() !== anchor.getDate()) return false;
+      const monthDiff =
+        target.getFullYear() * 12 +
+        target.getMonth() -
+        (anchor.getFullYear() * 12 + anchor.getMonth());
+      return monthDiff % (reminder.interval || 1) === 0;
+    }
+    return false;
+  };
+
   const nextDoseInfo = useMemo(() => {
     if (!medicine?.reminderTimes || medicine.reminderTimes.length === 0) {
       return null;
@@ -446,35 +546,47 @@ export default function MedicineDetailPage() {
 
     const now = new Date();
 
-    // Convert all reminders to their next occurrence (today or tomorrow)
     const occurrences = medicine.reminderTimes
       .map((r) => {
-        const reminderDate = new Date(r.time);
-        if (isNaN(reminderDate.getTime())) return null;
+        let checkDate = new Date(now);
+        let found = false;
+        let iterations = 0;
 
-        let occurrence = new Date(now);
-        occurrence.setHours(
-          reminderDate.getHours(),
-          reminderDate.getMinutes(),
-          0,
-          0,
-        );
+        while (!found && iterations < 90) {
+          if (isOccurrenceOnDay(r, checkDate)) {
+            const reminderDate = new Date(r.time);
+            const occurrence = new Date(checkDate);
+            occurrence.setHours(
+              reminderDate.getHours(),
+              reminderDate.getMinutes(),
+              0,
+              0,
+            );
 
-        // If the time has already passed today, scheduled it for tomorrow
-        if (isBefore(occurrence, now)) {
-          occurrence = addDays(occurrence, 1);
+            // If it's today and already passed, look for tomorrow or next valid day
+            if (
+              checkDate.toDateString() === now.toDateString() &&
+              isBefore(occurrence, now)
+            ) {
+              checkDate.setDate(checkDate.getDate() + 1);
+              iterations++;
+              continue;
+            }
+
+            return {
+              date: occurrence,
+              mealContext: r.mealContext || "no_preference",
+            };
+          }
+          checkDate.setDate(checkDate.getDate() + 1);
+          iterations++;
         }
-
-        return {
-          date: occurrence,
-          mealContext: r.mealContext || "no_preference",
-        };
+        return null;
       })
       .filter((occ): occ is NonNullable<typeof occ> => occ !== null);
 
     if (occurrences.length === 0) return null;
 
-    // Sort to find the nearest upcoming dose
     const sorted = [...occurrences].sort(
       (a, b) => a.date.getTime() - b.date.getTime(),
     );
@@ -492,10 +604,16 @@ export default function MedicineDetailPage() {
 
     const isToday =
       format(next.date, "yyyy-MM-dd") === format(now, "yyyy-MM-dd");
+    const isTomorrow =
+      format(next.date, "yyyy-MM-dd") === format(addDays(now, 1), "yyyy-MM-dd");
 
     return {
-      time: format(next.date, "p"), // e.g. 8:00 AM
-      dayText: isToday ? "Today" : "Tomorrow",
+      time: format(next.date, "p"),
+      dayText: isToday
+        ? "Today"
+        : isTomorrow
+          ? "Tomorrow"
+          : format(next.date, "MMM d"),
       remainingText,
       mealContext:
         next.mealContext === "no_preference"
@@ -542,7 +660,7 @@ export default function MedicineDetailPage() {
       prescriptionIds: newIds,
     };
 
-    await handleSave(updatePayload);
+    await handleSave(updatePayload, true);
     setIsPrescriptionDialogOpen(false);
   };
 
@@ -556,7 +674,7 @@ export default function MedicineDetailPage() {
     try {
       const urls = await uploadImages(Array.from(files));
       const updatedImages = [...(medicine?.images || []), ...urls];
-      await handleSave({ images: updatedImages });
+      await handleSave({ images: updatedImages }, true);
       toast.success("Images updated.");
     } catch (error) {
       toast.error("Failed to upload images.");
@@ -580,7 +698,7 @@ export default function MedicineDetailPage() {
 
   const removeImage = async (url: string) => {
     const updated = (medicine?.images || []).filter((img) => img !== url);
-    await handleSave({ images: updated });
+    await handleSave({ images: updated }, true);
   };
 
   const addReminder = () => {
@@ -588,17 +706,29 @@ export default function MedicineDetailPage() {
       ...prev,
       reminderTimes: [
         ...prev.reminderTimes,
-        { time: "08:00", mealContext: "no_preference" },
+        {
+          time: "19:00",
+          mealContext: "no_preference",
+          frequencyType: "daily",
+          daysOfWeek: [1, 2, 3, 4, 5],
+          interval: 1,
+        },
       ],
     }));
   };
 
   const updateReminder = (
     index: number,
-    updates: Partial<{ time: string; mealContext: string }>,
+    updates: Partial<{
+      time: string;
+      mealContext: string;
+      frequencyType: string;
+      daysOfWeek: number[];
+      interval: number;
+    }>,
   ) => {
     const newReminders = [...formData.reminderTimes];
-    newReminders[index] = { ...newReminders[index], ...updates };
+    newReminders[index] = { ...newReminders[index], ...updates } as any;
     setFormData((prev) => ({ ...prev, reminderTimes: newReminders }));
   };
 
@@ -942,42 +1072,37 @@ export default function MedicineDetailPage() {
             </div>
 
             <Tabs defaultValue="schedule" className="w-full relative z-10 mt-2">
-              <div className="w-full overflow-x-auto overflow-y-hidden mb-6 sm:mb-8 pb-1 custom-scrollbar">
-                <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 bg-muted/30 p-1 rounded-2xl h-12 border border-border/40 gap-1">
-                  <TabsTrigger
-                    value="schedule"
-                    className="rounded-xl font-bold text-xs sm:text-sm h-10 data-[state=active]:shadow-xl data-[state=active]:bg-background gap-2 transition-all whitespace-nowrap px-4"
-                  >
-                    <Clock
-                      className="h-4 w-4 text-primary"
-                      aria-hidden="true"
-                    />
-                    <span className="hidden sm:inline">Schedule</span>
-                    <span className="sm:hidden">Plan</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="history"
-                    className="rounded-xl font-bold text-xs sm:text-sm h-10 data-[state=active]:shadow-xl data-[state=active]:bg-background gap-2 transition-all whitespace-nowrap px-4"
-                  >
-                    <History
-                      className="h-4 w-4 text-primary"
-                      aria-hidden="true"
-                    />
-                    History
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="details"
-                    className="rounded-xl font-bold text-xs sm:text-sm h-10 data-[state=active]:shadow-xl data-[state=active]:bg-background gap-2 transition-all whitespace-nowrap px-4"
-                  >
-                    <FileText
-                      className="h-4 w-4 text-primary"
-                      aria-hidden="true"
-                    />
-                    <span className="hidden sm:inline">Details & Media</span>
-                    <span className="sm:hidden">Media</span>
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+              <TabsList className="w-full flex justify-start sm:w-auto sm:inline-flex overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] mb-6 sm:mb-8 bg-muted/30 p-1 rounded-2xl h-12 border border-border/40 gap-1">
+                <TabsTrigger
+                  value="schedule"
+                  className="rounded-xl font-bold text-xs sm:text-sm h-10 data-[state=active]:shadow-xl data-[state=active]:bg-background gap-2 transition-all whitespace-nowrap px-4"
+                >
+                  <Clock className="h-4 w-4 text-primary" aria-hidden="true" />
+                  <span className="hidden sm:inline">Schedule</span>
+                  <span className="sm:hidden">Plan</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="history"
+                  className="rounded-xl font-bold text-xs sm:text-sm h-10 data-[state=active]:shadow-xl data-[state=active]:bg-background gap-2 transition-all whitespace-nowrap px-4"
+                >
+                  <History
+                    className="h-4 w-4 text-primary"
+                    aria-hidden="true"
+                  />
+                  History
+                </TabsTrigger>
+                <TabsTrigger
+                  value="details"
+                  className="rounded-xl font-bold text-xs sm:text-sm h-10 data-[state=active]:shadow-xl data-[state=active]:bg-background gap-2 transition-all whitespace-nowrap px-4"
+                >
+                  <FileText
+                    className="h-4 w-4 text-primary"
+                    aria-hidden="true"
+                  />
+                  <span className="hidden sm:inline">Details & Media</span>
+                  <span className="sm:hidden">Media</span>
+                </TabsTrigger>
+              </TabsList>
 
               <TabsContent
                 value="history"
@@ -1060,7 +1185,7 @@ export default function MedicineDetailPage() {
               >
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 pb-4">
                   {/* Left Column: Reminders */}
-                  <div className="space-y-6">
+                  <div className="space-y-6 lg:h-0 lg:min-h-full flex flex-col">
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <Label className="text-sm font-black text-foreground flex items-center gap-2">
@@ -1081,7 +1206,7 @@ export default function MedicineDetailPage() {
                       </Button>
                     </div>
 
-                    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="space-y-3 pr-2 flex-1 overflow-y-auto custom-scrollbar">
                       {formData.reminderTimes.length === 0 ? (
                         <div className="py-12 flex flex-col items-center justify-center text-center bg-muted/5 rounded-3xl border-2 border-dashed border-primary/5">
                           <Clock
@@ -1093,62 +1218,207 @@ export default function MedicineDetailPage() {
                           </p>
                         </div>
                       ) : (
-                        formData.reminderTimes.map((r, idx) => (
-                          <div
-                            key={idx}
-                            className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 rounded-2xl bg-muted/20 border border-border/50 group/item transition-all hover:border-primary/20"
-                          >
-                            <div className="relative flex-1">
-                              <Clock
-                                className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground"
-                                aria-hidden="true"
-                              />
-                              <Input
-                                type="time"
-                                value={r.time}
-                                onChange={(e) =>
-                                  updateReminder(idx, { time: e.target.value })
-                                }
-                                className="pl-9 h-11 rounded-full border-border bg-background font-bold text-sm"
-                              />
-                            </div>
-
-                            <Select
-                              value={r.mealContext}
-                              onValueChange={(val) =>
-                                updateReminder(idx, { mealContext: val })
-                              }
+                        formData.reminderTimes.map((r, idx) => {
+                          const isInvalid =
+                            !r.time || !/^\d{2}:\d{2}$/.test(r.time);
+                          return (
+                            <Card
+                              key={idx}
+                              className={cn(
+                                "p-4 sm:p-5 rounded-[2rem] border shadow-sm transition-all hover:shadow-md",
+                                isInvalid
+                                  ? "border-destructive/50 bg-destructive/5"
+                                  : "border-border/50 bg-card/50",
+                              )}
                             >
-                              <SelectTrigger className="h-11 rounded-full border-border bg-background font-medium sm:w-[140px]">
-                                <SelectValue placeholder="Meal context" />
-                              </SelectTrigger>
-                              <SelectContent className="rounded-2xl border-border/50">
-                                <SelectItem value="no_preference">
-                                  No preference
-                                </SelectItem>
-                                <SelectItem value="before_meal">
-                                  Before meal
-                                </SelectItem>
-                                <SelectItem value="after_meal">
-                                  After meal
-                                </SelectItem>
-                                <SelectItem value="with_meal">
-                                  With meal
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
+                              <div className="flex flex-col gap-5">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                                      <Clock className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                      <p className="font-black text-sm text-foreground">
+                                        Reminder #{idx + 1}
+                                      </p>
+                                      <p className="text-[10px] font-bold text-muted-foreground opacity-60">
+                                        Set dose time and frequency
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removeReminder(idx)}
+                                    className="h-9 w-9 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
 
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeReminder(idx)}
-                              className="h-11 w-11 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive shrink-0"
-                              aria-label="Remove reminder"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                  <div className="space-y-1.5">
+                                    <Label className="text-[10px] font-black text-muted-foreground uppercase px-1">
+                                      Intake Time
+                                    </Label>
+                                    <Input
+                                      type="time"
+                                      className="h-11 rounded-xl bg-muted/30 border-none font-black text-sm focus:ring-1 focus:ring-primary/20"
+                                      value={r.time}
+                                      onChange={(e) =>
+                                        updateReminder(idx, {
+                                          time: e.target.value,
+                                        })
+                                      }
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label className="text-[10px] font-black text-muted-foreground uppercase px-1">
+                                      Meal Context
+                                    </Label>
+                                    <Select
+                                      value={r.mealContext}
+                                      onValueChange={(val) =>
+                                        updateReminder(idx, {
+                                          mealContext: val,
+                                        })
+                                      }
+                                    >
+                                      <SelectTrigger className="h-11 rounded-xl bg-muted/30 border-none font-bold text-xs focus:ring-1 focus:ring-primary/20">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent className="rounded-xl">
+                                        <SelectItem value="no_preference">
+                                          No Preference
+                                        </SelectItem>
+                                        <SelectItem value="before_meal">
+                                          Before Meal
+                                        </SelectItem>
+                                        <SelectItem value="after_meal">
+                                          After Meal
+                                        </SelectItem>
+                                        <SelectItem value="with_meal">
+                                          With Meal
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-3 pt-4 border-t border-border/20">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="space-y-0.5">
+                                      <Label className="text-[10px] font-black text-muted-foreground uppercase px-1">
+                                        Frequency
+                                      </Label>
+                                      <Select
+                                        value={r.frequencyType || "daily"}
+                                        onValueChange={(val) =>
+                                          updateReminder(idx, {
+                                            frequencyType: val,
+                                          })
+                                        }
+                                      >
+                                        <SelectTrigger className="h-11 rounded-xl bg-background border-border/40 font-black text-xs min-w-[160px]">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-xl">
+                                          <SelectItem value="daily">
+                                            Every Day
+                                          </SelectItem>
+                                          <SelectItem value="weekly">
+                                            Specific Days
+                                          </SelectItem>
+                                          <SelectItem value="interval_days">
+                                            Day Interval
+                                          </SelectItem>
+                                          <SelectItem value="interval_months">
+                                            Month Interval
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+
+                                    {(r.frequencyType === "interval_days" ||
+                                      r.frequencyType ===
+                                        "interval_months") && (
+                                      <div className="flex items-center gap-2 pr-2">
+                                        <span className="text-[10px] font-black text-muted-foreground/40 uppercase">
+                                          Every
+                                        </span>
+                                        <Input
+                                          type="number"
+                                          min={1}
+                                          max={365}
+                                          className="h-11 w-16 rounded-xl bg-background border-border/40 font-black text-center text-sm"
+                                          value={r.interval || 1}
+                                          onChange={(e) =>
+                                            updateReminder(idx, {
+                                              interval:
+                                                parseInt(e.target.value) || 1,
+                                            })
+                                          }
+                                        />
+                                        <span className="text-[10px] font-black text-muted-foreground/40 uppercase">
+                                          {r.frequencyType === "interval_days"
+                                            ? "Days"
+                                            : "Months"}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {r.frequencyType === "weekly" && (
+                                    <div className="flex justify-between gap-1 pt-2">
+                                      {["S", "M", "T", "W", "T", "F", "S"].map(
+                                        (day, dIdx) => {
+                                          const isSelected =
+                                            r.daysOfWeek?.includes(dIdx);
+                                          return (
+                                            <button
+                                              key={dIdx}
+                                              type="button"
+                                              onClick={() => {
+                                                const current =
+                                                  r.daysOfWeek || [];
+                                                const next = isSelected
+                                                  ? current.filter(
+                                                      (d) => d !== dIdx,
+                                                    )
+                                                  : [...current, dIdx];
+                                                updateReminder(idx, {
+                                                  daysOfWeek: next,
+                                                });
+                                              }}
+                                              className={cn(
+                                                "h-9 flex-1 rounded-xl border text-[10px] font-black transition-all",
+                                                isSelected
+                                                  ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20"
+                                                  : "bg-background border-border/40 text-muted-foreground hover:border-primary/20",
+                                              )}
+                                            >
+                                              {day}
+                                            </button>
+                                          );
+                                        },
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {r.frequencyType &&
+                                    r.frequencyType !== "daily" && (
+                                      <p className="text-[9px] font-bold text-muted-foreground/50 italic px-1 flex items-center gap-1">
+                                        <Activity className="h-2.5 w-2.5" />
+                                        {r.frequencyType === "weekly"
+                                          ? "Reminder only triggers on selected days."
+                                          : `Calculated relative to ${medicine.isUserAdded ? "the setup date" : "the batch enrollment date"}.`}
+                                      </p>
+                                    )}
+                                </div>
+                              </div>
+                            </Card>
+                          );
+                        })
                       )}
                     </div>
                   </div>
@@ -1336,6 +1606,126 @@ export default function MedicineDetailPage() {
                               }))
                             }
                           />
+                        </div>
+
+                        <div className="pt-6 border-t border-border/50">
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-600 shadow-sm border border-orange-500/20">
+                              <Bell className="h-5 w-5" aria-hidden="true" />
+                            </div>
+                            <div>
+                              <h3 className="text-sm font-black text-foreground">
+                                Notification preferences
+                              </h3>
+                              <p className="text-[10px] font-bold text-muted-foreground opacity-70">
+                                Override global alerts for this medicine
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            {[
+                              {
+                                key: "dose_reminder",
+                                label: "Dose Reminders",
+                                desc: "Alerts for scheduled times",
+                                hasLeadTime: true,
+                              },
+                              {
+                                key: "medicine_expiry",
+                                label: "Expiry Alerts",
+                                desc: "Alerts before this batch expires",
+                              },
+                            ].map((pref) => (
+                              <div
+                                key={pref.key}
+                                className="p-4 rounded-2xl bg-muted/20 border border-border/40 space-y-4"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="space-y-0.5">
+                                    <Label className="text-xs font-black">
+                                      {pref.label}
+                                    </Label>
+                                    <p className="text-[10px] font-medium text-muted-foreground/70">
+                                      {pref.desc}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex flex-col items-center gap-1">
+                                      <span className="text-[8px] font-black uppercase text-muted-foreground/40">
+                                        In-App
+                                      </span>
+                                      <Switch
+                                        checked={
+                                          formData.notificationOverrides[
+                                            pref.key
+                                          ]?.inApp ?? true
+                                        }
+                                        onCheckedChange={(checked) =>
+                                          handleNotificationOverride(
+                                            pref.key,
+                                            "inApp",
+                                            checked,
+                                          )
+                                        }
+                                        className="scale-75 data-[state=checked]:bg-primary"
+                                      />
+                                    </div>
+                                    <div className="flex flex-col items-center gap-1">
+                                      <span className="text-[8px] font-black uppercase text-muted-foreground/40">
+                                        Email
+                                      </span>
+                                      <Switch
+                                        checked={
+                                          formData.notificationOverrides[
+                                            pref.key
+                                          ]?.email ?? true
+                                        }
+                                        onCheckedChange={(checked) =>
+                                          handleNotificationOverride(
+                                            pref.key,
+                                            "email",
+                                            checked,
+                                          )
+                                        }
+                                        className="scale-75 data-[state=checked]:bg-primary"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {pref.hasLeadTime && (
+                                  <div className="flex items-center justify-between pt-3 border-t border-border/20">
+                                    <span className="text-[10px] font-black text-muted-foreground/60 uppercase">
+                                      Notification lead time
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        className="w-16 h-8 text-xs font-black text-center rounded-xl bg-background border-border/40"
+                                        value={
+                                          formData.notificationOverrides[
+                                            pref.key
+                                          ]?.leadTimeMinutes ?? 0
+                                        }
+                                        onChange={(e) =>
+                                          handleNotificationOverride(
+                                            pref.key,
+                                            "leadTimeMinutes",
+                                            parseInt(e.target.value) || 0,
+                                          )
+                                        }
+                                      />
+                                      <span className="text-[10px] font-bold text-muted-foreground/40">
+                                        min before
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1642,8 +2032,13 @@ export default function MedicineDetailPage() {
           {isDirty && (
             <div className="flex justify-end animate-in fade-in slide-in-from-bottom-4 duration-300">
               <Button
-                onClick={handleSave}
-                disabled={isSaving}
+                onClick={() => handleSave()}
+                disabled={
+                  isSaving ||
+                  formData.reminderTimes.some(
+                    (r) => !r.time || !/^\d{2}:\d{2}$/.test(r.time),
+                  )
+                }
                 className="rounded-xl sm:rounded-full w-full sm:w-auto px-8 shadow-lg shadow-primary/20 gap-2 h-14 sm:h-12 font-bold text-base transition-all"
               >
                 {isSaving ? (
@@ -1651,7 +2046,11 @@ export default function MedicineDetailPage() {
                 ) : (
                   <Save className="h-5 w-5" aria-hidden="true" />
                 )}
-                Save changes
+                {formData.reminderTimes.some(
+                  (r) => !r.time || !/^\d{2}:\d{2}$/.test(r.time),
+                )
+                  ? "Correct time errors"
+                  : "Save changes"}
               </Button>
             </div>
           )}

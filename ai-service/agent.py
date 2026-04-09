@@ -9,7 +9,7 @@ from langchain_openai import ChatOpenAI
 from config import get_settings
 from prompts import CUSTOMER_SYSTEM_PROMPT, MANUFACTURER_SYSTEM_PROMPT
 
-DEFAULT_OPENROUTER_MODEL = "stepfun/step-3.5-flash:free"
+DEFAULT_OPENROUTER_MODEL = "openrouter/free"
 BASE_URL = "https://openrouter.ai/api/v1"
 
 

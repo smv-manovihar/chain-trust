@@ -22,7 +22,6 @@ interface AgentContextType {
   input: string;
   isSending: boolean;
   isOpen: boolean;
-  isHistoryOpen: boolean;
   isLoadingSessions: boolean;
   isLoadingMessages: boolean;
   isGenerating: boolean;
@@ -32,7 +31,6 @@ interface AgentContextType {
 
   setInput: (input: string) => void;
   setOpen: (open: boolean) => void;
-  setHistoryOpen: (open: boolean) => void;
   setCurrentSessionId: (id: string | undefined) => void;
   sendMessage: (context?: any) => Promise<void>;
   createSession: () => Promise<string>;
@@ -68,7 +66,6 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isOpen, setOpen] = useState(false);
-  const [isHistoryOpen, setHistoryOpen] = useState(false);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -509,7 +506,6 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
       const { session_id } = await agentApi.createSession();
       handleSetCurrentSessionId(session_id);
       loadSessions();
-      setHistoryOpen(false);
       return session_id;
     } catch (error) {
       toast.error("Failed to create new chat");
@@ -694,7 +690,6 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     stopGeneration();
     handleSetCurrentSessionId(undefined);
     setInput("");
-    setHistoryOpen(false);
   }, [handleSetCurrentSessionId, stopGeneration]);
 
   const loadMoreSessions = useCallback(async () => {
@@ -750,40 +745,69 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loadSessions, searchQuery, isAuthenticated, isAuthLoading]);
 
+  const contextValue = React.useMemo(
+    () => ({
+      sessions,
+      currentSessionId,
+      messages,
+      input,
+      isSending,
+      isOpen,
+      isLoadingSessions,
+      isLoadingMessages,
+      isGenerating,
+      searchQuery,
+      hasMoreSessions,
+      isLoadingMoreSessions,
+      setInput,
+      setOpen,
+      setCurrentSessionId: handleSetCurrentSessionId,
+      sendMessage,
+      createSession,
+      deleteSession,
+      renameSession,
+      retryMessage,
+      editMessage,
+      deleteMessage,
+      refreshSessions,
+      loadMoreSessions,
+      setSearchQuery,
+      stopGeneration,
+      resetChat,
+    }),
+    [
+      sessions,
+      currentSessionId,
+      messages,
+      input,
+      isSending,
+      isOpen,
+      isLoadingSessions,
+      isLoadingMessages,
+      isGenerating,
+      searchQuery,
+      hasMoreSessions,
+      isLoadingMoreSessions,
+      setInput,
+      setOpen,
+      handleSetCurrentSessionId,
+      sendMessage,
+      createSession,
+      deleteSession,
+      renameSession,
+      retryMessage,
+      editMessage,
+      deleteMessage,
+      refreshSessions,
+      loadMoreSessions,
+      setSearchQuery,
+      stopGeneration,
+      resetChat,
+    ],
+  );
+
   return (
-    <AgentContext.Provider
-      value={{
-        sessions,
-        currentSessionId,
-        messages,
-        input,
-        isSending,
-        isOpen,
-        isHistoryOpen,
-        isLoadingSessions,
-        isLoadingMessages,
-        isGenerating,
-        searchQuery,
-        hasMoreSessions,
-        isLoadingMoreSessions,
-        setInput,
-        setOpen,
-        setHistoryOpen,
-        setCurrentSessionId: handleSetCurrentSessionId,
-        sendMessage,
-        createSession,
-        deleteSession,
-        renameSession,
-        retryMessage,
-        editMessage,
-        deleteMessage,
-        refreshSessions,
-        loadMoreSessions,
-        setSearchQuery,
-        stopGeneration,
-        resetChat,
-      }}
-    >
+    <AgentContext.Provider value={contextValue}>
       {children}
     </AgentContext.Provider>
   );

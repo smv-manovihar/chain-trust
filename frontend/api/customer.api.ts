@@ -25,6 +25,9 @@ export interface CabinetItem {
   reminderTimes?: {
     time: string;
     mealContext?: 'before_meal' | 'after_meal' | 'with_meal' | 'no_preference';
+    frequencyType?: 'daily' | 'weekly' | 'interval_days' | 'interval_months';
+    daysOfWeek?: number[];
+    interval?: number;
   }[];
   prescriptionIds?: string[];
   prescriptions?: {

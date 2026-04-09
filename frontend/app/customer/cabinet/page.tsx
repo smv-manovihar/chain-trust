@@ -296,10 +296,12 @@ export default function MyMedicinesPage() {
                       {/* Adherence Streak Badge */}
                       {med.currentStreak !== undefined &&
                         med.currentStreak > 0 && (
-                          <Badge className="absolute top-4 right-4 rounded-full bg-orange-500/10 text-orange-600 border-orange-200 font-black px-2 py-0.5 text-[9px] z-20 animate-pulse">
-                            <Flame className="h-2.5 w-2.5 mr-1 fill-current" />
-                            {med.currentStreak} Day Streak
-                          </Badge>
+                          <div className="absolute top-4 right-4 z-20">
+                            <Badge className="rounded-full bg-orange-500/10 text-orange-600 border-orange-200 font-black px-2 py-0.5 text-[10px] sm:text-[11px] flex items-center gap-1 shadow-sm transition-transform active:scale-95 group-hover:scale-110">
+                              <Flame className="h-3 w-3 fill-current animate-pulse-fast transition-all" />
+                              {med.currentStreak}
+                            </Badge>
+                          </div>
                         )}
 
                       <div className="flex gap-4 items-center relative z-10 w-full shrink-0">
@@ -675,9 +677,10 @@ export default function MyMedicinesPage() {
                       <div className="flex gap-4 items-center w-full sm:w-[200px] shrink-0 relative">
                         {med.currentStreak !== undefined &&
                           med.currentStreak > 0 && (
-                            <div className="absolute -top-2 -right-2 bg-orange-500 text-white rounded-full p-1 shadow-lg z-20 animate-pulse border-2 border-background">
-                              <Flame className="h-3 w-3 fill-current" />
-                            </div>
+                            <Badge className="absolute -top-2 -right-1 rounded-full bg-orange-500 text-white border-2 border-background font-black px-1.5 py-0.5 text-[9px] shadow-lg z-20 flex items-center gap-0.5 animate-in zoom-in duration-300">
+                              <Flame className="h-2.5 w-2.5 fill-current" />
+                              {med.currentStreak}
+                            </Badge>
                           )}
                         {med.images && med.images.length > 0 ? (
                           <div className="h-12 w-12 overflow-hidden shrink-0 shadow-sm border border-primary/10">

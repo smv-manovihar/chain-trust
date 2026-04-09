@@ -3,7 +3,7 @@
 import { code } from "@streamdown/code";
 import { type ClassValue, clsx } from "clsx";
 import Image from "next/image";
-import React, { useMemo } from "react";
+import React, { useMemo, memo } from "react";
 import { Streamdown } from "streamdown";
 import { twMerge } from "tailwind-merge";
 import Link from "next/link";
@@ -179,7 +179,7 @@ const renderContentWithActions = (
           <Button
             variant="outline"
             size="sm"
-            className="h-7 px-3 text-[10px] font-bold gap-1.5 border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary rounded-full transition-all shadow-sm"
+            className="h-7 px-3 text-xs font-bold gap-1.5 border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary rounded-full transition-all shadow-sm"
             asChild
             onClick={() => onAction?.()}
           >
@@ -204,15 +204,17 @@ const renderContentWithActions = (
   return parts.length > 0 ? parts : node;
 };
 
-
 // A streaming-ready Markdown renderer handling incomplete blocks, code highlighting, and custom components.
-export function MarkdownRenderer({
+export const MarkdownRenderer = memo(function MarkdownRenderer({
   content,
   className,
   isStreaming = false,
 }: MarkdownRendererProps) {
   const { setOpen } = useAgent();
-  const components = useMemo(() => BASE_COMPONENTS(() => setOpen(true)) as any, [setOpen]);
+  const components = useMemo(
+    () => BASE_COMPONENTS(() => setOpen(true)) as any,
+    [setOpen],
+  );
 
   // JSX Return Statement
   return (
@@ -232,4 +234,4 @@ export function MarkdownRenderer({
       </Streamdown>
     </div>
   );
-}
+});

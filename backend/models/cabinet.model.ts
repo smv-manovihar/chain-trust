@@ -4,12 +4,15 @@ import { deleteFile } from '../services/s3.service.js';
 export interface IReminderTime {
 	time: Date; // Stored as UTC literal
 	mealContext?: 'before_meal' | 'after_meal' | 'with_meal' | 'no_preference';
+	frequencyType?: 'daily' | 'weekly' | 'interval_days' | 'interval_months';
+	daysOfWeek?: number[]; // 0-6 (Sun-Sat)
+	interval?: number; // X in "Every X days/months"
 }
 
 export interface INotificationOverride {
 	medicine_expiry?: { inApp?: boolean; email?: boolean };
 	batch_recall?: { inApp?: boolean; email?: boolean };
-	dose_reminder?: { inApp?: boolean; email?: boolean };
+	dose_reminder?: { inApp?: boolean; email?: boolean; leadTimeMinutes?: number };
 }
 
 export interface ICabinetItem extends Document {
@@ -96,6 +99,13 @@ const cabinetItemSchema = new Schema<ICabinetItem>(
 					enum: ['before_meal', 'after_meal', 'with_meal', 'no_preference'],
 					default: 'no_preference',
 				},
+				frequencyType: {
+					type: String,
+					enum: ['daily', 'weekly', 'interval_days', 'interval_months'],
+					default: 'daily',
+				},
+				daysOfWeek: { type: [Number], default: [] },
+				interval: { type: Number, default: 1 },
 			},
 		],
 		notificationOverrides: {
@@ -110,6 +120,7 @@ const cabinetItemSchema = new Schema<ICabinetItem>(
 			dose_reminder: {
 				inApp: { type: Boolean },
 				email: { type: Boolean },
+				leadTimeMinutes: { type: Number },
 			},
 		},
 		lastDoseTaken: { type: Date },

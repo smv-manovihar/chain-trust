@@ -56,7 +56,7 @@ const medicineSchema = z.object({
   name: z.string().min(2, "Medicine name is required"),
   brand: z.string().min(2, "Brand name is required"),
   composition: z.string().min(2, "Composition / molecules are required"),
-  dosage: z.string().optional(),
+  dosage: z.coerce.number().min(0).optional(),
   frequency: z.string().optional(),
   currentQuantity: z.coerce.number().min(0, "Current quantity cannot be negative").optional(),
   totalQuantity: z.coerce.number().min(1, "Pack size must be at least 1").optional(),
@@ -67,7 +67,10 @@ const medicineSchema = z.object({
   expiryDate: z.date().optional(),
   reminderTimes: z.array(z.object({
     time: z.date(),
-    mealContext: z.enum(['before_meal', 'after_meal', 'with_meal', 'no_preference'])
+    mealContext: z.enum(['before_meal', 'after_meal', 'with_meal', 'no_preference']),
+    frequencyType: z.enum(['daily', 'weekly', 'interval_days', 'interval_months']).optional(),
+    daysOfWeek: z.array(z.number()).optional(),
+    interval: z.number().min(1).optional(),
   })).default([]),
 });
 
@@ -91,7 +94,7 @@ export default function AddMedicinePage() {
       name: "",
       brand: "",
       composition: "",
-      dosage: "",
+      dosage: undefined,
       frequency: "Daily",
       currentQuantity: 30,
       totalQuantity: 30,
@@ -166,7 +169,10 @@ export default function AddMedicinePage() {
         notes: data.notes,
         reminderTimes: data.reminderTimes?.map(r => ({
           ...r,
-          time: r.time.toISOString()
+          time: r.time.toISOString(),
+          frequencyType: r.frequencyType || 'daily',
+          daysOfWeek: r.daysOfWeek || [],
+          interval: r.interval || 1,
         })),
       });
 
@@ -254,7 +260,7 @@ export default function AddMedicinePage() {
                       render={({ field }) => (
                         <FormItem className="space-y-4">
                           <div className="flex items-center justify-between px-1">
-                            <FormLabel className="text-sm font-black text-foreground/80">Daily Doses</FormLabel>
+                            <FormLabel className="text-sm font-black text-foreground/80">Scheduled Intake Times</FormLabel>
                             <Button 
                               type="button" 
                               variant="outline" 
@@ -263,25 +269,40 @@ export default function AddMedicinePage() {
                               onClick={() => {
                                 const newTime = new Date();
                                 newTime.setHours(8, 0, 0, 0);
-                                field.onChange([...field.value, { time: newTime, mealContext: 'no_preference' }]);
+                                field.onChange([
+                                  ...field.value, 
+                                  { 
+                                    time: newTime, 
+                                    mealContext: 'no_preference',
+                                    frequencyType: 'daily',
+                                    daysOfWeek: [1, 2, 3, 4, 5],
+                                    interval: 1
+                                  }
+                                ]);
                               }}
                             >
-                              <Plus className="h-3.5 w-3.5 mr-1" /> Add Time
+                              <Plus className="h-3.5 w-3.5 mr-1" /> Add Reminder
                             </Button>
                           </div>
                           
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-4">
                             {field.value.length === 0 && (
-                              <div className="col-span-full py-12 px-6 border-2 border-dashed border-primary/5 rounded-[2rem] flex flex-col items-center justify-center text-center bg-muted/5">
+                              <div className="py-12 px-6 border-2 border-dashed border-primary/5 rounded-[2.5rem] flex flex-col items-center justify-center text-center bg-muted/5">
                                 <Clock className="h-8 w-8 text-muted-foreground/20 mb-3" />
-                                <p className="text-sm font-bold text-muted-foreground/40">No reminders set.</p>
+                                <p className="text-sm font-bold text-muted-foreground/40">No reminders scheduled.</p>
                                 <Button 
                                   type="button" 
                                   variant="link" 
                                   className="text-xs font-black text-primary mt-2"
                                   onClick={() => {
                                     const t1 = new Date(); t1.setHours(8, 0, 0, 0);
-                                    field.onChange([{ time: t1, mealContext: 'no_preference' }]);
+                                    field.onChange([{ 
+                                      time: t1, 
+                                      mealContext: 'no_preference',
+                                      frequencyType: 'daily',
+                                      daysOfWeek: [1, 2, 3, 4, 5],
+                                      interval: 1
+                                    }]);
                                   }}
                                 >
                                   Fast Add: Morning (8:00 AM)
@@ -290,14 +311,39 @@ export default function AddMedicinePage() {
                             )}
                             
                             {field.value.map((reminder, index) => (
-                              <Card key={index} className="p-4 rounded-3xl border-primary/5 bg-background relative group">
-                                <div className="flex gap-4 items-center">
-                                  <div className="flex-1 space-y-3">
-                                    <div className="flex flex-col gap-1.5">
-                                      <Label className="text-[10px] font-black text-muted-foreground/60 px-1">Dose Time</Label>
+                              <Card key={index} className="p-5 sm:p-6 rounded-[2.5rem] border-primary/5 bg-background shadow-sm hover:shadow-md transition-all">
+                                <div className="flex flex-col gap-6">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                                        <Clock className="h-5 w-5" />
+                                      </div>
+                                      <div>
+                                        <p className="font-black text-sm text-foreground">Reminder #{index + 1}</p>
+                                        <p className="text-[10px] font-bold text-muted-foreground opacity-60">Set dose time and frequency</p>
+                                      </div>
+                                    </div>
+                                    <Button 
+                                      type="button" 
+                                      variant="ghost" 
+                                      size="icon"
+                                      className="h-9 w-9 rounded-full text-destructive hover:bg-destructive/10"
+                                      onClick={() => {
+                                        const newVal = [...field.value];
+                                        newVal.splice(index, 1);
+                                        field.onChange(newVal);
+                                      }}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                    <div className="space-y-1.5 px-1">
+                                      <Label className="text-[10px] font-black text-muted-foreground uppercase opacity-60">Intake Time</Label>
                                       <Input 
                                         type="time" 
-                                        className="h-10 rounded-xl bg-muted/30 border-none font-black text-sm"
+                                        className="h-12 rounded-2xl bg-muted/30 border-none font-black text-sm pr-4 focus:ring-1 focus:ring-primary/20"
                                         value={format(reminder.time, "HH:mm")}
                                         onChange={(e) => {
                                           const [h, m] = e.target.value.split(':');
@@ -309,10 +355,10 @@ export default function AddMedicinePage() {
                                         }}
                                       />
                                     </div>
-                                    <div className="flex flex-col gap-1.5">
-                                      <Label className="text-[10px] font-black text-muted-foreground/60 px-1">Context</Label>
+                                    <div className="space-y-1.5 px-1">
+                                      <Label className="text-[10px] font-black text-muted-foreground uppercase opacity-60">Meal Context</Label>
                                       <select 
-                                        className="h-10 rounded-xl bg-muted/30 border-none font-bold text-xs px-3 focus:ring-1 focus:ring-primary/20 outline-none"
+                                        className="w-full h-12 rounded-2xl bg-muted/30 border-none font-bold text-xs px-4 focus:ring-1 focus:ring-primary/20 outline-none"
                                         value={reminder.mealContext}
                                         onChange={(e) => {
                                           const newVal = [...field.value];
@@ -327,19 +373,79 @@ export default function AddMedicinePage() {
                                       </select>
                                     </div>
                                   </div>
-                                  <Button 
-                                    type="button" 
-                                    variant="ghost" 
-                                    size="icon"
-                                    className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10"
-                                    onClick={() => {
-                                      const newVal = [...field.value];
-                                      newVal.splice(index, 1);
-                                      field.onChange(newVal);
-                                    }}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
+
+                                  <div className="space-y-4 pt-4 border-t border-primary/5">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                      <div className="space-y-1 px-1">
+                                        <Label className="text-[10px] font-black text-muted-foreground uppercase opacity-60">Frequency Type</Label>
+                                        <select
+                                          value={reminder.frequencyType || 'daily'}
+                                          onChange={(e) => {
+                                            const newVal = [...field.value];
+                                            newVal[index].frequencyType = e.target.value as any;
+                                            field.onChange(newVal);
+                                          }}
+                                          className="w-full sm:w-[180px] h-12 rounded-2xl bg-background border border-primary/10 font-black text-xs px-4"
+                                        >
+                                          <option value="daily">Every Day</option>
+                                          <option value="weekly">Specific Days</option>
+                                          <option value="interval_days">Day Interval</option>
+                                          <option value="interval_months">Month Interval</option>
+                                        </select>
+                                      </div>
+
+                                      {(reminder.frequencyType === 'interval_days' || reminder.frequencyType === 'interval_months') && (
+                                        <div className="flex items-center gap-3 bg-primary/5 px-4 py-3 rounded-2xl border border-primary/10">
+                                          <span className="text-[10px] font-black text-muted-foreground uppercase">Every</span>
+                                          <Input
+                                            type="number"
+                                            min={1}
+                                            max={365}
+                                            className="h-10 w-16 rounded-xl bg-background border-none font-black text-center text-sm shadow-inner"
+                                            value={reminder.interval || 1}
+                                            onChange={(e) => {
+                                              const newVal = [...field.value];
+                                              newVal[index].interval = parseInt(e.target.value) || 1;
+                                              field.onChange(newVal);
+                                            }}
+                                          />
+                                          <span className="text-[10px] font-black text-muted-foreground uppercase">
+                                            {reminder.frequencyType === 'interval_days' ? 'Days' : 'Months'}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {reminder.frequencyType === 'weekly' && (
+                                      <div className="flex justify-between gap-1.5 pt-1">
+                                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, dIdx) => {
+                                          const isSelected = reminder.daysOfWeek?.includes(dIdx);
+                                          return (
+                                            <button
+                                              key={dIdx}
+                                              type="button"
+                                              onClick={() => {
+                                                const newVal = [...field.value];
+                                                const current = reminder.daysOfWeek || [];
+                                                newVal[index].daysOfWeek = isSelected 
+                                                  ? current.filter(d => d !== dIdx)
+                                                  : [...current, dIdx];
+                                                field.onChange(newVal);
+                                              }}
+                                              className={cn(
+                                                "h-10 flex-1 rounded-xl border text-[10px] font-black transition-all",
+                                                isSelected 
+                                                  ? "bg-primary border-primary text-primary-foreground shadow-md shadow-primary/20 scale-105" 
+                                                  : "bg-background border-primary/10 text-muted-foreground hover:border-primary/30"
+                                              )}
+                                            >
+                                              {day}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </Card>
                             ))}
@@ -511,15 +617,17 @@ export default function AddMedicinePage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-xs font-black text-muted-foreground/80 ml-1">
-                            Dosage per take (e.g. 1 Tablet)
+                            Dosage per take (e.g. 1)
                           </FormLabel>
                           <FormControl>
                             <div className="relative group">
                               <FlaskConical className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40 group-focus-within:opacity-100 transition-opacity" />
                               <Input
-                                placeholder="1 Tablet"
+                                type="number"
+                                placeholder="1"
                                 className="pl-11 h-12 rounded-full border-primary/10 bg-muted/20 focus-visible:ring-primary/20 font-semibold"
                                 {...field}
+                                onChange={(e) => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}
                               />
                             </div>
                           </FormControl>

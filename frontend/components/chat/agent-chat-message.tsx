@@ -52,14 +52,14 @@ const sanitizeForCopy = (content: string): string => {
     .replace(/\[action:\s*\w+\s*(?:\|[^\]]+)?\]/g, "");
 };
 
-const AgentChatMessageBase = ({
+export const AgentChatMessage = memo(function AgentChatMessage({
   message,
   onEdit,
   onDelete,
   onRetry,
   compact = false,
   isGenerating = false,
-}: AgentChatMessageProps) => {
+}: AgentChatMessageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(message.content || "");
   const [isSaving, setIsSaving] = useState(false);
@@ -420,6 +420,4 @@ const AgentChatMessageBase = ({
       </AlertDialog>
     </div>
   );
-};
-
-export const AgentChatMessage = memo(AgentChatMessageBase);
+});

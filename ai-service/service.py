@@ -182,7 +182,7 @@ class ChatService:
                     tool_input = event["data"].get("input", {})
 
                     # Generate dynamic message
-                    display_message = self.tools_instance.get_tool_message(
+                    display_message = await self.tools_instance.get_tool_message(
                         tool_name, tool_input, tense="present", context=context_obj
                     )
 
@@ -262,7 +262,7 @@ class ChatService:
                         del tool_event_buffers[run_id]
 
                     # Generate past tense message
-                    display_message = self.tools_instance.get_tool_message(
+                    display_message = await self.tools_instance.get_tool_message(
                         tool_name, tool_input, tense="past", context=context_obj
                     )
 
@@ -340,7 +340,7 @@ class ChatService:
         try:
             settings = get_settings()
             llm = ChatOpenAI(
-                model="qwen/qwen3.6-plus:free",
+                model="openrouter/free",
                 api_key=settings.OPENROUTER_API_KEY,
                 base_url="https://openrouter.ai/api/v1",
                 temperature=0.7,
@@ -391,7 +391,7 @@ class ChatService:
                 "4. Use specific names (Product IDs, Batches) if available in context.\n"
                 "5. Example: 'Batch PRD-102 Analysis', 'Prescription OCR Read', 'Medicine Cabinet Search'."
             )
-            
+
             user_data = f"User Message: {first_message}\n\n{context_str}"
 
             try:
@@ -408,7 +408,7 @@ class ChatService:
                         f"Title primary model rate limited, trying fallback: {e}"
                     )
                     fallback_llm = ChatOpenAI(
-                        model="nvidia/nemotron-3-super-120b-a12b:free",
+                        model="openrouter/free",
                         api_key=settings.OPENROUTER_API_KEY,
                         base_url="https://openrouter.ai/api/v1",
                         temperature=0.7,

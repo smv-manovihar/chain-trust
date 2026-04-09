@@ -46,10 +46,25 @@ export function UpcomingDoseCarousel() {
     fetchUpcoming();
   }, []);
 
-  const handleTakeDose = async (id: string, name: string) => {
-    setActionLoading(id);
+  const handleTakeDose = async (cabinetItemId: string, name: string, scheduledTime: Date) => {
+    // Unique key for this specific occurrence
+    const doseKey = `${cabinetItemId}-${new Date(scheduledTime).getTime()}`;
+    setActionLoading(doseKey);
+    
+    // Find the item to potentially restore it later
+    const itemToHide = upcoming.find(u => 
+      u.cabinetItemId === cabinetItemId && 
+      new Date(u.scheduledTime).getTime() === new Date(scheduledTime).getTime()
+    );
+    const originalUpcoming = [...upcoming];
+
     try {
-      const res = await markDoseTaken(id);
+      // Optimistic UI: Hide ONLY this specific occurrence
+      setUpcoming(prev => prev.filter(u => 
+        `${u.cabinetItemId}-${new Date(u.scheduledTime).getTime()}` !== doseKey
+      ));
+
+      const res = await markDoseTaken(cabinetItemId);
       const isLate = !res.wasPunctual;
 
       toast.success(isLate ? `Dose recorded (Late)` : `Dose recorded!`, {
@@ -58,23 +73,37 @@ export function UpcomingDoseCarousel() {
           : `Your dose for ${name} has been recorded.`,
         action: {
           label: "Undo",
-          onClick: () => handleUndo(id, name),
+          onClick: () => handleUndo(cabinetItemId, name, doseKey, itemToHide),
         },
       });
-      fetchUpcoming();
     } catch (err: any) {
+      // Restore state on error
+      setUpcoming(originalUpcoming);
       toast.error(err.response?.data?.message || "Failed to record dose");
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleUndo = async (id: string, name: string) => {
-    setActionLoading(id);
+  const handleUndo = async (cabinetItemId: string, name: string, doseKey: string, restoredItem?: any) => {
+    setActionLoading(doseKey);
     try {
-      await undoDose(id);
+      await undoDose(cabinetItemId);
+      
+      // If we have the item, put it back immediately for responsiveness
+      if (restoredItem) {
+        setUpcoming(prev => {
+          const exists = prev.find(u => `${u.cabinetItemId}-${new Date(u.scheduledTime).getTime()}` === doseKey);
+          if (exists) return prev;
+          const newList = [...prev, restoredItem];
+          return newList.sort((a, b) => 
+            new Date(a.scheduledTime).getTime() - new Date(b.scheduledTime).getTime()
+          );
+        });
+      }
+      
       toast.success(`Reverted dose for ${name}`);
-      fetchUpcoming();
+      await fetchUpcoming();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to revert dose");
     } finally {
@@ -193,12 +222,12 @@ export function UpcomingDoseCarousel() {
                   <Button
                     size="lg"
                     onClick={() =>
-                      handleTakeDose(dose.cabinetItemId, dose.name)
+                      handleTakeDose(dose.cabinetItemId, dose.name, dose.scheduledTime)
                     }
                     disabled={!!actionLoading}
                     className="flex-1 h-14 rounded-xl text-base font-bold transition-all active:scale-[0.98]"
                   >
-                    {actionLoading === dose.cabinetItemId ? (
+                    {actionLoading === `${dose.cabinetItemId}-${new Date(dose.scheduledTime).getTime()}` ? (
                       <RotateCcw className="h-5 w-5 animate-spin" />
                     ) : (
                       <>

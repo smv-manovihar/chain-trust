@@ -23,7 +23,7 @@ export interface IUser extends Document {
 	notificationDefaults: {
 		medicine_expiry: { inApp: boolean; email: boolean };
 		batch_recall: { inApp: boolean; email: boolean };
-		dose_reminder: { inApp: boolean; email: boolean };
+		dose_reminder: { inApp: boolean; email: boolean; leadTimeMinutes: number };
 		suspicious_scan: { inApp: boolean; email: boolean };
 		scan_milestone: { inApp: boolean; email: boolean };
 		system: { inApp: boolean; email: boolean };
@@ -102,6 +102,7 @@ const userSchema = new Schema<IUser>(
 			dose_reminder: {
 				inApp: { type: Boolean, default: true },
 				email: { type: Boolean, default: false },
+				leadTimeMinutes: { type: Number, default: 0 },
 			},
 			suspicious_scan: {
 				inApp: { type: Boolean, default: true },

@@ -299,7 +299,7 @@ export default function ManufacturerSettingsPage() {
                         {isLoading && (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         )}
-                        Save Profile Changes
+                        Update Profile
                       </Button>
                     </div>
                   </form>
@@ -358,8 +358,9 @@ export default function ManufacturerSettingsPage() {
                   monitoring
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
+              <CardContent className="p-0 sm:p-6">
+                {/* Desktop view: Table */}
+                <div className="hidden md:block overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="border-b border-border/50 bg-muted/5">
@@ -385,11 +386,6 @@ export default function ManufacturerSettingsPage() {
                           key: "scan_milestone",
                           label: "Scan Milestones",
                           desc: "Alerts for batch reach and consumer engagement levels.",
-                        },
-                        {
-                          key: "inventory_warning",
-                          label: "Inventory Alerts",
-                          desc: "Low-stock warnings for enrolled batches.",
                         },
                         {
                           key: "system",
@@ -443,6 +439,60 @@ export default function ManufacturerSettingsPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Mobile view: Stacked cards */}
+                <div className="md:hidden divide-y divide-border/50">
+                  {[
+                    {
+                      key: "suspicious_scan",
+                      label: "Security Alerts",
+                      desc: "Unusual scan velocities or geographic anomalies.",
+                    },
+                    {
+                      key: "scan_milestone",
+                      label: "Scan Milestones",
+                      desc: "Alerts for batch reach and consumer engagement levels.",
+                    },
+                    {
+                      key: "system",
+                      label: "System Compliance",
+                      desc: "Platform updates and regulatory requirement changes.",
+                    },
+                  ].map((type) => (
+                    <div key={type.key} className="p-6 space-y-4">
+                      <div className="space-y-1">
+                        <Label className="text-base font-black">
+                          {type.label}
+                        </Label>
+                        <p className="text-xs text-muted-foreground/70 font-medium leading-relaxed">
+                          {type.desc}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-2xl bg-muted/30 border border-border/50">
+                        <div className="flex items-center gap-6">
+                          <div className="flex flex-col items-center gap-1.5">
+                            <span className="text-[10px] font-black uppercase text-muted-foreground/50">In-App</span>
+                            <Switch
+                              checked={notificationPrefs?.[type.key]?.inApp || false}
+                              onCheckedChange={(checked) => handlePrefToggle(type.key, "inApp", checked)}
+                              disabled={prefsLoading || !notificationPrefs}
+                              className="scale-90 data-[state=checked]:bg-primary"
+                            />
+                          </div>
+                          <div className="flex flex-col items-center gap-1.5">
+                            <span className="text-[10px] font-black uppercase text-muted-foreground/50">Email</span>
+                            <Switch
+                              checked={notificationPrefs?.[type.key]?.email || false}
+                              onCheckedChange={(checked) => handlePrefToggle(type.key, "email", checked)}
+                              disabled={prefsLoading || !notificationPrefs}
+                              className="scale-90 data-[state=checked]:bg-primary"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>

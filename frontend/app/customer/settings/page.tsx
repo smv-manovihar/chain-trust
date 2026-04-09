@@ -126,6 +126,27 @@ export default function CustomerSettingsPage() {
     }
   };
 
+  const handleLeadTimeChange = async (key: string, minutes: number) => {
+    if (!notificationPrefs || !notificationPrefs[key]) return;
+
+    const newPrefs = {
+      ...notificationPrefs,
+      [key]: {
+        ...notificationPrefs[key],
+        leadTimeMinutes: minutes,
+      },
+    };
+
+    setNotificationPrefs(newPrefs);
+    try {
+      await updateNotificationPreferences(newPrefs);
+      toast.success("Lead time updated");
+    } catch (error) {
+      toast.error("Failed to update lead time");
+      setNotificationPrefs(notificationPrefs);
+    }
+  };
+
   const onProfileSubmit = async (data: z.infer<typeof profileSchema>) => {
     setIsLoading(true);
     try {
@@ -363,12 +384,12 @@ export default function CustomerSettingsPage() {
                     <div className="flex justify-end pt-6 border-t border-border mt-8">
                       <Button
                         disabled={isLoading}
-                        className="rounded-full w-full sm:w-auto px-10 h-12 shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                        className="rounded-full w-full sm:w-auto px-10 h-12 shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all text-xs sm:text-[10px] font-bold"
                       >
                         {isLoading && (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         )}
-                        Save Profile Changes
+                        Update Profile
                       </Button>
                     </div>
                   </form>
@@ -428,8 +449,9 @@ export default function CustomerSettingsPage() {
                   Customize how and where you receive critical medicine alerts
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
+              <CardContent className="p-0 sm:p-6">
+                {/* Desktop view: Table */}
+                <div className="hidden md:block overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="border-b border-border/50 bg-muted/5">
@@ -460,6 +482,7 @@ export default function CustomerSettingsPage() {
                           key: "dose_reminder",
                           label: "Dose Reminders",
                           desc: "Daily schedule tracking reminders.",
+                          hasLeadTime: true,
                         },
                         {
                           key: "low_stock",
@@ -484,6 +507,21 @@ export default function CustomerSettingsPage() {
                               <p className="text-xs text-muted-foreground/70 font-medium max-w-sm line-clamp-1 group-hover:line-clamp-none transition-all">
                                 {type.desc}
                               </p>
+                              {type.hasLeadTime && (
+                                <div className="pt-2 flex items-center gap-3">
+                                  <Label className="text-[10px] font-black uppercase text-muted-foreground/50">Notify me</Label>
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      value={notificationPrefs?.[type.key]?.leadTimeMinutes || 0}
+                                      onChange={(e) => handleLeadTimeChange(type.key, parseInt(e.target.value) || 0)}
+                                      className="w-16 h-7 text-[10px] font-bold rounded-lg bg-muted/30 border-none text-center"
+                                    />
+                                    <span className="text-[10px] font-bold text-muted-foreground/40">min before dose</span>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </td>
                           <td className="py-6 px-6">
@@ -518,6 +556,88 @@ export default function CustomerSettingsPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Mobile view: Stacked cards */}
+                <div className="md:hidden divide-y divide-border/50">
+                  {[
+                    {
+                      key: "batch_recall",
+                      label: "Safety Recalls",
+                      desc: "Immediate alerts if a medicine is recalled.",
+                    },
+                    {
+                      key: "medicine_expiry",
+                      label: "Expiry Alerts",
+                      desc: "Notifications before your medicine expires.",
+                    },
+                    {
+                      key: "dose_reminder",
+                      label: "Dose Reminders",
+                      desc: "Daily schedule tracking reminders.",
+                      hasLeadTime: true,
+                    },
+                    {
+                      key: "low_stock",
+                      label: "Low Stock",
+                      desc: "Alerts when your stock drops below threshold.",
+                    },
+                    {
+                      key: "system",
+                      label: "System Updates",
+                      desc: "New features and security improvements.",
+                    },
+                  ].map((type) => (
+                    <div key={type.key} className="p-6 space-y-4">
+                      <div className="space-y-1">
+                        <Label className="text-base font-black">
+                          {type.label}
+                        </Label>
+                        <p className="text-xs text-muted-foreground/70 font-medium leading-relaxed">
+                          {type.desc}
+                        </p>
+                      </div>
+
+                      {type.hasLeadTime && (
+                        <div className="flex items-center justify-between p-3 rounded-2xl bg-primary/5 border border-primary/10">
+                          <Label className="text-[10px] font-black uppercase text-primary/60">Lead Time</Label>
+                          <div className="flex items-center gap-2">
+                             <Input
+                                type="number"
+                                min={0}
+                                value={notificationPrefs?.[type.key]?.leadTimeMinutes || 0}
+                                onChange={(e) => handleLeadTimeChange(type.key, parseInt(e.target.value) || 0)}
+                                className="w-14 h-8 text-xs font-black rounded-xl bg-background border-primary/20 text-center"
+                              />
+                              <span className="text-[10px] font-bold text-muted-foreground/50">min</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between p-3 rounded-2xl bg-muted/30 border border-border/50">
+                        <div className="flex items-center gap-6">
+                          <div className="flex flex-col items-center gap-1.5">
+                            <span className="text-[10px] font-black uppercase text-muted-foreground/50">In-App</span>
+                            <Switch
+                              checked={notificationPrefs?.[type.key]?.inApp || false}
+                              onCheckedChange={(checked) => handlePrefToggle(type.key, "inApp", checked)}
+                              disabled={prefsLoading || !notificationPrefs}
+                              className="scale-90 data-[state=checked]:bg-primary"
+                            />
+                          </div>
+                          <div className="flex flex-col items-center gap-1.5">
+                            <span className="text-[10px] font-black uppercase text-muted-foreground/50">Email</span>
+                            <Switch
+                              checked={notificationPrefs?.[type.key]?.email || false}
+                              onCheckedChange={(checked) => handlePrefToggle(type.key, "email", checked)}
+                              disabled={prefsLoading || !notificationPrefs}
+                              className="scale-90 data-[state=checked]:bg-primary"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>

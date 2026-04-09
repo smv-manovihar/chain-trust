@@ -74,10 +74,7 @@ export function LinkedMedications({
               ) : (
                 <div
                   className={cn(
-                    "h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center rounded-[0.85rem] transition-all duration-300 shrink-0",
-                    med.isUserAdded
-                      ? "bg-muted text-muted-foreground group-hover:bg-foreground group-hover:text-background"
-                      : "bg-primary/5 text-primary group-hover:bg-primary group-hover:text-primary-foreground",
+                    "h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center rounded-[0.85rem] transition-all duration-300 shrink-0 bg-primary/5 text-primary group-hover:bg-primary group-hover:text-primary-foreground",
                   )}
                 >
                   {med.isUserAdded ? (

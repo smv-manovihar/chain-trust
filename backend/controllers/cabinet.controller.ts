@@ -7,6 +7,7 @@ import DosageLog from '../models/dosage.model.js';
 import Notification from '../models/notification.model.js';
 import { AI_SERVICE_URL, INTERNAL_API_KEY } from '../config/config.js';
 import { generateIdSlug, resolveItem } from '../utils/identifier.util.js';
+import { isOccurrenceOnDay } from '../utils/medicine.util.js';
 
 const WINDOW_MINUTES = 180; // 3 hours window for "in time"
 
@@ -30,16 +31,19 @@ const calculateStreak = async (item: any): Promise<number> => {
 
 	// Function to check if a single day was "Perfect"
 	const isDayPerfect = (day: Date, dayLogs: any[]): boolean => {
-		const reminderCount = item.reminderTimes.length;
+		const remindersDueOnDay = item.reminderTimes.filter((r: any) => isOccurrenceOnDay(r, day));
+		const reminderCount = remindersDueOnDay.length;
+
+		// If no reminders were due and no logs were found, it's perfect (a rest day)
+		if (reminderCount === 0) return dayLogs.length === 0;
 		if (dayLogs.length !== reminderCount) return false;
 
 		// Optimization: If logs have the 'wasPunctual' flag, use it directly.
-		// This avoids expensive date comparisons for most records.
 		return dayLogs.every(log => {
 			if (log.wasPunctual !== undefined) return log.wasPunctual;
 			
 			// Fallback for legacy logs
-			const dayReminders = [...item.reminderTimes].sort((a: any, b: any) => {
+			const dayReminders = [...remindersDueOnDay].sort((a: any, b: any) => {
 				const da = new Date(a.time);
 				const db = new Date(b.time);
 				return (da.getHours() * 60 + da.getMinutes()) - (db.getHours() * 60 + db.getMinutes());
@@ -58,7 +62,8 @@ const calculateStreak = async (item: any): Promise<number> => {
 
 	// Function to check if Today is still "On Track"
 	const isTodayOnTrack = (dayLogs: any[]): boolean => {
-		const dayReminders = [...item.reminderTimes].sort((a: any, b: any) => {
+		const remindersDueToday = item.reminderTimes.filter((r: any) => isOccurrenceOnDay(r, now));
+		const dayReminders = [...remindersDueToday].sort((a: any, b: any) => {
 			const da = new Date(a.time);
 			const db = new Date(b.time);
 			return (da.getHours() * 60 + da.getMinutes()) - (db.getHours() * 60 + db.getMinutes());
@@ -89,8 +94,9 @@ const calculateStreak = async (item: any): Promise<number> => {
 	const logsToday = logs.filter(l => l.timestamp >= startOfToday);
 	if (!isTodayOnTrack(logsToday)) return 0; // Missed today
 
-	// If today is actually finished (all doses taken), count it
-	if (logsToday.length === item.reminderTimes.length && isDayPerfect(startOfToday, logsToday)) {
+	// If today is actually finished (all doses taken for the day), count it
+	const remindersDueTodayCount = item.reminderTimes.filter((r: any) => isOccurrenceOnDay(r, now)).length;
+	if (remindersDueTodayCount > 0 && logsToday.length === remindersDueTodayCount && isDayPerfect(startOfToday, logsToday)) {
 		streak++;
 	}
 
@@ -149,59 +155,82 @@ export const getUpcomingDoses = async (req: Request, res: Response): Promise<voi
 		for (const item of items) {
 			if (!item.reminderTimes) continue;
 
-			// Get logs for today for this item
 			const logsTodayCount = await DosageLog.countDocuments({
 				cabinetItemId: item._id,
 				timestamp: { $gte: startOfDay, $lte: endOfDay }
 			});
 
-			// Use cached streak if recently updated, otherwise trigger a background refresh logic might be needed
-			// For now, return the cached value directly for performance
 			const currentStreak = item.currentStreak || 0;
 
-			// Sort reminder times for this item chronologically by hour/min
-			const sortedReminders = [...item.reminderTimes].sort((a: any, b: any) => {
-				const da = new Date(a.time);
-				const db = new Date(b.time);
-				return (da.getHours() * 60 + da.getMinutes()) - (db.getHours() * 60 + db.getMinutes());
-			});
+			for (const reminder of item.reminderTimes) {
+				let checkDate = new Date(now);
+				let found = false;
+				let iterations = 0;
 
-			for (const reminder of sortedReminders) {
-				const index = sortedReminders.indexOf(reminder);
-				const reminderDate = new Date(reminder.time);
-				const h = reminderDate.getHours();
-				const m = reminderDate.getMinutes();
+				while (!found && iterations < 90) { // Look ahead up to 90 days
+					if (isOccurrenceOnDay(reminder, checkDate)) {
+						const rTime = new Date(reminder.time);
+						const scheduled = new Date(checkDate);
+						scheduled.setHours(rTime.getHours(), rTime.getMinutes(), 0, 0);
 
-				const scheduledToday = new Date();
-				scheduledToday.setHours(h, m, 0, 0);
+						const isToday = checkDate.toDateString() === now.toDateString();
+						
+						// If it's today, we need to see if it's already fulfilled
+						if (isToday) {
+							// Sort reminders due today to find this specific one's index
+							const remindersToday = item.reminderTimes
+								.filter((r: any) => isOccurrenceOnDay(r, now))
+								.sort((a: any, b: any) => {
+									const da = new Date(a.time);
+									const db = new Date(b.time);
+									return (da.getHours() * 60 + da.getMinutes()) - (db.getHours() * 60 + db.getMinutes());
+								});
+							
+							const index = remindersToday.findIndex((r: any) => r._id?.toString() === (reminder as any)._id?.toString() || r.time === reminder.time);
 
-				// Logic:
-				// If index < logsTodayCount, this reminder was fulfilled today.
-				let scheduledTime = scheduledToday;
-				let isMissed = false;
-				let isFulfilled = index < logsTodayCount;
+							if (index < logsTodayCount) {
+								// Already taken today, move to next occurrence
+								checkDate.setDate(checkDate.getDate() + 1);
+								iterations++;
+								continue;
+							}
 
-				if (isFulfilled) {
-					// Fulfilled today, next occurrence is tomorrow
-					scheduledTime = new Date(scheduledToday.getTime() + 24 * 60 * 60 * 1000);
-					isFulfilled = false;
-				} else if (scheduledToday.getTime() < now.getTime()) {
-					// Past time today and not fulfilled => Missed
-					isMissed = true;
+							const isMissed = scheduled.getTime() < now.getTime();
+							
+							upcoming.push({
+								cabinetItemId: item._id,
+								name: item.name,
+								brand: item.brand,
+								image: item.images?.[0],
+								scheduledTime: scheduled,
+								isMissed,
+								mealContext: reminder.mealContext,
+								dosage: item.dosage,
+								unit: item.unit,
+								currentStreak
+							});
+							found = true;
+						} else {
+							// Future occurrence
+							upcoming.push({
+								cabinetItemId: item._id,
+								name: item.name,
+								brand: item.brand,
+								image: item.images?.[0],
+								scheduledTime: scheduled,
+								isMissed: false,
+								mealContext: reminder.mealContext,
+								dosage: item.dosage,
+								unit: item.unit,
+								currentStreak
+							});
+							found = true;
+						}
+					} else {
+						checkDate.setDate(checkDate.getDate() + 1);
+						iterations++;
+					}
 				}
-
-				upcoming.push({
-					cabinetItemId: item._id,
-					name: item.name,
-					brand: item.brand,
-					image: item.images?.[0],
-					scheduledTime,
-					isMissed,
-					mealContext: reminder.mealContext,
-					dosage: item.dosage,
-					unit: item.unit,
-					currentStreak
-				});
 			}
 		}
 
