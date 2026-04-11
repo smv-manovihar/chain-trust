@@ -788,14 +788,15 @@ export const getBatchPDF = async (req: Request, res: Response) => {
 			return res.status(404).json({ message: 'Batch not found' });
 		}
 
-		// Ensure we have current QR settings from the product
-		const settings = ((batch as any).product as any)?.qrSettings || {
-			qrSize: 15,
-			columns: 4,
-			showProductName: true,
-			showUnitIndex: true,
-			showBatchNumber: true,
-			labelPadding: 5
+		// Ensure we have current QR settings from the product with sensible defaults
+		const productSettings = ((batch as any).product as any)?.qrSettings || {};
+		const settings = {
+			qrSize: productSettings.qrSize || 20,
+			showProductName: productSettings.showProductName !== false,
+			showUnitIndex: productSettings.showUnitIndex !== false,
+			showBatchNumber: productSettings.showBatchNumber !== false,
+			columns: productSettings.columns || 4, // pdfService will cap this safely
+			labelPadding: productSettings.labelPadding || 5
 		};
 
 		// Set response headers for PDF download

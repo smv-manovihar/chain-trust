@@ -33,6 +33,7 @@ import {
   Download,
 } from "lucide-react";
 import QrDisplay from "@/components/manufacturer/qr-display";
+import { calculateMaxColumns } from "@/lib/qr-utils";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -52,6 +53,7 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
   ResponsiveDialogDescription,
+  ResponsiveDialogBody,
 } from "@/components/ui/responsive-dialog";
 import {
   AlertDialog,
@@ -84,11 +86,12 @@ export default function BatchDetailPage() {
   const [pageSize, setPageSize] = useState(50);
   const [isDownloading, setIsDownloading] = useState(false);
   const [qrSettings, setQrSettings] = useState({
-    qrSize: 15,
+    qrSize: 20,
     showProductName: true,
     showUnitIndex: true,
     showBatchNumber: true,
     labelPadding: 5,
+    columns: 4,
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [scanDetails, setScanDetails] = useState<any>(null);
@@ -107,10 +110,27 @@ export default function BatchDetailPage() {
     if (!batch || !pendingSettings) return;
     try {
       setIsSavingSettings(true);
-      await updateProduct(batch.productId, { qrSettings: pendingSettings });
+      
+      // Use product object ID for more reliable updates, fallback to productId SKU
+      const targetId = batch.product?._id || batch.productId;
+      
+      // Only send fields that exist in the updated Product model
+      const { qrSize, showProductName, showUnitIndex, showBatchNumber } = pendingSettings;
+      const res = await updateProduct(targetId, { 
+        qrSettings: { qrSize, showProductName, showUnitIndex, showBatchNumber } 
+      });
+      
+      // Update local state (including computed fields) and close dialog
       setQrSettings(pendingSettings);
+      if (res.product && batch.product) {
+        setBatch((prev: any) => ({
+          ...prev,
+          product: { ...prev.product, qrSettings: res.product.qrSettings }
+        }));
+      }
+      
       toast.success("Design settings updated successfully");
-      setIsSettingsOpen(false);
+      setTimeout(() => setIsSettingsOpen(false), 50);
     } catch (err: any) {
       toast.error(err.message || "Failed to save settings");
     } finally {
@@ -141,7 +161,16 @@ export default function BatchDetailPage() {
 
   useEffect(() => {
     if (batch?.product?.qrSettings) {
-      setQrSettings(batch.product.qrSettings);
+      const qs = batch.product.qrSettings;
+      const qrSize = qs.qrSize ?? 20;
+      setQrSettings({
+        qrSize,
+        showProductName: qs.showProductName ?? true,
+        showUnitIndex: qs.showUnitIndex ?? true,
+        showBatchNumber: qs.showBatchNumber ?? true,
+        labelPadding: 5, // Match default in model/controller
+        columns: calculateMaxColumns(qrSize, 5), // Dynamically compute grid columns
+      });
     }
   }, [batch]);
 
@@ -429,161 +458,150 @@ export default function BatchDetailPage() {
                         </ResponsiveDialogDescription>
                       </ResponsiveDialogHeader>
 
-                      <ScrollArea className="max-h-[70dvh] px-6">
-                        <div className="space-y-8 py-4">
-                          {/* Preview Section */}
-                          <div className="p-6 rounded-3xl bg-muted/20 border border-border/40 flex flex-col items-center justify-center gap-4 relative overflow-hidden group">
-                            <div className="absolute top-3 left-3 flex items-center gap-1.5 opacity-40">
-                              <ShieldCheck className="h-3 w-3" />
-                              <span className="text-[8px] font-bold">
-                                Print safe preview
-                              </span>
-                            </div>
-                            <div className="bg-white p-4 rounded-2xl shadow-inner border border-border/20 transition-transform duration-500 group-hover:scale-105">
-                              <QrDisplay
-                                salt={qrData?.units[0]?.salt || "preview"}
-                                // Preview scaling: 1mm = 3.78px at 96 DPI. Here we use a multiplier to fit the card.
-                                size={(pendingSettings?.qrSize || 15) * 4.5}
-                              />
-                            </div>
-                            <div className="text-center">
-                              <p className="text-[10px] font-black text-muted-foreground">
-                                Live scale check
-                              </p>
-                              <p className="text-[8px] text-muted-foreground/60 font-bold mt-1 italic">
-                                Approximate on-screen representation
-                              </p>
+                      <ResponsiveDialogBody className="space-y-8 py-4">
+                        {/* Preview Section with Fixed Container */}
+                        <div className="h-[280px] w-full rounded-3xl bg-muted/20 border border-border/40 flex flex-col items-center justify-center relative overflow-hidden group p-4">
+                          <div className="absolute top-3 left-3 flex items-center gap-1.5 opacity-40">
+                            <ShieldCheck className="h-3 w-3" />
+                            <span className="text-[8px] font-bold">
+                              96 DPI Emulation
+                            </span>
+                          </div>
+                          <div className="bg-white p-4 rounded-2xl shadow-inner border border-border/20 transition-transform duration-500 group-hover:scale-105 flex flex-col items-center">
+                            <QrDisplay
+                              salt={qrData?.units[0]?.salt || "preview"}
+                              // Standard scale: 1mm = 3.78px
+                              size={(pendingSettings?.qrSize || 20) * 3.78}
+                            />
+                            <div className="mt-2 text-center space-y-0.5">
+                              {pendingSettings?.showProductName && (
+                                <p className="text-[7px] font-black uppercase text-black max-w-[120px] truncate leading-tight">
+                                  {batch.productName}
+                                </p>
+                              )}
+                              {(pendingSettings?.showUnitIndex ||
+                                pendingSettings?.showBatchNumber) && (
+                                <p className="text-[6px] font-bold text-muted-foreground leading-tight">
+                                  {pendingSettings?.showUnitIndex ? "ID: 000001" : ""}{" "}
+                                  {pendingSettings?.showBatchNumber
+                                    ? `| B: ${batch.batchNumber}`
+                                    : ""}
+                                </p>
+                              )}
                             </div>
                           </div>
+                          <div className="absolute bottom-3 text-center">
+                            <p className="text-[10px] font-black text-muted-foreground">
+                              High fidelity preview
+                            </p>
+                          </div>
+                        </div>
 
-                          <div className="grid gap-8">
-                            <div className="space-y-4">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-xs font-bold opacity-60 flex items-center gap-2">
-                                  <ScanLine
-                                    className="h-3 w-3"
-                                    aria-hidden="true"
-                                  />
-                                  QR code size (mm)
-                                </Label>
-                                <span className="text-xs font-mono font-bold bg-primary/10 text-primary px-3 py-1 rounded-full">
-                                  {pendingSettings?.qrSize}mm
-                                </span>
-                              </div>
-                              <Slider
-                                value={[pendingSettings?.qrSize || 15]}
-                                min={10}
-                                max={60}
-                                step={1}
-                                onValueChange={([val]) =>
-                                  setPendingSettings({
-                                    ...pendingSettings,
-                                    qrSize: val,
-                                  })
-                                }
-                                className="py-2"
-                              />
-                              <p className="text-[9px] text-muted-foreground font-medium italic opacity-60">
-                                Standard standard: 15mm-25mm for small medicine
-                                packs.
-                              </p>
-                            </div>
-
-                            <div className="space-y-4">
-                              <Label className="text-xs font-black opacity-60 flex items-center gap-2">
-                                <ShieldCheck
-                                  className="h-3 w-3"
-                                  aria-hidden="true"
-                                />
-                                Visibility Options
+                        <div className="grid gap-8">
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs font-bold opacity-60 flex items-center gap-2">
+                                <ScanLine className="h-3 w-3" aria-hidden="true" />
+                                QR code size (mm)
                               </Label>
-                              <div className="grid grid-cols-1 gap-3">
-                                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-muted/10 border border-border/40 hover:bg-muted/20 transition-colors">
-                                  <div>
-                                    <Label className="text-[11px] font-bold block leading-none">
-                                      Product Name
-                                    </Label>
-                                    <p className="text-[8px] text-muted-foreground font-medium mt-1">
-                                      Top alignment
-                                    </p>
-                                  </div>
-                                  <Switch
-                                    checked={pendingSettings?.showProductName}
-                                    onCheckedChange={(val) =>
-                                      setPendingSettings({
-                                        ...pendingSettings,
-                                        showProductName: val,
-                                      })
-                                    }
-                                  />
-                                </div>
-                                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-muted/10 border border-border/40 hover:bg-muted/20 transition-colors">
-                                  <div>
-                                    <Label className="text-[11px] font-bold block leading-none">
-                                      Batch Number
-                                    </Label>
-                                    <p className="text-[8px] text-muted-foreground font-medium mt-1">
-                                      Sub-text identifier
-                                    </p>
-                                  </div>
-                                  <Switch
-                                    checked={pendingSettings?.showBatchNumber}
-                                    onCheckedChange={(val) =>
-                                      setPendingSettings({
-                                        ...pendingSettings,
-                                        showBatchNumber: val,
-                                      })
-                                    }
-                                  />
-                                </div>
-                                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-muted/10 border border-border/40 hover:bg-muted/20 transition-colors">
-                                  <div>
-                                    <Label className="text-[11px] font-bold block leading-none">
-                                      Unit Index
-                                    </Label>
-                                    <p className="text-[8px] text-muted-foreground font-medium mt-1">
-                                      Serialization suffix
-                                    </p>
-                                  </div>
-                                  <Switch
-                                    checked={pendingSettings?.showUnitIndex}
-                                    onCheckedChange={(val) =>
-                                      setPendingSettings({
-                                        ...pendingSettings,
-                                        showUnitIndex: val,
-                                      })
-                                    }
-                                  />
-                                </div>
-                              </div>
+                              <span className="text-xs font-mono font-bold bg-primary/10 text-primary px-3 py-1 rounded-full">
+                                {pendingSettings?.qrSize}mm
+                              </span>
                             </div>
+                            <Slider
+                              value={[pendingSettings?.qrSize || 20]}
+                              min={20}
+                              max={60}
+                              step={1}
+                              onValueChange={([val]) => {
+                                // Auto-calculate optimal columns for the new size
+                                const optimalCols = calculateMaxColumns(val, 5); // Using static 5mm padding for simplicity
+                                setPendingSettings({
+                                  ...pendingSettings,
+                                  qrSize: val,
+                                  labelPadding: 5,
+                                  columns: optimalCols,
+                                });
+                              }}
+                              className="py-2"
+                            />
+                            <p className="text-[9px] text-muted-foreground font-medium italic opacity-60">
+                              Symmetrical{" "}
+                              {calculateMaxColumns(
+                                pendingSettings?.qrSize || 20,
+                                5,
+                              )}
+                              -column grid (5mm padding).
+                            </p>
+                          </div>
 
-                            <div className="space-y-4">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-xs font-black opacity-60">
-                                  Label padding (mm)
-                                </Label>
-                                <span className="text-xs font-mono font-black">
-                                  {pendingSettings?.labelPadding}mm
-                                </span>
+                          <div className="space-y-4">
+                            <Label className="text-xs font-black opacity-60 flex items-center gap-2">
+                              <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+                              Visibility Options
+                            </Label>
+                            <div className="grid grid-cols-1 gap-3">
+                              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-muted/10 border border-border/40 hover:bg-muted/20 transition-colors">
+                                <div>
+                                  <Label className="text-[11px] font-bold block leading-none">
+                                    Product Name
+                                  </Label>
+                                  <p className="text-[8px] text-muted-foreground font-medium mt-1">
+                                    Top alignment
+                                  </p>
+                                </div>
+                                <Switch
+                                  checked={pendingSettings?.showProductName}
+                                  onCheckedChange={(val) =>
+                                    setPendingSettings({
+                                      ...pendingSettings,
+                                      showProductName: val,
+                                    })
+                                  }
+                                />
                               </div>
-                              <Slider
-                                value={[pendingSettings?.labelPadding || 5]}
-                                min={0}
-                                max={20}
-                                step={1}
-                                onValueChange={([val]) =>
-                                  setPendingSettings({
-                                    ...pendingSettings,
-                                    labelPadding: val,
-                                  })
-                                }
-                                className="py-2"
-                              />
+                              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-muted/10 border border-border/40 hover:bg-muted/20 transition-colors">
+                                <div>
+                                  <Label className="text-[11px] font-bold block leading-none">
+                                    Batch Number
+                                  </Label>
+                                  <p className="text-[8px] text-muted-foreground font-medium mt-1">
+                                    Sub-text identifier
+                                  </p>
+                                </div>
+                                <Switch
+                                  checked={pendingSettings?.showBatchNumber}
+                                  onCheckedChange={(val) =>
+                                    setPendingSettings({
+                                      ...pendingSettings,
+                                      showBatchNumber: val,
+                                    })
+                                  }
+                                />
+                              </div>
+                              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-muted/10 border border-border/40 hover:bg-muted/20 transition-colors">
+                                <div>
+                                  <Label className="text-[11px] font-bold block leading-none">
+                                    Unit Index
+                                  </Label>
+                                  <p className="text-[8px] text-muted-foreground font-medium mt-1">
+                                    Serialization suffix
+                                  </p>
+                                </div>
+                                <Switch
+                                  checked={pendingSettings?.showUnitIndex}
+                                  onCheckedChange={(val) =>
+                                    setPendingSettings({
+                                      ...pendingSettings,
+                                      showUnitIndex: val,
+                                    })
+                                  }
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </ScrollArea>
+                      </ResponsiveDialogBody>
 
                       <div className="flex gap-4 p-6 pt-2">
                         <Button

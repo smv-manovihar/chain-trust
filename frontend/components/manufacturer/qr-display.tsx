@@ -24,15 +24,15 @@ export default function QrDisplay({ salt, size = 150, className, errorCorrection
 
     const url = generateVerifyUrl(salt);
     
-    // Balanced ECL for logo integration without making modules too small
-    const ecl = errorCorrectionLevel || 'M';
+    // Level 'Q' (Quartile) provides 25% recovery - perfect for 15% logo obstruction
+    const ecl = errorCorrectionLevel || 'Q';
 
     QRCode.toCanvas(
       canvasRef.current,
       url,
       {
         width: size,
-        margin: 2, // Increased quiet zone for better recognition
+        margin: 4, // Increased quiet zone for better recognition
         errorCorrectionLevel: ecl,
         color: {
           dark: '#000000',
@@ -55,17 +55,17 @@ export default function QrDisplay({ salt, size = 150, className, errorCorrection
         const logo = new Image();
         logo.src = '/chain-trust-icon.png';
         logo.onload = () => {
-          const logoSize = size * 0.18; // Balanced size (~18% of QR)
+          const logoSize = size * 0.15; // Balanced size (~15% of QR)
           const x = (size - logoSize) / 2;
           const y = (size - logoSize) / 2;
           
           ctx.save();
-          ctx.globalAlpha = 0.65; // Semi-transparent as requested
           
-          // Draw a small white background for the logo to improve visibility
+          // Draw a small solid white background for the logo to maximize contrast
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(x - 1, y - 1, logoSize + 2, logoSize + 2);
           
+          ctx.globalAlpha = 0.8; // Increased clarity for brand recognition
           ctx.drawImage(logo, x, y, logoSize, logoSize);
           ctx.restore();
         };

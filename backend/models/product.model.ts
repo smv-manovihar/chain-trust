@@ -16,11 +16,9 @@ export interface IProduct extends Document {
 	customerVisibleImages?: number[]; // Indices of images visible to customers
 	qrSettings: {
 		qrSize: number;
-		columns: number;
 		showProductName: boolean;
 		showUnitIndex: boolean;
 		showBatchNumber: boolean;
-		labelPadding: number;
 	};
 	createdBy: Types.ObjectId;
 	createdAt: Date;
@@ -85,12 +83,10 @@ const productSchema = new Schema<IProduct>(
 			trim: true,
 		},
 		qrSettings: {
-			qrSize: { type: Number, default: 40 }, // mm
-			columns: { type: Number, default: 4 },
+			qrSize: { type: Number, default: 20, min: 20 }, // mm (Standard medicine pack size)
 			showProductName: { type: Boolean, default: true },
 			showUnitIndex: { type: Boolean, default: true },
 			showBatchNumber: { type: Boolean, default: true },
-			labelPadding: { type: Number, default: 10 }, // px
 		},
 		createdBy: {
 			type: Schema.Types.ObjectId,

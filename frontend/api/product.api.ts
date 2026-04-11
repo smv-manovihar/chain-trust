@@ -18,7 +18,6 @@ export interface ProductDto {
 		showProductName: boolean;
 		showUnitIndex: boolean;
 		showBatchNumber: boolean;
-		labelPadding: number;
 	};
 	wizardState?: any; // Dynamic dict for UI state tracking (FIX-004)
 }

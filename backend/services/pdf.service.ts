@@ -41,24 +41,30 @@ export const generateBatchPDF = async (
         const pageWidth = 210 * MM_TO_PT;
         const pageHeight = 297 * MM_TO_PT;
         const margin = 10 * MM_TO_PT;
-        
-        // Label calculations
-        const cols = settings.columns || 4;
-        const padding = (settings.labelPadding || 5) * MM_TO_PT;
-        
-        // Dynamic QR Sizing: 
-        // Ensure QR code fits inside the column width after padding.
         const availableWidth = pageWidth - 2 * margin;
-        const labelWidth = availableWidth / cols;
+
+        // Mandatory Padding & Safety Checks
+        const qrSizeMm = Math.max(20, settings.qrSize || 20);
+        const paddingMm = settings.labelPadding || 5;
         
-        // qrSize is taken from settings or defaults to 85% of labelWidth
-        let qrSize = (settings.qrSize || 0) * MM_TO_PT;
-        if (qrSize === 0 || qrSize > (labelWidth - 2 * padding)) {
+        // 1. Column Capping Logic (Safety first)
+        const maxPossibleCols = Math.floor(210 / (qrSizeMm + 2 * paddingMm)); // Absolute page width check
+        const safeMaxCols = Math.floor(availableWidth / ((qrSizeMm + 2 * paddingMm) * MM_TO_PT));
+        const cols = Math.min(settings.columns || 4, Math.max(1, safeMaxCols));
+        
+        const padding = paddingMm * MM_TO_PT;
+        
+        // 2. Symmetrical Layout Calculations
+        const labelWidth = availableWidth / cols;
+        // Force symmetry: labelHeight = labelWidth
+        const labelHeight = labelWidth; 
+        
+        // Final QR sizing to fit within the symmetrical label
+        let qrSize = qrSizeMm * MM_TO_PT;
+        if (qrSize > (labelWidth - 2 * padding)) {
             qrSize = labelWidth - 2 * padding;
         }
 
-        const labelHeight = qrSize + (padding * 2) + 20; // Compressed branding space
-        
         let currentX = margin;
         let currentY = margin;
         let colIndex = 0;
@@ -77,15 +83,16 @@ export const generateBatchPDF = async (
                     // Derive salt locally to avoid passing huge arrays
                     const unitHash = crypto.createHash('sha256').update(`${batch.batchSalt}-${i}`).digest('hex');
                     const qrSalt = `${batch.batchSalt}:${i}:${unitHash}`;
-                    const verifyUrl = `${frontendUrl}/verify?salt=${qrSalt}`;
+                    // Optimized shortened param 's' for scan reliability
+                    const verifyUrl = `${frontendUrl}/verify?s=${qrSalt}`;
 
-                    // 1. Generate QR Buffer (Balanced ECL for logo integration)
-                    const ecl: 'L' | 'M' | 'Q' | 'H' = 'M';
+                    // 1. Generate QR Buffer (Level 'Q' for balanced detection)
+                    const ecl: 'L' | 'M' | 'Q' | 'H' = 'Q';
 
                     const qrBuffer = await QRCode.toBuffer(verifyUrl, {
                         errorCorrectionLevel: ecl,
-                        margin: 2,
-                        width: 512, // Reduced resolution for PDF performance
+                        margin: 4, // Increased quiet zone
+                        width: 512, // High resolution for vector sharp rendering
                         color: {
                             dark: '#000000',
                             light: '#FFFFFF'
@@ -108,32 +115,37 @@ export const generateBatchPDF = async (
                         .stroke()
                         .restore();
 
-                    // 4. Draw QR Code (Centered in the column)
+                    // 4. Draw QR Code (Centered in the symmetrical cell)
                     const qrX = currentX + (labelWidth - qrSize) / 2;
-                    const qrY = currentY + padding;
-                    doc.image(qrBuffer, qrX, qrY, { width: qrSize });
+                    // For vertical symmetry, we center the QR + Metadata block or just the QR
+                    // Metadata usually goes below. We center the group.
+                    const metadataHeight = 15; // Estimated height for text
+                    const totalContentHeight = qrSize + metadataHeight;
+                    const contentY = currentY + (labelHeight - totalContentHeight) / 2;
 
-                    // 4b. Draw Center Logo (Integrated)
+                    doc.image(qrBuffer, qrX, contentY, { width: qrSize });
+
+                    // 4b. Draw Center Logo (Integrated) - Optimized size at 15%
                     try {
-                        const logoSize = qrSize * 0.18;
+                        const logoSize = qrSize * 0.15;
                         const logoX = qrX + (qrSize - logoSize) / 2;
-                        const logoY = qrY + (qrSize - logoSize) / 2;
+                        const logoY = contentY + (qrSize - logoSize) / 2;
                         
                         doc.save();
                         doc.fillColor('#FFFFFF')
                            .rect(logoX - 1, logoY - 1, logoSize + 2, logoSize + 2)
                            .fill();
                         
-                        doc.opacity(0.65)
+                        doc.opacity(0.8)
                            .image(LOGO_PATH, logoX, logoY, { width: logoSize });
                         doc.restore();
                     } catch (e) {
                         // Silent error for logo
                     }
 
-                    // 5. Draw Metadata
+                    // 5. Minimal Metadata (No "Verified by Chaintrust" junk)
                     doc.fillColor('#000000');
-                    let textY = currentY + padding + qrSize + 1;
+                    let textY = contentY + qrSize + 2;
 
                     if (settings.showProductName) {
                         doc.fontSize(6).font('Helvetica-Bold').text((batch.productName || 'PRODUCT').toUpperCase(), currentX + 2, textY, {
@@ -154,7 +166,6 @@ export const generateBatchPDF = async (
                         });
                         textY += 6;
                     }
-
 
                     // 6. Update coordinates for next unit
                     colIndex++;

@@ -52,9 +52,10 @@ import { uploadImages } from "@/api/upload.api";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/page-header";
 import { resolveMediaUrl } from "@/lib/media-url";
-import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import QrDisplay from "@/components/manufacturer/qr-display";
+import { calculateMaxColumns } from "@/lib/qr-utils";
 import {
   Tooltip,
   TooltipContent,
@@ -89,7 +90,6 @@ interface Product {
     showProductName: boolean;
     showUnitIndex: boolean;
     showBatchNumber: boolean;
-    labelPadding: number;
   };
   createdAt: string;
 }
@@ -118,11 +118,12 @@ export default function ProductDetailsPage() {
   >("public");
   const [formVisibleImages, setFormVisibleImages] = useState<number[]>([]);
   const [formQrSettings, setFormQrSettings] = useState({
-    qrSize: 40,
+    qrSize: 20,
     showProductName: true,
     showUnitIndex: true,
     showBatchNumber: true,
-    labelPadding: 10,
+    labelPadding: 5,
+    columns: 4,
   });
   const [activeTab, setActiveTab] = useState("info");
   const [viewerDoc, setViewerDoc] = useState<{
@@ -144,12 +145,20 @@ export default function ProductDetailsPage() {
     const qrChanged =
       JSON.stringify(formQrSettings) !==
       JSON.stringify(
-        product.qrSettings || {
-          qrSize: 40,
+        product.qrSettings ? {
+          qrSize: product.qrSettings.qrSize,
+          showProductName: product.qrSettings.showProductName,
+          showUnitIndex: product.qrSettings.showUnitIndex,
+          showBatchNumber: product.qrSettings.showBatchNumber,
+          labelPadding: 5,
+          columns: calculateMaxColumns(product.qrSettings.qrSize, 5),
+        } : {
+          qrSize: 20,
           showProductName: true,
           showUnitIndex: true,
           showBatchNumber: true,
-          labelPadding: 10,
+          labelPadding: 5,
+          columns: 4,
         },
       );
 
@@ -218,7 +227,17 @@ export default function ProductDetailsPage() {
         setFormImages(p.images || []);
         setFormAccessLevel(p.imageAccessLevel || "public");
         setFormVisibleImages(p.customerVisibleImages || []);
-        if (p.qrSettings) setFormQrSettings(p.qrSettings);
+        if (p.qrSettings) {
+          const qrSize = p.qrSettings.qrSize ?? 20;
+          setFormQrSettings({
+            qrSize,
+            showProductName: p.qrSettings.showProductName ?? true,
+            showUnitIndex: p.qrSettings.showUnitIndex ?? true,
+            showBatchNumber: p.qrSettings.showBatchNumber ?? true,
+            labelPadding: 5,
+            columns: calculateMaxColumns(qrSize, 5),
+          });
+        }
       } catch (err: any) {
         if (err.name === "AbortError") return;
         toast.error("Failed to load product details.");
@@ -296,7 +315,12 @@ export default function ProductDetailsPage() {
         images: formImages,
         imageAccessLevel: formAccessLevel,
         customerVisibleImages: formVisibleImages,
-        qrSettings: formQrSettings,
+        qrSettings: {
+          qrSize: formQrSettings.qrSize,
+          showProductName: formQrSettings.showProductName,
+          showUnitIndex: formQrSettings.showUnitIndex,
+          showBatchNumber: formQrSettings.showBatchNumber,
+        },
       };
 
       await updateProduct(productId, data);
@@ -371,8 +395,8 @@ export default function ProductDetailsPage() {
                     </AlertDialogTitle>
                     <AlertDialogDescription className="text-sm font-medium pt-2">
                       This action cannot be undone. This product will be
-                      permanently removed from your catalogue and any future batch
-                      associations.
+                      permanently removed from your catalogue and any future
+                      batch associations.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter className="gap-4 mt-8">
@@ -432,7 +456,7 @@ export default function ProductDetailsPage() {
           ].map((stat, i) => (
             <Card
               key={i}
-              className="bg-muted/10 border-border/40 border-2 rounded-3xl p-5 sm:p-6 flex items-center justify-between group hover:bg-primary/[0.02] transition-all duration-300"
+              className="bg-muted/10 border-border/40 border-[1.5px] sm:border-2 rounded-2xl sm:rounded-3xl p-4 sm:p-6 flex items-center justify-between group hover:bg-primary/[0.02] transition-all duration-300"
             >
               <div className="space-y-1 sm:space-y-2 min-w-0">
                 <p className="text-[8px] sm:text-[10px] font-black text-muted-foreground opacity-60 truncate leading-none mb-1">
@@ -485,10 +509,13 @@ export default function ProductDetailsPage() {
               >
                 <div className="grid lg:grid-cols-3 gap-6 sm:gap-8">
                   <div className="lg:col-span-2 space-y-6 sm:space-y-8">
-                    <Card className="p-5 sm:p-8 rounded-3xl border-2 border-border/40 bg-card/40 space-y-8 sm:space-y-12 shadow-sm">
+                    <Card className="p-4 sm:p-8 rounded-[2rem] sm:rounded-3xl border-2 border-border/40 bg-card/40 space-y-8 sm:space-y-12 shadow-sm">
                       <div className="flex items-start gap-4 sm:gap-6 border-b border-border/40 pb-6 sm:pb-8">
                         <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-2xl sm:rounded-3xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20 shrink-0">
-                          <Info className="h-7 w-7 sm:h-10 sm:w-10" aria-hidden="true" />
+                          <Info
+                            className="h-7 w-7 sm:h-10 sm:w-10"
+                            aria-hidden="true"
+                          />
                         </div>
                         <div>
                           <h3 className="text-xl sm:text-2xl font-black tracking-tight mb-1 sm:mb-2 text-foreground">
@@ -501,7 +528,7 @@ export default function ProductDetailsPage() {
                         </div>
                       </div>
 
-                      <div className="grid sm:grid-cols-2 gap-x-8 gap-y-7">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 sm:gap-y-7">
                         <div className="space-y-2.5">
                           <Label className="text-xs font-semibold text-muted-foreground ml-1">
                             Product name
@@ -549,10 +576,7 @@ export default function ProductDetailsPage() {
                           <Label className="text-xs font-semibold text-muted-foreground ml-1">
                             Standard unit (Dose type)
                           </Label>
-                          <Select
-                            value={formUnit}
-                            onValueChange={setFormUnit}
-                          >
+                          <Select value={formUnit} onValueChange={setFormUnit}>
                             <SelectTrigger className="h-13 bg-background/50 rounded-full border-border/60 focus:ring-primary/20 px-5 font-bold text-base">
                               <SelectValue placeholder="Select unit" />
                             </SelectTrigger>
@@ -580,7 +604,10 @@ export default function ProductDetailsPage() {
                                     size="icon"
                                     className="h-4 w-4 rounded-full"
                                   >
-                                    <Info className="h-3 w-3 text-primary/60" aria-hidden="true" />
+                                    <Info
+                                      className="h-3 w-3 text-primary/60"
+                                      aria-hidden="true"
+                                    />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-[200px] p-2 text-[10px]">
@@ -608,7 +635,10 @@ export default function ProductDetailsPage() {
                               onChange={(e) => setFormPrice(e.target.value)}
                               className="h-13 pl-12 pr-5 bg-background/50 rounded-full border-border/60 font-mono text-lg font-bold"
                             />
-                            <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary/40 pointer-events-none z-10" aria-hidden="true" />
+                            <DollarSign
+                              className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary/40 pointer-events-none z-10"
+                              aria-hidden="true"
+                            />
                           </div>
                         </div>
                       </div>
@@ -628,10 +658,11 @@ export default function ProductDetailsPage() {
                   </div>
 
                   <div className="space-y-6">
-                    <Card className="p-5 sm:p-8 rounded-3xl border-2 border-primary/20 bg-gradient-to-br from-primary/[0.03] to-transparent space-y-8 shadow-xl shadow-primary/5">
+                    <Card className="p-4 sm:p-8 rounded-[2rem] sm:rounded-3xl border-2 border-primary/20 bg-gradient-to-br from-primary/[0.03] to-transparent space-y-8 shadow-xl shadow-primary/5">
                       <div className="space-y-4">
                         <h4 className="font-black text-xs sm:text-sm mb-4 flex items-center gap-2 text-primary">
-                          <Settings2 className="h-4 w-4" aria-hidden="true" /> QR Code Settings
+                          <Settings2 className="h-4 w-4" aria-hidden="true" />{" "}
+                          QR Code Settings
                         </h4>
                         <p className="text-[11px] sm:text-xs text-muted-foreground font-medium leading-relaxed opacity-80">
                           These parameters control the generation of holographic
@@ -640,10 +671,54 @@ export default function ProductDetailsPage() {
                       </div>
 
                       <div className="space-y-8">
+                        {/* QR Preview with Fixed Container */}
+                        <div className="space-y-4">
+                          <Label className="text-xs font-semibold text-muted-foreground ml-1">
+                            Live Label Preview
+                          </Label>
+                          <div className="h-[220px] sm:h-[280px] w-full rounded-2xl bg-muted/20 border border-border/40 flex items-center justify-center relative overflow-hidden group p-4">
+                            <div className="absolute top-2 left-3 flex items-center gap-1.5 opacity-40">
+                              <ShieldCheck className="h-3 w-3" />
+                              <span className="text-[8px] font-bold">
+                                96 DPI Emulation
+                              </span>
+                            </div>
+                            <div className="bg-white p-3 rounded-xl shadow-inner border border-border/20 flex flex-col items-center">
+                              <QrDisplay
+                                salt="preview-salt"
+                                // Adaptive scale: On mobile we magnify slightly so it doesn't look tiny
+                                size={formQrSettings.qrSize * (typeof window !== 'undefined' && window.innerWidth < 640 ? 5.5 : 3.78)}
+                              />
+                              <div className="mt-2 text-center space-y-0.5">
+                                {formQrSettings.showProductName && (
+                                  <p className="text-[7px] font-black uppercase text-black max-w-[100px] truncate leading-tight">
+                                    {formName || "Product Name"}
+                                  </p>
+                                )}
+                                {(formQrSettings.showUnitIndex ||
+                                  formQrSettings.showBatchNumber) && (
+                                  <p className="text-[6px] font-bold text-muted-foreground leading-tight">
+                                    {formQrSettings.showUnitIndex
+                                      ? "ID: 000001"
+                                      : ""}{" "}
+                                    {formQrSettings.showBatchNumber
+                                      ? "| B: PREVIEW"
+                                      : ""}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground font-medium italic opacity-60 text-center">
+                            Labels will be printed in a {formQrSettings.columns}
+                            -column symmetrical grid.
+                          </p>
+                        </div>
+
                         <div className="space-y-4">
                           <div className="flex justify-between items-center">
                             <Label className="text-xs font-semibold text-muted-foreground">
-                              Standard QR size
+                              Standard QR size (mm)
                             </Label>
                             <span className="text-[10px] font-bold font-mono bg-primary/10 text-primary px-3 py-1 rounded-full">
                               {formQrSettings.qrSize}mm
@@ -651,14 +726,17 @@ export default function ProductDetailsPage() {
                           </div>
                           <Slider
                             value={[formQrSettings.qrSize]}
-                            onValueChange={([val]) =>
+                            onValueChange={([val]) => {
+                              const optimalCols = calculateMaxColumns(val, 5);
                               setFormQrSettings((prev) => ({
                                 ...prev,
                                 qrSize: val,
-                              }))
-                            }
-                            min={15}
-                            max={80}
+                                labelPadding: 5,
+                                columns: optimalCols,
+                              }));
+                            }}
+                            min={20}
+                            max={60}
                             step={1}
                             className="py-2"
                           />
@@ -715,11 +793,14 @@ export default function ProductDetailsPage() {
                 value="images"
                 className="space-y-6 focus-visible:outline-none m-0 mt-6"
               >
-                <Card className="p-5 sm:p-8 rounded-3xl border-2 border-border/40 bg-card/40 shadow-sm">
+                <Card className="p-4 sm:p-8 rounded-[2rem] sm:rounded-3xl border-2 border-border/40 bg-card/40 shadow-sm">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 border-b border-border/40 pb-8 sm:pb-10 mb-8 sm:mb-10">
                     <div className="flex items-center gap-4 sm:gap-6">
                       <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-2xl sm:rounded-3xl bg-blue-500/10 flex items-center justify-center text-blue-500 shadow-inner border border-blue-500/20 shrink-0">
-                        <ImageIcon className="h-7 w-7 sm:h-10 sm:w-10" aria-hidden="true" />
+                        <ImageIcon
+                          className="h-7 w-7 sm:h-10 sm:w-10"
+                          aria-hidden="true"
+                        />
                       </div>
                       <div>
                         <h3 className="text-xl sm:text-2xl font-black tracking-tight mb-1 sm:mb-2">
@@ -733,7 +814,7 @@ export default function ProductDetailsPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
                     {formImages.map((url, idx) => (
                       <Card
                         key={idx}
@@ -757,7 +838,10 @@ export default function ProductDetailsPage() {
                             }
                             className="h-8 w-8 sm:h-10 sm:w-10 rounded-full shadow-xl hover:scale-110 transition-transform active:scale-90 bg-background/80 backdrop-blur-md hover:bg-background"
                           >
-                            <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+                            <Maximize2
+                              className="h-4 w-4 sm:h-5 sm:w-5"
+                              aria-hidden="true"
+                            />
                           </Button>
                         </div>
 
@@ -790,7 +874,10 @@ export default function ProductDetailsPage() {
                                 "bg-background/80 backdrop-blur-md hover:bg-background",
                             )}
                           >
-                            <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+                            <CheckCircle2
+                              className="h-4 w-4 sm:h-5 sm:w-5"
+                              aria-hidden="true"
+                            />
                           </Button>
                           <Button
                             variant="destructive"
@@ -798,7 +885,10 @@ export default function ProductDetailsPage() {
                             onClick={() => removeImage(idx)}
                             className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl shadow-xl hover:scale-110 transition-transform active:scale-90"
                           >
-                            <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+                            <Trash2
+                              className="h-4 w-4 sm:h-5 sm:w-5"
+                              aria-hidden="true"
+                            />
                           </Button>
                         </div>
                         {formVisibleImages.includes(idx) && (
@@ -821,7 +911,10 @@ export default function ProductDetailsPage() {
                     >
                       {uploading ? (
                         <div className="flex flex-col items-center gap-3">
-                          <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
+                          <Loader2
+                            className="h-8 w-8 animate-spin text-primary"
+                            aria-hidden="true"
+                          />
                           <span className="text-[10px] font-bold text-primary animate-pulse">
                             Syncing...
                           </span>
@@ -829,7 +922,10 @@ export default function ProductDetailsPage() {
                       ) : (
                         <>
                           <div className="h-12 w-12 rounded-2xl bg-background shadow-lg flex items-center justify-center group-hover:scale-110 transition-transform border border-border/40">
-                            <Plus className="h-6 w-6 text-primary" aria-hidden="true" />
+                            <Plus
+                              className="h-6 w-6 text-primary"
+                              aria-hidden="true"
+                            />
                           </div>
                           <span className="text-[10px] mt-4 font-bold text-muted-foreground opacity-60">
                             Upload Image
@@ -852,10 +948,13 @@ export default function ProductDetailsPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 mt-6 sm:mt-8">
                   <div className="lg:col-span-2 invisible" />
                   <div className="space-y-6">
-                    <Card className="p-5 sm:p-8 rounded-3xl border-2 border-border/40 bg-card/40 space-y-8 shadow-sm">
+                    <Card className="p-4 sm:p-8 rounded-[2rem] sm:rounded-3xl border-2 border-border/40 bg-card/40 space-y-8 shadow-sm">
                       <div className="flex items-start gap-4 sm:gap-6 border-b border-border/40 pb-6 sm:pb-8">
                         <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl sm:rounded-3xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 shadow-inner border border-emerald-500/20 shrink-0">
-                          <ShieldCheck className="h-6 w-6 sm:h-8 sm:w-8" aria-hidden="true" />
+                          <ShieldCheck
+                            className="h-6 w-6 sm:h-8 sm:w-8"
+                            aria-hidden="true"
+                          />
                         </div>
                         <div>
                           <h4 className="text-sm sm:text-base font-black text-foreground mb-1 leading-none">
@@ -875,11 +974,12 @@ export default function ProductDetailsPage() {
                             desc: "Visible to all consumers and visitors.",
                             icon: Globe,
                             styles: {
-                              active: "bg-emerald-500/[0.03] border-emerald-500/40 shadow-sm shadow-emerald-500/10",
+                              active:
+                                "bg-emerald-500/[0.03] border-emerald-500/40 shadow-sm shadow-emerald-500/10",
                               icon: "bg-emerald-500/10 border-emerald-500/30 text-emerald-600",
                               label: "text-emerald-700",
-                              checked: "text-emerald-500"
-                            }
+                              checked: "text-emerald-500",
+                            },
                           },
                           {
                             level: "verified_only",
@@ -887,11 +987,12 @@ export default function ProductDetailsPage() {
                             desc: "Visible only after a successful scan.",
                             icon: ShieldCheck,
                             styles: {
-                              active: "bg-amber-500/[0.03] border-amber-500/40 shadow-sm shadow-amber-500/10",
+                              active:
+                                "bg-amber-500/[0.03] border-amber-500/40 shadow-sm shadow-amber-500/10",
                               icon: "bg-amber-500/10 border-amber-500/30 text-amber-600",
                               label: "text-amber-700",
-                              checked: "text-amber-500"
-                            }
+                              checked: "text-amber-500",
+                            },
                           },
                           {
                             level: "internal_only",
@@ -899,11 +1000,12 @@ export default function ProductDetailsPage() {
                             desc: "Restricted to manufacturer portal.",
                             icon: EyeOff,
                             styles: {
-                              active: "bg-slate-500/[0.03] border-slate-500/40 shadow-sm shadow-slate-500/10",
+                              active:
+                                "bg-slate-500/[0.03] border-slate-500/40 shadow-sm shadow-slate-500/10",
                               icon: "bg-slate-500/10 border-slate-500/30 text-slate-600",
                               label: "text-slate-700",
-                              checked: "text-slate-500"
-                            }
+                              checked: "text-slate-500",
+                            },
                           },
                         ].map((policy) => {
                           const Icon = policy.icon;
@@ -920,26 +1022,39 @@ export default function ProductDetailsPage() {
                                   await updateProduct(productId, {
                                     imageAccessLevel: policy.level as any,
                                   });
-                                  toast.success(`Access level: ${policy.label}`);
+                                  toast.success(
+                                    `Access level: ${policy.label}`,
+                                  );
                                 } catch (err) {
                                   toast.error("Failed to sync policy");
                                 }
                               }}
                               className={cn(
                                 "flex items-start gap-4 p-4 h-auto rounded-2xl border-2 text-left transition-all group relative overflow-hidden active:scale-[0.98]",
-                                isActive ? policy.styles.active : "bg-muted/10 border-border/30 text-muted-foreground hover:bg-muted/20 hover:border-border/60"
+                                isActive
+                                  ? policy.styles.active
+                                  : "bg-muted/10 border-border/30 text-muted-foreground hover:bg-muted/20 hover:border-border/60",
                               )}
                             >
                               <div
                                 className={cn(
                                   "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 border transition-all duration-500 group-hover:scale-110",
-                                  isActive ? policy.styles.icon : "bg-background/80 border-border/40 text-muted-foreground/60"
+                                  isActive
+                                    ? policy.styles.icon
+                                    : "bg-background/80 border-border/40 text-muted-foreground/60",
                                 )}
                               >
                                 <Icon className="h-5 w-5" aria-hidden="true" />
                               </div>
                               <div className="flex-1 min-w-0 pr-6">
-                                <p className={cn("text-xs font-black tracking-tight", isActive ? policy.styles.label : "text-foreground/80")}>
+                                <p
+                                  className={cn(
+                                    "text-xs font-black tracking-tight",
+                                    isActive
+                                      ? policy.styles.label
+                                      : "text-foreground/80",
+                                  )}
+                                >
                                   {policy.label}
                                 </p>
                                 <p className="text-[10px] opacity-60 mt-1 font-bold leading-relaxed line-clamp-2">
@@ -948,7 +1063,13 @@ export default function ProductDetailsPage() {
                               </div>
                               {isActive && (
                                 <div className="absolute top-4 right-4">
-                                  <CheckCircle2 className={cn("h-4 w-4", policy.styles.checked)} aria-hidden="true" />
+                                  <CheckCircle2
+                                    className={cn(
+                                      "h-4 w-4",
+                                      policy.styles.checked,
+                                    )}
+                                    aria-hidden="true"
+                                  />
                                 </div>
                               )}
                             </Button>

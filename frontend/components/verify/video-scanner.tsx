@@ -80,7 +80,11 @@ export function VideoScanner({
           camId,
           { 
             fps: 30, 
-            qrbox: { width: 280, height: 280 }, 
+            qrbox: (viewWidth, viewHeight) => {
+                const minSide = Math.min(viewWidth, viewHeight);
+                const size = Math.floor(minSide * 0.7);
+                return { width: size, height: size };
+            },
             aspectRatio: 4 / 3,
             videoConstraints: {
                 focusMode: 'continuous',
@@ -115,7 +119,11 @@ export function VideoScanner({
           { facingMode: facing },
           { 
             fps: 30, 
-            qrbox: { width: 260, height: 260 }, 
+            qrbox: (viewWidth, viewHeight) => {
+                const minSide = Math.min(viewWidth, viewHeight);
+                const size = Math.floor(minSide * 0.75);
+                return { width: size, height: size };
+            },
             aspectRatio: 9 / 16,
             videoConstraints: {
                 facingMode: facing,
@@ -145,7 +153,10 @@ export function VideoScanner({
     if (startedRef.current) return;
     startedRef.current = true;
 
-    const html5QrCode = new Html5Qrcode(regionId.current);
+    const html5QrCode = new Html5Qrcode(regionId.current, {
+        useBarCodeDetectorIfSupported: true,
+        verbose: false
+    });
     scannerRef.current = html5QrCode;
 
     if (isMobileDevice) {

@@ -14,6 +14,7 @@ import { useSSEStream, SSEEvent } from "@/hooks/use-sse-stream";
 import { toast } from "sonner";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
+import { Suspense } from "react";
 
 interface AgentContextType {
   sessions: ChatSession[];
@@ -53,6 +54,14 @@ interface AgentContextType {
 const AgentContext = createContext<AgentContextType | undefined>(undefined);
 
 export function AgentProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={null}>
+      <AgentProviderInner>{children}</AgentProviderInner>
+    </Suspense>
+  );
+}
+
+function AgentProviderInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -93,10 +102,10 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     if (!pathname.includes("/agent")) return;
 
     const sessionParam = searchParams.get("session") || undefined;
-    
+
     // Only update state if the URL actually differs from our current state
     // We use the functional update pattern to check the current state without adding it to deps
-    setCurrentSessionId(prev => {
+    setCurrentSessionId((prev) => {
       if (sessionParam !== prev) return sessionParam;
       return prev;
     });

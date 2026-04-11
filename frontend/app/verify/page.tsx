@@ -340,7 +340,7 @@ function VerifyContent() {
   const [scanView, setScanView] = useState<ScanView | null>(null);
 
   useEffect(() => {
-    const autoScanSalt = searchParams.get("salt") || searchParams.get("id");
+    const autoScanSalt = searchParams.get("s") || searchParams.get("salt") || searchParams.get("id");
     if (autoScanSalt && !scanned && !loading) {
       setQrInput(autoScanSalt);
       handleScan(autoScanSalt);
@@ -492,14 +492,14 @@ function VerifyContent() {
     try {
       const url = new URL(decodedText);
       const isVerifyPath = url.pathname.includes("/verify");
-      const hasSalt = url.searchParams.has("salt") || url.searchParams.has("id");
+      const hasSalt = url.searchParams.has("s") || url.searchParams.has("salt") || url.searchParams.has("id");
 
       if (!isVerifyPath || !hasSalt) {
         toast.error("Unrecognized QR Code");
         return;
       }
 
-      const salt = url.searchParams.get("salt") || url.searchParams.get("id");
+      const salt = url.searchParams.get("s") || url.searchParams.get("salt") || url.searchParams.get("id");
       if (salt) {
         setQrInput(salt);
         handleScan(salt);
