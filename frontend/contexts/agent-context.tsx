@@ -26,9 +26,11 @@ interface AgentContextType {
   isLoadingSessions: boolean;
   isLoadingMessages: boolean;
   isGenerating: boolean;
+  activeMessageId: string | undefined;
   searchQuery: string;
   hasMoreSessions: boolean;
   isLoadingMoreSessions: boolean;
+  activeData: any;
 
   setInput: (input: string) => void;
   setOpen: (open: boolean) => void;
@@ -49,6 +51,7 @@ interface AgentContextType {
   setSearchQuery: (query: string) => void;
   stopGeneration: () => void;
   resetChat: () => void;
+  setActiveData: (data: any) => void;
 }
 
 const AgentContext = createContext<AgentContextType | undefined>(undefined);
@@ -78,16 +81,21 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [activeMessageId, setActiveMessageId] = useState<string | undefined>(
+    undefined,
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [hasMoreSessions, setHasMoreSessions] = useState(true);
   const [isLoadingMoreSessions, setIsLoadingMoreSessions] = useState(false);
+  const [activeData, setActiveData] = useState<any>(null);
 
   const situationalContext = React.useMemo(
     () => ({
       route: pathname,
       params: Object.fromEntries(searchParams.entries()),
+      active_data: activeData, // Persistent context (e.g. from /verify after redirect)
     }),
-    [pathname, searchParams],
+    [pathname, searchParams, activeData],
   );
 
   const isSubmittingRef = useRef(false);
@@ -170,38 +178,6 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const loadMessages = useCallback(async (sessionId: string) => {
-    if (messagesAbortRef.current) messagesAbortRef.current.abort();
-    const controller = new AbortController();
-    messagesAbortRef.current = controller;
-
-    try {
-      setIsLoadingMessages(true);
-      const data = await agentApi.listMessages(sessionId, controller.signal);
-      setMessages(data);
-    } catch (error: any) {
-      if (
-        error.name === "AbortError" ||
-        error.name === "CanceledError" ||
-        error.message === "canceled"
-      )
-        return;
-      console.error("Failed to load messages", error);
-    } finally {
-      setIsLoadingMessages(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (currentSessionId) {
-      setMessages([]); // Clear stale messages immediately
-      loadMessages(currentSessionId);
-    } else {
-      setMessages([]);
-    }
-    return () => messagesAbortRef.current?.abort();
-  }, [currentSessionId, loadMessages]);
-
   // SSE Management
   const handleSSEEvent = useCallback(
     (sseEvent: SSEEvent) => {
@@ -211,6 +187,7 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
       switch (event) {
         case "token":
           if (msgId && data.content) {
+            setActiveMessageId(msgId);
             setMessages((prev) => {
               const existing = prev.find((m) => m.id === msgId);
               if (existing) {
@@ -244,6 +221,7 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
 
         case "partial_response":
           if (msgId && data.content) {
+            setActiveMessageId(msgId);
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === msgId
@@ -284,6 +262,7 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
 
         case "tool_start":
           if (msgId && data.tool) {
+            setActiveMessageId(msgId);
             setMessages((prev) => {
               const existing = prev.find((m) => m.id === msgId);
               const thought = {
@@ -355,6 +334,7 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
 
         case "done":
           setIsGenerating(false);
+          setActiveMessageId(undefined);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === msgId && m.status !== "error"
@@ -367,6 +347,7 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
 
         case "error":
           setIsGenerating(false);
+          setActiveMessageId(undefined);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === msgId
@@ -393,8 +374,54 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
     getUrl: () =>
       currentSessionId ? agentApi.getStreamUrl(currentSessionId) : "",
     onEvent: handleSSEEvent,
-    onComplete: () => setIsGenerating(false),
+    onComplete: () => {
+      setIsGenerating(false);
+      setActiveMessageId(undefined);
+    },
   });
+
+  const loadMessages = useCallback(
+    async (sessionId: string) => {
+      if (messagesAbortRef.current) messagesAbortRef.current.abort();
+      const controller = new AbortController();
+      messagesAbortRef.current = controller;
+
+      try {
+        setIsLoadingMessages(true);
+        const data = await agentApi.listMessages(sessionId, controller.signal);
+        setMessages(data);
+
+        // Auto-reconnect if any message is generating
+        const generatingMsg = data.find((m) => m.status === "generating");
+        if (generatingMsg) {
+          setIsGenerating(true);
+          setActiveMessageId(generatingMsg.id);
+          connect();
+        }
+      } catch (error: any) {
+        if (
+          error.name === "AbortError" ||
+          error.name === "CanceledError" ||
+          error.message === "canceled"
+        )
+          return;
+        console.error("Failed to load messages", error);
+      } finally {
+        setIsLoadingMessages(false);
+      }
+    },
+    [connect],
+  );
+
+  useEffect(() => {
+    if (currentSessionId) {
+      setMessages([]); // Clear stale messages immediately
+      loadMessages(currentSessionId);
+    } else {
+      setMessages([]);
+    }
+    return () => messagesAbortRef.current?.abort();
+  }, [currentSessionId, loadMessages]);
 
   const sendMessage = async (context?: any) => {
     if (!input.trim() || isSubmittingRef.current) return;
@@ -465,6 +492,8 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
         );
         message_id = result.message_id;
       }
+
+      setActiveMessageId(message_id);
 
       // Add Assistant Placeholder
       const assistantPlaceholder: AgentMessage = {
@@ -596,6 +625,7 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
           return [...truncatedMessages, assistantPlaceholder];
         });
 
+        setActiveMessageId(result.message_id);
         connect();
       } catch (err) {
         toast.error("Failed to retry");
@@ -655,6 +685,7 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
           return [...updatedMessages, assistantPlaceholder];
         });
 
+        setActiveMessageId(result.message_id);
         connect();
       } catch (error: any) {
         if (error.name === "AbortError") return;
@@ -691,6 +722,7 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
     }
     disconnect();
     setIsGenerating(false);
+    setActiveMessageId(undefined);
     setIsSending(false);
     isSubmittingRef.current = false;
   }, [disconnect]);
@@ -765,6 +797,7 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
       isLoadingSessions,
       isLoadingMessages,
       isGenerating,
+      activeMessageId,
       searchQuery,
       hasMoreSessions,
       isLoadingMoreSessions,
@@ -783,6 +816,8 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
       setSearchQuery,
       stopGeneration,
       resetChat,
+      activeData,
+      setActiveData,
     }),
     [
       sessions,
@@ -794,6 +829,7 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
       isLoadingSessions,
       isLoadingMessages,
       isGenerating,
+      activeMessageId,
       searchQuery,
       hasMoreSessions,
       isLoadingMoreSessions,
@@ -812,6 +848,8 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
       setSearchQuery,
       stopGeneration,
       resetChat,
+      activeData,
+      setActiveData,
     ],
   );
 

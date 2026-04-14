@@ -16,9 +16,8 @@ import categoryRouter from './routers/category.router.js';
 import notificationRouter from './routers/notification.router.js';
 import analyticsRouter from './routers/analytics.router.js';
 import cabinetRouter from './routers/cabinet.router.js';
-import { startCronJobs } from './jobs/cron.js';
+import { initAllJobs } from './jobs/index.js';
 import { initS3 } from './services/s3.service.js';
-import { initReconciliation } from './services/reconciliation.service.js';
 
 // Initialize Express
 const app = express();
@@ -109,8 +108,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 const startServer = async () => {
 	await connectDB();
 	await initS3();
-	initReconciliation(); // Distributed State Reconciliation
-	startCronJobs();
+	initAllJobs();
 
 	const server = app.listen(PORT, () => {
 		console.log(`Server is running on port ${PORT}`);

@@ -11,7 +11,7 @@ class ToolStore:
         self.db = get_db()
 
     def _to_obj_id(self, id_str: str) -> Optional[PyObjectId]:
-        """Safe wrapper to convert string to PyObjectId. Prevents FIX-009 crashes."""
+        """Safe wrapper to convert string to PyObjectId."""
         if not id_str:
             return None
         try:
@@ -169,23 +169,45 @@ class ToolStore:
         sort_by: str = "createdAt",
         order: str = "desc",
     ) -> List[Dict[str, Any]]:
-        """List manufacturer production batches."""
+        """List manufacturer production batches with scan counts."""
+        u_id = self._to_obj_id(user_id)
         sort_order = -1 if order == "desc" else 1
+        
         cursor = (
             self.db["batches"]
-            .find({"createdBy": self._to_obj_id(user_id)})
+            .find({"createdBy": u_id})
             .sort(sort_by, sort_order)
             .skip(skip)
             .limit(limit)
         )
         batches = await cursor.to_list(length=limit)
-        return [self._serialize_doc(b, keep_id=False) for b in batches]
+        
+        if not batches:
+            return []
+
+        # Logic Sync: Add scan counts like batch.controller.ts
+        batch_ids = [b["_id"] for b in batches]
+        scan_pipeline = [
+            {"$match": {"batch": {"$in": batch_ids}}},
+            {"$group": {"_id": "$batch", "count": {"$sum": 1}}},
+        ]
+        scan_counts = await self.db["scans"].aggregate(scan_pipeline).to_list(length=len(batch_ids))
+        counts_map = {str(item["_id"]): item["count"] for item in scan_counts}
+
+        serialized = []
+        for b in batches:
+            b_doc = self._serialize_doc(b, keep_id=False)
+            b_doc["totalScans"] = counts_map.get(str(b["_id"]), 0)
+            serialized.append(b_doc)
+            
+        return serialized
 
     async def search_batches(
         self, user_id: str, query: str = None, categories: List[str] = None
     ) -> List[Dict[str, Any]]:
-        """Search manufacturer batches."""
-        filter_query = {"createdBy": self._to_obj_id(user_id)}
+        """Search manufacturer batches with scan counts."""
+        u_id = self._to_obj_id(user_id)
+        filter_query = {"createdBy": u_id}
 
         if query:
             try:
@@ -212,9 +234,27 @@ class ToolStore:
                 ]
                 filter_query["productId"] = {"$in": product_skus}
 
-        cursor = self.db["batches"].find(filter_query)
+        cursor = self.db["batches"].find(filter_query).limit(20)
         batches = await cursor.to_list(length=20)
-        return [self._serialize_doc(b, keep_id=False) for b in batches]
+        
+        if not batches:
+            return []
+            
+        batch_ids = [b["_id"] for b in batches]
+        scan_pipeline = [
+            {"$match": {"batch": {"$in": batch_ids}}},
+            {"$group": {"_id": "$batch", "count": {"$sum": 1}}},
+        ]
+        scan_counts = await self.db["scans"].aggregate(scan_pipeline).to_list(length=len(batch_ids))
+        counts_map = {str(item["_id"]): item["count"] for item in scan_counts}
+
+        serialized = []
+        for b in batches:
+            b_doc = self._serialize_doc(b, keep_id=False)
+            b_doc["totalScans"] = counts_map.get(str(b["_id"]), 0)
+            serialized.append(b_doc)
+            
+        return serialized
 
     async def get_batch_details(
         self, batch_number: str, user_id: str = None
@@ -273,11 +313,12 @@ class ToolStore:
         sort_by: str = "updatedAt",
         order: str = "desc",
     ) -> List[Dict[str, Any]]:
-        """List user's cabinet items (My Medicines)."""
+        """List user's cabinet items with enrichment for scans, streaks, and prescriptions."""
+        u_id = self._to_obj_id(user_id)
         sort_order = -1 if order == "desc" else 1
         cursor = (
             self.db["cabinet_items"]
-            .find({"userId": self._to_obj_id(user_id)})
+            .find({"userId": u_id})
             .sort(sort_by, sort_order)
             .skip(skip)
             .limit(limit)
@@ -287,25 +328,68 @@ class ToolStore:
         if not items:
             return []
 
-        # Enrich with batch status
-        batch_numbers = [i["batchNumber"] for i in items if "batchNumber" in i]
+        # Batch & Recall Status Lookup
+        batch_ids = [i["batchId"] for i in items if i.get("batchId")]
         batches_cursor = self.db["batches"].find(
-            {"batchNumber": {"$in": batch_numbers}},
-            {"batchNumber": 1, "isRecalled": 1, "isOnBlockchain": 1},
+            {"_id": {"$in": batch_ids}},
+            {"isRecalled": 1, "isOnBlockchain": 1},
         )
-        batches_info = {
-            b["batchNumber"]: b
-            for b in await batches_cursor.to_list(length=len(batch_numbers))
-        }
+        batches_info = {str(b["_id"]): b for b in await batches_cursor.to_list(length=len(batch_ids))}
+
+        # Prescription Labels Lookup
+        all_presc_ids = []
+        for i in items:
+            all_presc_ids.extend(i.get("prescriptionIds", []))
+        
+        presc_labels = {}
+        if all_presc_ids:
+            presc_cursor = self.db["prescriptions"].find(
+                {"_id": {"$in": all_presc_ids}},
+                {"label": 1}
+            )
+            presc_labels = {str(p["_id"]): p["label"] for p in await presc_cursor.to_list(length=len(all_presc_ids))}
+
+        # Live Scan Counts Logic Sync with cabinet.controller.ts
+        scan_pairs = []
+        for i in items:
+            if i.get("batchId") and i.get("salt") and ":" in i["salt"]:
+                try:
+                    unit_idx = int(i["salt"].split(":")[1])
+                    scan_pairs.append({"batch": i["batchId"], "unitIndex": unit_idx})
+                except Exception:
+                    pass
+        
+        counts_map = {}
+        if scan_pairs:
+            scan_counts = await self.db["scans"].aggregate([
+                {"$match": {"$or": scan_pairs}},
+                {"$group": {"_id": {"batch": "$batch", "unit": "$unitIndex"}, "count": {"$sum": 1}}}
+            ]).to_list(length=len(scan_pairs))
+            for c in scan_counts:
+                counts_map[f"{str(c['_id']['batch'])}:{c['_id']['unit']}"] = c["count"]
 
         serialized = []
         for i in items:
-            i_doc = self._serialize_doc(
-                i, keep_id=True
-            )  # User requested keeping _id for cabinet items
-            b_info = batches_info.get(i.get("batchNumber"), {})
+            i_doc = self._serialize_doc(i, keep_id=True)
+            
+            # Enrich Recall & Blockchain
+            b_id_str = str(i.get("batchId"))
+            b_info = batches_info.get(b_id_str, {})
             i_doc["status"] = "RECALLED" if b_info.get("isRecalled") else "Active"
             i_doc["blockchainVerified"] = b_info.get("isOnBlockchain", False)
+            
+            # Enrich Prescription Labels
+            p_ids = [str(pid) for pid in i.get("prescriptionIds", [])]
+            i_doc["prescriptionLabels"] = [presc_labels.get(pid, "Unknown") for pid in p_ids if pid in presc_labels]
+            
+            # Enrich Live Scan Count
+            if i.get("batchId") and i.get("salt") and ":" in i["salt"]:
+                unit_idx = i["salt"].split(":")[1]
+                count_key = f"{b_id_str}:{unit_idx}"
+                i_doc["liveScanCount"] = counts_map.get(count_key, 0)
+            else:
+                i_doc["liveScanCount"] = 0
+                
             serialized.append(i_doc)
 
         return serialized
@@ -313,8 +397,9 @@ class ToolStore:
     async def search_cabinet_items(
         self, user_id: str, query: str = None, categories: List[str] = None
     ) -> List[Dict[str, Any]]:
-        """Search user's cabinet items."""
-        filter_query = {"userId": self._to_obj_id(user_id)}
+        """Search user's cabinet items with full enrichment."""
+        u_id = self._to_obj_id(user_id)
+        filter_query = {"userId": u_id}
 
         if query:
             try:
@@ -339,28 +424,38 @@ class ToolStore:
             if cat_list:
                 filter_query["category"] = {"$in": cat_list}
 
-        cursor = self.db["cabinet_items"].find(filter_query)
+        cursor = self.db["cabinet_items"].find(filter_query).limit(20)
         items = await cursor.to_list(length=20)
 
         if not items:
             return []
 
-        batch_numbers = [i["batchNumber"] for i in items if "batchNumber" in i]
-        batches_cursor = self.db["batches"].find(
-            {"batchNumber": {"$in": batch_numbers}},
-            {"batchNumber": 1, "isRecalled": 1, "isOnBlockchain": 1},
-        )
-        batches_info = {
-            b["batchNumber"]: b
-            for b in await batches_cursor.to_list(length=len(batch_numbers))
-        }
+        # Enrichment (Reuse logic from list_cabinet_items if this was a larger project, but for now inline is fine for AI speed)
+        # Identical enrichment logic to list_cabinet_items
+        batch_ids = [i["batchId"] for i in items if i.get("batchId")]
+        batches_info = {}
+        if batch_ids:
+            batches_cursor = self.db["batches"].find({"_id": {"$in": batch_ids}}, {"isRecalled": 1, "isOnBlockchain": 1})
+            batches_info = {str(b["_id"]): b for b in await batches_cursor.to_list(length=len(batch_ids))}
+
+        all_presc_ids = []
+        for i in items:
+            all_presc_ids.extend(i.get("prescriptionIds", []))
+        
+        presc_labels = {}
+        if all_presc_ids:
+            presc_cursor = self.db["prescriptions"].find({"_id": {"$in": all_presc_ids}}, {"label": 1})
+            presc_labels = {str(p["_id"]): p["label"] for p in await presc_cursor.to_list(length=len(all_presc_ids))}
 
         serialized = []
         for i in items:
             i_doc = self._serialize_doc(i, keep_id=True)
-            b_info = batches_info.get(i.get("batchNumber"), {})
+            b_id_str = str(i.get("batchId"))
+            b_info = batches_info.get(b_id_str, {})
             i_doc["status"] = "RECALLED" if b_info.get("isRecalled") else "Active"
             i_doc["blockchainVerified"] = b_info.get("isOnBlockchain", False)
+            p_ids = [str(pid) for pid in i.get("prescriptionIds", [])]
+            i_doc["prescriptionLabels"] = [presc_labels.get(pid, "Unknown") for pid in p_ids if pid in presc_labels]
             serialized.append(i_doc)
 
         return serialized
@@ -620,9 +715,9 @@ class ToolStore:
         """
         cursor = self.db["prescriptions"].find(
             {"userId": self._to_obj_id(user_id), "content": {"$regex": query, "$options": "i"}}
-        ).limit(20)
+        ).limit(31)
         
-        results = await cursor.to_list(length=20)
+        results = await cursor.to_list(length=31)
         return [self._serialize_doc(r, keep_id=True) for r in results]
 
     async def get_scan_geography(
@@ -824,7 +919,16 @@ class ToolStore:
                 return await self.get_notifications_summary(user_id)
 
             if route == "/verify":
+                # Situational Hand-off Logic: check params, then persistent activeData
                 salt = params.get("salt") or params.get("id")
+                
+                # If cleared from URL, look in the persistent active_data provided by AgentContext
+                # 'context' is passed in higher-level but we are inside get_view_data
+                # We need to ensure tools.py passes the full context if possible, 
+                # or main.py merges it into params.
+                if not salt and params.get("active_data"):
+                    salt = params["active_data"].get("salt")
+
                 if salt:
                     if salt in ["null", "undefined"]:
                         return "The verification identifier (salt) is wrong or missing. Please ensure you are viewing a valid verification page."

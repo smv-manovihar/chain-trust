@@ -200,14 +200,10 @@ export const updateProduct = async (req: Request, res: Response) => {
 			const oldImages = product.images || [];
 			const removedImages = oldImages.filter(img => !images.includes(img));
 			
-			// Reliability: Await deletion to prevent storage leaks if process restarts
+			// Reliability: Non-blocking fire-and-forget cleanup
 			if (removedImages.length > 0) {
-				try {
-					await Promise.all(removedImages.map(img => s3Service.deleteFile(img)));
-				} catch (err) {
-					console.error('Critical: Failed to cleanup some images during product update:', err);
-					// We continue as the DB update is primary, but we logged the error
-				}
+				Promise.all(removedImages.map(img => s3Service.deleteFile(img)))
+					.catch(err => console.error('Background: Failed to cleanup some images during product update:', err));
 			}
 			
 			product.images = images;
@@ -245,13 +241,18 @@ export const deleteProduct = async (req: Request, res: Response) => {
 			return res.status(404).json({ message: 'Product not found' });
 		}
 
-		// Reliability: Await deletion to prevent storage leaks
+		// Data Integrity: Prevent deletion of products that have associated batches
+		const existingBatchesCount = await Batch.countDocuments({ product: product._id });
+		if (existingBatchesCount > 0) {
+			return res.status(400).json({ 
+				message: `Cannot delete product: There are ${existingBatchesCount} enrolled batch(es) associated with this product. Data integrity requires that the product remains in the catalogue for verification purposes.` 
+			});
+		}
+
+		// Reliability: Non-blocking fire-and-forget cleanup
 		if (product.images && product.images.length > 0) {
-			try {
-				await Promise.all(product.images.map(img => s3Service.deleteFile(img)));
-			} catch (err) {
-				console.error('Critical: Failed to cleanup images during product deletion:', err);
-			}
+			Promise.all(product.images.map(img => s3Service.deleteFile(img)))
+				.catch(err => console.error('Background: Failed to cleanup images during product deletion:', err));
 		}
 
 		await product.deleteOne();

@@ -1,8 +1,6 @@
-import cron from 'node-cron';
 import Batch from '../models/batch.model.js';
 import Product from '../models/product.model.js';
 import { getOnChainBatch } from './blockchain.service.js';
-import { deleteFile } from './s3.service.js';
 
 /**
  * Reconciliation Service
@@ -81,26 +79,7 @@ export const reconcilePendingProducts = async () => {
 	}
 };
 
-/**
- * Initialize the Reconciliation Service Cron Jobs
- */
-export const initReconciliation = () => {
-	// Run Batch Sweep every hour at minute 0
-	// Run Batch Sweep every 15 minutes (Reliability FIX-001)
-	cron.schedule('*/15 * * * *', () => {
-		reconcilePendingBatches();
-	});
-
-	// Run Product Cleanup every 6 hours
-	cron.schedule('0 */6 * * *', () => {
-		reconcilePendingProducts();
-	});
-
-	console.log('\x1b[35m[Reconciliation Service]\x1b[0m Cron jobs initialized (Hourly Batch Sweep / 6H Product Purge)');
-};
-
 export default {
-	initReconciliation,
 	reconcilePendingBatches,
 	reconcilePendingProducts
 };

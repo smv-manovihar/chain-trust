@@ -7,7 +7,7 @@ import { AgentMessage } from "@/types/agent.types";
 interface ChatMessageListProps {
   messages: AgentMessage[];
   compact?: boolean;
-  isGenerating: boolean;
+  activeMessageId?: string;
   handleRetryMessage: (id: string) => void;
   handleEditMessage: (id: string, content: string) => void;
   handleDeleteMessage: (id: string) => void;
@@ -16,7 +16,7 @@ interface ChatMessageListProps {
 export const ChatMessageList = memo(function ChatMessageList({
   messages,
   compact,
-  isGenerating,
+  activeMessageId,
   handleRetryMessage,
   handleEditMessage,
   handleDeleteMessage,
@@ -31,7 +31,7 @@ export const ChatMessageList = memo(function ChatMessageList({
           onRetry={handleRetryMessage}
           onEdit={handleEditMessage}
           onDelete={handleDeleteMessage}
-          isGenerating={isGenerating && msg.status === "generating"}
+          isGenerating={activeMessageId === msg.id}
         />
       ))}
     </>

@@ -77,18 +77,13 @@ class ChatService:
                 or "..." in current_name
             )
         ):
-            first_msg = req_context.get("message")
-            if not first_msg:
-                user_msgs = [
-                    m["content"]
-                    for m in history
-                    if m.get("role") == "user" and m.get("content")
-                ]
-                if user_msgs:
-                    first_msg = user_msgs[0]
-
-            if first_msg:
-                await self._auto_name_session(session_id, first_msg, context_obj)
+            user_msgs = [
+                m["content"]
+                for m in history
+                if m.get("role") == "user" and m.get("content")
+            ]
+            if user_msgs:
+                await self._auto_name_session(session_id, user_msgs[0], context_obj)
 
         try:
             messages = []
@@ -402,26 +397,9 @@ class ChatService:
                     ]
                 )
             except Exception as e:
-                # If primary model is rate limited (429), try a fallback Gemini model
-                if "429" in str(e) or "rate" in str(e).lower():
-                    logger.warning(
-                        f"Title primary model rate limited, trying fallback: {e}"
-                    )
-                    fallback_llm = ChatOpenAI(
-                        model="openrouter/free",
-                        api_key=settings.OPENROUTER_API_KEY,
-                        base_url="https://openrouter.ai/api/v1",
-                        temperature=0.7,
-                        max_tokens=50,
-                    )
-                    response = await fallback_llm.ainvoke(
-                        [
-                            SystemMessage(content=system_prompt),
-                            HumanMessage(content=user_data),
-                        ]
-                    )
-                else:
-                    raise e
+                logger.warning(f"Title generation failed: {e}")
+                truncated = first_message[:40]
+                return truncated + ("..." if len(first_message) > 40 else "")
 
             raw_content = response.content or ""
             # Clean up common LLM prefixes
@@ -434,9 +412,11 @@ class ChatService:
                 logger.warning(
                     f"LLM returned empty title for message. Raw: '{raw_content}'"
                 )
-                title = first_message[:40] + ("..." if len(first_message) > 40 else "")
+                truncated = first_message[:40]
+                title = truncated + ("..." if len(first_message) > 40 else "")
 
             return title[:50]
         except Exception as e:
             logger.error(f"Error generating session title: {e}")
-            return first_message[:40] + "..."
+            truncated = first_message[:40]
+            return truncated + ("..." if len(first_message) > 40 else "")

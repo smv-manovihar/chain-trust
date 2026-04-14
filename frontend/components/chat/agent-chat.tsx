@@ -41,7 +41,7 @@ export function AgentChat({
     retryMessage,
     editMessage,
     deleteMessage,
-    isGenerating,
+    activeMessageId,
     hasMoreSessions,
     isLoadingMoreSessions,
     loadMoreSessions,
@@ -145,7 +145,7 @@ export function AgentChat({
                 <ChatMessageList 
                   messages={messages}
                   compact={compact}
-                  isGenerating={isGenerating}
+                  activeMessageId={activeMessageId}
                   handleRetryMessage={handleRetryMessage}
                   handleEditMessage={handleEditMessage}
                   handleDeleteMessage={handleDeleteMessage}

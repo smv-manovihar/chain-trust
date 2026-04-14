@@ -83,6 +83,36 @@ const notificationSchema = new Schema<INotification>(
 notificationSchema.index({ user: 1, isRead: 1 });
 notificationSchema.index({ user: 1, createdAt: -1 });
 
+/**
+ * Enforce the 50-notification limit per user.
+ * Automatically deletes the oldest notifications when a new one is saved.
+ */
+notificationSchema.post('save', async function (doc: INotification) {
+	try {
+		const MAX_NOTIFICATIONS = 50;
+		const user = doc.user;
+
+		const count = await mongoose.model('Notification').countDocuments({ user });
+		
+		if (count > MAX_NOTIFICATIONS) {
+			const toDelete = count - MAX_NOTIFICATIONS;
+			const oldestNotifications = await mongoose.model('Notification')
+				.find({ user })
+				.sort({ createdAt: 1 })
+				.limit(toDelete)
+				.select('_id');
+			
+			const idsToDelete = oldestNotifications.map(n => n._id);
+			if (idsToDelete.length > 0) {
+				await mongoose.model('Notification').deleteMany({ _id: { $in: idsToDelete } });
+				console.log(`[Notification Cleanup] Pruned ${idsToDelete.length} notifications for user ${user}`);
+			}
+		}
+	} catch (error) {
+		console.error('[Notification Cleanup Error]:', error);
+	}
+});
+
 const Notification = mongoose.model<INotification>('Notification', notificationSchema);
 
 export default Notification;

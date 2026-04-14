@@ -239,6 +239,17 @@ export const updateBatch = async (req: Request, res: Response) => {
 			}
 		}
 
+		// Immutability Check: Core batch details cannot be changed once finalized
+		if (batch.status === 'completed') {
+			const immutableFields = ['batchNumber', 'quantity', 'manufactureDate', 'batchSalt', 'product'];
+			const attemptedImmutables = immutableFields.filter(field => updates[field] !== undefined && updates[field] !== (batch as any)[field]);
+			if (attemptedImmutables.length > 0) {
+				return res.status(400).json({ 
+					message: `Cannot update immutable fields (${attemptedImmutables.join(', ')}) on a completed batch.` 
+				});
+			}
+		}
+
 		// Apply updates
 		const allowedUpdates = [
 			'batchNumber', 'quantity', 'manufactureDate', 'expiryDate', 
@@ -621,6 +632,8 @@ export const verifyScan = async (req: Request, res: Response) => {
 				images: filteredImages,
 				unitIndex,
 				unitNumber: unitIndex + 1,
+				description: batch.description || product?.description || '',
+				composition: product?.composition || '',
 			},
 			scanCount: newCount,
 			isRecalled: batch.isRecalled,

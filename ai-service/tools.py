@@ -90,7 +90,8 @@ class AddMedicineArgs(BaseModel):
     name: str = Field(description="[Required] Name of the medicine")
     brand: str = Field(description="[Required] Manufacturer or brand name")
     composition: Optional[str] = Field(
-        default=None, description="[Optional] Molecules and strength, e.g. 'Paracetamol 500mg'"
+        default=None,
+        description="[Optional] Molecules and strength, e.g. 'Paracetamol 500mg'",
     )
     medicine_code: Optional[str] = Field(
         default=None, description="[Optional] UPC or Barcode from packaging"
@@ -106,22 +107,27 @@ class AddMedicineArgs(BaseModel):
         description="[Optional] List of string IDs for attached prescriptions",
     )
     dosage: Optional[float] = Field(
-        default=None, description="[Optional] Dose amount as a number (e.g. 1, 2.5). Do not include units."
+        default=None,
+        description="[Optional] Dose amount as a number (e.g. 1, 2.5). Do not include units.",
     )
     unit: Optional[str] = Field(
-        default="pills", description="[Optional] Dose unit (e.g. 'pills', 'ml', 'tablets', 'drops'). Defaults to 'pills'."
+        default="pills",
+        description="[Optional] Dose unit (e.g. 'pills', 'ml', 'tablets', 'drops'). Defaults to 'pills'.",
     )
     frequency: Optional[str] = Field(
-        default=None, description="[Optional] How often (e.g. 'Twice daily', 'Once a week')"
+        default=None,
+        description="[Optional] How often (e.g. 'Twice daily', 'Once a week')",
     )
     quantity: Optional[int] = Field(
-        default=None, description="[Optional] Initial inventory quantity (number of units/pills)"
+        default=None,
+        description="[Optional] Initial inventory quantity (number of units/pills)",
     )
     doctor_name: Optional[str] = Field(
         default=None, description="[Optional] Name of the prescribing doctor"
     )
     notes: Optional[str] = Field(
-        default=None, description="[Optional] Personal notes or instructions about this medicine"
+        default=None,
+        description="[Optional] Personal notes or instructions about this medicine",
     )
 
 
@@ -142,16 +148,20 @@ class UpdateMedicineArgs(BaseModel):
         default=None, description="[Optional] Updated expiry date (YYYY-MM-DD)"
     )
     dosage: Optional[float] = Field(
-        default=None, description="[Optional] Updated dose amount as a number (e.g. 1, 2.5). Do not include units."
+        default=None,
+        description="[Optional] Updated dose amount as a number (e.g. 1, 2.5). Do not include units.",
     )
     unit: Optional[str] = Field(
-        default=None, description="[Optional] Updated dose unit (e.g. 'pills', 'ml', 'tablets')"
+        default=None,
+        description="[Optional] Updated dose unit (e.g. 'pills', 'ml', 'tablets')",
     )
     frequency: Optional[str] = Field(
-        default=None, description="[Optional] Updated frequency (e.g. 'Once daily', 'Twice weekly')"
+        default=None,
+        description="[Optional] Updated frequency (e.g. 'Once daily', 'Twice weekly')",
     )
     quantity: Optional[int] = Field(
-        default=None, description="[Optional] Updated inventory count (number of units/pills)"
+        default=None,
+        description="[Optional] Updated inventory count (number of units/pills)",
     )
     doctor_name: Optional[str] = Field(
         default=None, description="[Optional] Updated prescribing doctor name"
@@ -384,20 +394,30 @@ class PrescriptionRegistry:
         self.user_id = user_id
         self.registry: Dict[int, Dict[str, Any]] = {}
         self._is_built = False
+        self._total_count = 0
 
-    async def build(self):
-        if self._is_built:
-            return
-        prescriptions = await tool_store.list_prescriptions(self.user_id, limit=50)
-        for idx, p in enumerate(prescriptions, start=1):
-            self.registry[idx] = {
-                "index": idx,
+    async def build(self, skip: int = 0, limit: int = 50):
+        """Builds a registry of prescriptions with proxy IDs. Optimized for pagination."""
+        # Note: We build incremently if skip > 0, or rebuild if skip=0
+        if skip == 0:
+            self.registry = {}
+
+        prescriptions = await tool_store.list_prescriptions(
+            self.user_id, skip=skip, limit=limit
+        )
+
+        # Start indexing from where we left off or from 1
+        current_max = max(self.registry.keys()) if self.registry else 0
+
+        for p in prescriptions:
+            current_max += 1
+            self.registry[current_max] = {
+                "index": current_max,
                 "real_id": str(p["id"]),
                 "label": p.get("label", "Untitled"),
                 "doctorName": p.get("doctorName", "Unknown"),
                 "issuedDate": p.get("issuedDate", "Unknown"),
                 "url": p.get("url", ""),
-                # Content is excluded from list_prescriptions bulk fetch for performance
                 "content": None,
             }
         self._is_built = True
@@ -776,25 +796,31 @@ class Tools:
         order: SortOrder = SortOrder.DESC,
     ) -> str:
         """Retrieves paginated medicine list. **Use** for overview. **Do NOT use** for specific lookup."""
-        items = await tool_store.list_cabinet_items(
-            self.user_id, skip, limit, sort_by.value, order.value
-        )
-        if not items:
-            return self._format_output(
-                "SUCCESS", "No medications found in My Medicines."
+        try:
+            items = await tool_store.list_cabinet_items(
+                self.user_id, skip, limit, sort_by.value, order.value
             )
+            if not items:
+                return self._format_output(
+                    "SUCCESS", "No medications found in My Medicines."
+                )
 
-        rows = [
-            "| ID | Medicine | Brand | Status | Blockchain |",
-            "| :--- | :--- | :--- | :--- | :--- |",
-        ]
-        for i in items:
-            rows.append(
-                f"| {i['id']} | {i['name']} | {i['brand']} | {i['status']} | {'✅' if i['blockchainVerified'] else '❌'} |"
+            rows = [
+                "| ID | Medicine | Brand | Status | Scans | Streak | Blockchain |",
+                "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+            ]
+            for i in items:
+                v_label = "Yes" if i["blockchainVerified"] else "No"
+                rows.append(
+                    f"| {i['id']} | {i['name']} | {i['brand']} | {i['status']} | {i['liveScanCount']} | {i.get('currentStreak', 0)}d | {v_label} |"
+                )
+            return self._format_output(
+                "SUCCESS",
+                f"Retrieved {len(items)} items. [Use skip={skip + limit} to see more]",
+                "\n".join(rows),
             )
-        return self._format_output(
-            "SUCCESS", f"Retrieved {len(items)} items.", "\n".join(rows)
-        )
+        except Exception as e:
+            return self._format_output("ERROR", f"Failed to list medicines: {str(e)}")
 
     async def search_my_medicines(
         self, query: str, categories: List[str] = None
@@ -869,7 +895,10 @@ class Tools:
                 "Failed to add medication. Ensure 'name' and 'brand' are provided. If it already exists, use update_medicine instead.",
             )
         except Exception as e:
-            return self._format_output("ERROR", f"Operation failed: {e}. Ask the user for any missing details if necessary.")
+            return self._format_output(
+                "ERROR",
+                f"Operation failed: {e}. Ask the user for any missing details if necessary.",
+            )
 
     async def update_medicine(self, medicine_id: str, **kwargs) -> str:
         """Modifies existing med record. **IMPORTANT:** Confirm final details with the user before calling this. **Use** for dosage/unit/notes/doctor updates. **Do NOT use** for removal."""
@@ -900,13 +929,18 @@ class Tools:
                 medicine_id, self.user_id, remapped
             )
             if success:
-                return self._format_output("SUCCESS", f"Medication {medicine_id} updated.")
+                return self._format_output(
+                    "SUCCESS", f"Medication {medicine_id} updated."
+                )
             return self._format_output(
                 "ERROR",
                 f"Medication '{medicine_id}' not found or update failed. Verify the medication ID and ensure you are only updating editable fields.",
             )
         except Exception as e:
-            return self._format_output("ERROR", f"Update failed: {e}. If the ID format was wrong, verify it first.")
+            return self._format_output(
+                "ERROR",
+                f"Update failed: {e}. If the ID format was wrong, verify it first.",
+            )
 
     async def remove_medicine(self, medicine_id: str) -> str:
         """Deletes med from cabinet. **IMPORTANT:** Confirm final details with the user before calling this. **Use** for permanent removal. **Do NOT use** to hide items."""
@@ -916,7 +950,9 @@ class Tools:
                 return self._format_output(
                     "SUCCESS", f"Medication {medicine_id} permanently removed."
                 )
-            return self._format_output("ERROR", f"Medication '{medicine_id}' not found.")
+            return self._format_output(
+                "ERROR", f"Medication '{medicine_id}' not found."
+            )
         except Exception as e:
             return self._format_output("ERROR", f"Removal failed: {e}.")
 
@@ -996,7 +1032,8 @@ class Tools:
             )
             if success:
                 return self._format_output(
-                    "SUCCESS", f"Reminder at position {reminder_index} removed successfully."
+                    "SUCCESS",
+                    f"Reminder at position {reminder_index} removed successfully.",
                 )
             return self._format_output(
                 "ERROR",
@@ -1007,26 +1044,38 @@ class Tools:
 
     async def list_prescriptions(self, skip: int = 0, limit: int = 10) -> str:
         """Lists docs with Proxy IDs. **Use** for file discovery. **Do NOT use** to read content."""
-        await self.prescription_registry.build()
-        records = list(self.prescription_registry.registry.values())[
-            skip : skip + limit
-        ]
-        if not records:
-            return self._format_output("SUCCESS", "No prescription documents found.")
+        try:
+            await self.prescription_registry.build(skip=skip, limit=limit)
+            records = list(self.prescription_registry.registry.values())
 
-        rows = [
-            "| Document ID | Label | Doctor | Issued Date |",
-            "| :--- | :--- | :--- | :--- |",
-        ]
-        for r in records:
-            rows.append(
-                f"| [{r['index']}] | {r['label']} | {r['doctorName']} | {r['issuedDate']} |"
+            # Since build appends to registry, we need to filter only the current range
+            display_records = (
+                records[skip : skip + limit] if skip < len(records) else []
             )
-        return self._format_output(
-            "SUCCESS",
-            f"Found {len(records)} documents. Use read_prescription [ID] to view content.",
-            "\n".join(rows),
-        )
+
+            if not display_records:
+                return self._format_output(
+                    "SUCCESS", "No prescription documents found in this range."
+                )
+
+            rows = [
+                "| Document ID | Label | Doctor | Issued Date |",
+                "| :--- | :--- | :--- | :--- |",
+            ]
+            for r in display_records:
+                rows.append(
+                    f"| [{r['index']}] | {r['label']} | {r['doctorName']} | {r['issuedDate']} |"
+                )
+
+            return self._format_output(
+                "SUCCESS",
+                f"Found {len(display_records)} documents. [Action: Use read_prescription [ID] to view content. Use skip={skip + limit} to see more.]",
+                "\n".join(rows),
+            )
+        except Exception as e:
+            return self._format_output(
+                "ERROR", f"Failed to list prescriptions: {str(e)}"
+            )
 
     async def read_prescription(
         self, doc_id: int, start_line: int = 1, end_line: int = 100
@@ -1073,29 +1122,102 @@ class Tools:
             formatted_content,
         )
 
-    async def search_prescriptions(self, query: str) -> str:
-        """Global digitized content search. **Use** to find terms across files. **Do NOT use** for summaries."""
+    async def search_prescriptions(
+        self, query: str, include_content: bool = False
+    ) -> str:
+        """Global digitized content search. **Use** to find terms across files. Set include_content=True to see matching text. **Do NOT use** for summaries."""
         # Reliability Fix: Offload search to MongoDB rather than looping S3 in Python
-        matches_data = await tool_store.search_prescriptions_content(self.user_id, query)
-        
+        matches_data = await tool_store.search_prescriptions_content(
+            self.user_id, query
+        )
+
         if not matches_data:
             return self._format_output(
                 "SUCCESS", f"No prescriptions contain the term '{query}'."
             )
 
-        matches = []
-        for p in matches_data:
-            # We don't have Proxy ID indexing for the search result subset yet, 
-            # so we use the database ID as a reference or a note to run list_prescriptions.
-            matches.append(
-                f"- **{p['label']}:** Found matches for '{query}' (ID: {p['id']})"
-            )
+        total_matches = len(matches_data)
+        is_truncated = total_matches > 30
 
-        return self._format_output(
-            "SUCCESS", 
-            f"Keyword matches found in {len(matches)} document(s):", 
-            "\n".join(matches) + "\n\n[NOTE: Use read_prescription with the list IDs from list_page_guides/list_prescriptions to view full text.]"
+        matches = []
+        for p in matches_data[:30]:
+            db_id = str(p.get("id", p.get("_id")))
+            proxy_id = None
+
+            # Map DB ID to the existing proxy registry or create dynamically
+            # to guarantee continuous alignment between DB search and read_prescription
+            for pid, data in self.prescription_registry.registry.items():
+                if data.get("real_id") == db_id:
+                    proxy_id = pid
+                    break
+
+            if proxy_id is None:
+                proxy_id = (
+                    (max(self.prescription_registry.registry.keys()) + 1)
+                    if self.prescription_registry.registry
+                    else 1
+                )
+                self.prescription_registry.registry[proxy_id] = {
+                    "index": proxy_id,
+                    "real_id": db_id,
+                    "label": p.get("label", "Untitled"),
+                    "doctorName": p.get("doctorName", "Unknown"),
+                    "issuedDate": p.get("issuedDate", "Unknown"),
+                    "url": p.get("url", ""),
+                    "content": p.get("content", None),
+                }
+
+            label = p.get("label", "Untitled")
+
+            if include_content and p.get("content"):
+                lines = p["content"].split("\n")
+                query_lower = query.lower()
+                chunk_found = False
+                for i, line in enumerate(lines):
+                    if query_lower in line.lower():
+                        start_idx = max(0, i - 2)
+                        end_idx = min(len(lines), i + 3)
+                        context_block = "\n".join(lines[start_idx:end_idx])
+
+                        chunk = (
+                            f'<prescription id=[{proxy_id}] name="{label}">\n'
+                            f"{context_block}\n"
+                            f"</prescription>"
+                        )
+                        matches.append(chunk)
+                        chunk_found = True
+                        break  # Only show the first matching block per doc for conciseness
+
+                if not chunk_found:
+                    matches.append(f"- **{label}** (ID: [{proxy_id}])")
+            else:
+                matches.append(
+                    f"- **{label}:** Found matches for '{query}' (ID: [{proxy_id}])"
+                )
+
+        footer = (
+            "\n\n[NOTE: Use read_prescription with the listed IDs to view full text.]"
         )
+        if is_truncated:
+            footer += "\n[INSTRUCTION: More than 30 matches found. Showing only the first 30. Please formulate a more precise search query if you did not find what you were looking for.]"
+        else:
+            footer += "\n[INSTRUCTION: These are all the matches found for your query. No more matches exist.]"
+
+        if include_content:
+            msg = f"Content search matches for '{query}'"
+            if is_truncated:
+                msg += " (Showing first 30 max):"
+            else:
+                msg += ":"
+            return self._format_output("SUCCESS", msg, "\n\n".join(matches) + footer)
+
+        msg = f"Keyword matches found in {min(total_matches, 30)} document(s)"
+        if is_truncated:
+            msg += " (over 30 matches exist):"
+        else:
+            msg += ":"
+
+        return self._format_output("SUCCESS", msg, "\n".join(matches) + footer)
 
     # --- Manufacturer Tools ---
 
@@ -1129,24 +1251,29 @@ class Tools:
         order: SortOrder = SortOrder.DESC,
     ) -> str:
         """Paginated production history. **Use** for batch discovery. **Do NOT use** for product lists."""
-        batches = await tool_store.list_batches(
-            self.user_id, skip, limit, sort_by.value, order.value
-        )
-        if not batches:
-            return self._format_output("SUCCESS", "No production batches enrolled.")
-
-        rows = [
-            "| Batch # | Product | Created | Status |",
-            "| :--- | :--- | :--- | :--- |",
-        ]
-        for b in batches:
-            status = "🔴 Recalled" if b.get("isRecalled") else "🟢 Active"
-            rows.append(
-                f"| {b['batchNumber']} | {b['productName']} | {b['createdAt']} | {status} |"
+        try:
+            batches = await tool_store.list_batches(
+                self.user_id, skip, limit, sort_by.value, order.value
             )
-        return self._format_output(
-            "SUCCESS", f"Retrieved {len(batches)} batches.", "\n".join(rows)
-        )
+            if not batches:
+                return self._format_output("SUCCESS", "No production batches enrolled.")
+
+            rows = [
+                "| Batch # | Product | Created | Scans | Status |",
+                "| :--- | :--- | :--- | :--- | :--- |",
+            ]
+            for b in batches:
+                status = "Recalled" if b.get("isRecalled") else "Active"
+                rows.append(
+                    f"| {b['batchNumber']} | {b['productName']} | {b['createdAt']} | {b.get('totalScans', 0)} | {status} |"
+                )
+            return self._format_output(
+                "SUCCESS",
+                f"Retrieved {len(batches)} batches. [Use skip={skip + limit} for more]",
+                "\n".join(rows),
+            )
+        except Exception as e:
+            return self._format_output("ERROR", f"Failed to list batches: {str(e)}")
 
     async def search_batches(self, query: str) -> str:
         """Regex search across batches. **Use** for specific run lookup. **Do NOT use** for bulk list."""
@@ -1284,7 +1411,9 @@ class Tools:
             rows.append(
                 f"| {d['batchNumber']} | {d['unit']} | {d['visitorCount']} | {d['totalScans']} |"
             )
-        return self._format_output("SUCCESS", "Critical threat signals identified.", "\n".join(rows))
+        return self._format_output(
+            "SUCCESS", "Critical threat signals identified.", "\n".join(rows)
+        )
 
     async def list_categories(self) -> str:
         """[Manufacturer Only] Retrieves all unique product categories defined by your company. **Use** to identify valid categories for new product enrollment."""

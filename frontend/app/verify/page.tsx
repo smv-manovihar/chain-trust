@@ -21,6 +21,7 @@ import { resolveMediaUrl } from "@/lib/media-url";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
+import { useAgent } from "@/contexts/agent-context";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -313,7 +314,6 @@ function VerifyContent() {
   const [scanned, setScanned] = useState(false);
   const [qrInput, setQrInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [product, setProduct] = useState<ScanResult["product"] | null>(null);
   const [scanStats, setScanStats] = useState({
     count: 0,
@@ -328,10 +328,10 @@ function VerifyContent() {
     errorDescription: "",
   });
   const { user, isAuthenticated } = useAuth();
+  const { setActiveData } = useAgent();
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
 
-  const [userInteracted, setUserInteracted] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const { isMobileDevice, hasCameraAPI } = useDevice();
@@ -358,11 +358,9 @@ function VerifyContent() {
       return;
     }
 
-    if (!userInteracted) {
-      setScanView(defaultView);
-    }
+    setScanView(defaultView);
     return () => abortControllerRef.current?.abort();
-  }, [isMobileDevice, searchParams, defaultView, userInteracted]);
+  }, [isMobileDevice, searchParams, defaultView]);
 
   const handleScan = async (overrideSalt?: string) => {
     const saltToVerify = overrideSalt || qrInput;
@@ -373,7 +371,6 @@ function VerifyContent() {
     abortControllerRef.current = controller;
 
     setLoading(true);
-    setError("");
 
     try {
       const parts = saltToVerify.split(":");
@@ -466,11 +463,12 @@ function VerifyContent() {
       setScanned(true);
 
       if (searchParams.has("salt") || searchParams.has("id")) {
+        // Persist salt in AgentContext before clearing from URL so AI can see it
+        setActiveData({ salt: saltToVerify, product: finalProduct, stats: finalStats });
         router.replace("/verify", { scroll: false });
       }
     } catch (err: any) {
       if (err.name === "AbortError") return;
-      setError(err.message || "Verification failed.");
       toast.error(err.message || "Verification failed");
       setScanned(false);
     } finally {
