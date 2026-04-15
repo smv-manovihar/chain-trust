@@ -1,49 +1,60 @@
-# My Medicines — Operational Manual
+# My Medicines (Cabinet) — Operational Manual
 **Route:** `/customer/cabinet`
+**Available Query Params:** `?search=[string]`, `?status=[all|active|recalled|consumed]`
 
-The "My Medicines" page is a premium medication archive and live inventory management suite. It serves as the user's personal medication library, tracking both verified authentic products and manually added entries with real-time adherence oversight.
+The "My Medicines" digital cabinet is the central hub for inventory tracking and dose management. It displays all tracked medications, whether manually added by the user or securely added via blockchain QR scanning.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Dynamic Data Toolbar**: A floating toolbar containing a search input, a view toggle (Grid vs. List), and a "Show Inactive" toggle.
-- **View Modes**:
-  - **Grid View (Default)**: Premium 3D-effect cards with glass backgrounds, progress bars, and floating **Flame Streaks** badges.
-  - **List View**: A high-density data table for professional management, featuring a dedicated "STREAK" column.
-- **Adherence Streaks**: Medicines with consistent "Punctual" doses show an animated orange badge with a **Flame icon** (e.g., "5 Day Streak").
-- **Quick Action Bar**: Every medicine has direct **Take Dose** and **Undo** buttons, allowing users to record adherence without leaving the list.
+
+- **Header Controls:** 
+  - **"Add Medicine" button:** A prominent primary button linking to `/customer/cabinet/add` for manual prescription/medication entry.
+  - **"Verify Medicine" button:** Links to the blockchain scanner (`/verify`).
+- **Data Toolbar (Filtering & Views):**
+  - **Search Input:** A unified search bar to instantly filter medications.
+  - **Show Inactive Toggle:** A switch to reveal hidden or inactive medications.
+  - **Grid / List Mode:** A toggle to switch between comfortable Grid Cards and dense Table-based List Views.
+- **Medication Cards (Grid Mode):** Each medicine is displayed in a glassmorphic card interface featuring:
+  - **Adherence Streak (Flame Badge):** An orange badge appearing in the top right, indicating consecutive days of schedule adherence.
+  - **Visual Identifier:** Displays the product's thumbnail image if available, or defaults to a Pill icon (for manual entries) or a Shield icon (for blockchain verified entries).
+  - **Inventory Tracking:** Displays `Current Quantity / Total Quantity` with a visual progress bar. The remaining quantity text turns **Red** if the supply drops below critically low levels (under 5 units).
+  - **Metadata Tags:** Bottom tags showing the Expiry Date (Month/Year) and the Batch Code (if verified).
+- **Quick Card Actions:**
+  - **Take Dose:** Instantly logs adherence. Changes to "Recently Taken" and disables itself after clicking.
+  - **Undo (RotateCcw Icon):** Appears next to recently taken doses allowing immediate reversal of accidents.
+  - **Remove (Trash Icon):** Erases the medicine from the user's tracking history.
 
 ---
 
-## 🔗 URL & Navigation (Link Generation)
-The agent can generate deep-links to this page using the following query parameters:
+## 🔗 Deep Linking & Discovery
 
-| Parameter | Type | Description | Example Link |
-| :--- | :--- | :--- | :--- |
-| `search` | String | Filters the list by name, brand, or batch. | `/customer/cabinet?search=Paracetamol` |
-| `status` | String | Filters by `active` (default) or `all`. | `/customer/cabinet?status=all` |
+The agent can generate links to specific functionalities within this namespace:
 
-**AI Rule:** When a user asks to "see my history" or "find a past med", generate a link with `status=all`. For specific meds, use the `search` parameter.
+| Action | Example Link |
+| :--- | :--- |
+| Scan new medication | `/verify` |
+| Add un-serialized medicine | `/customer/cabinet/add` |
+| View detailed medicine page | `/customer/cabinet/[id]` |
 
 ---
 
-## 🛠️ Tool Integration & AI Guidance
+## 🛠️ Behavioral Instructions for the Assistant
+
+When the user asks questions concerning their tracked inventory, the agent has deep visibility into this interface state via tools.
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "What's my longest streak?" | `get_view_data` | Reference the **Dashboard Max Streak** or scan the cabinet list. |
-| "Show me my inventory." | `get_view_data` | Use the cabinet summary to highlight low quantities. |
-| "I missed my last dose." | `mark_dose_taken` | Record it now, but remind them it may break their **Flame Streak**. |
-
----
-
-## 🚨 Error & Empty States
-- **Empty State**: Shows a custom `EmptyState` component with a `Pill` icon and a prompt to either [Add Manual](/customer/cabinet/add) or [Verify](/verify).
-- **Recently Taken**: The "Take Dose" button disables for 5 minutes after a record to prevent accidental double-dosing.
+| "Show my medicines" | `list_my_medicines` | Returns the paginated inventory identical to the view. Note that users can sort it by name or date. |
+| "I am looking for aspirin." | `search_my_medicines` | Performs a text search. Matches the frontend search toolbar behavior. |
+| "I threw away my meds." | `remove_medicine` | Removes it via API identically to clicking the Trash icon. |
+| "I took my blue pill." | `mark_dose_taken` | Matches the "Take Dose" action. |
 
 ---
 
 ## 🧠 Operational Best Practices
-- **View Mode Context**: "I've filtered your list for 'Paracetamol'. You can toggle between Grid and Table views using the icons in the toolbar."
-- **Streak Celebration**: Always call out high streaks (e.g., "Wow, your 12-day streak on Vitamin D is impressive! Keep it up 🔥").
-- **Visual Cues**: Verified items use the `ShieldCheck` icon; manual entries use the `Pill` icon.
+
+- **Provenance Context:** AI must be mindful of whether an item was `isUserAdded` (Manual Entry) or scanned from the blockchain. The AI can remind users that manually entered items do not receive automated blockchain safety recalls.
+- **Inventory Monitoring:** If `currentQuantity` drops dangerously low while the user is discussing a medicine, the agent must proactively warn the user that their digital cabinet warns it is almost empty.
+- **Editing Capabilities:** If a user wishes to modify their drug schedule or update quantities, the AI must do so directly via tools (`update_medicine` or `add_reminder`) rather than directing the user to click buttons.
+

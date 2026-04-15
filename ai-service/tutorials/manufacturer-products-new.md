@@ -1,47 +1,34 @@
-# Enroll New Product — Operational Manual
+# New Product Catalog Configuration — Visual Context & Behavioral Guide
 **Route:** `/manufacturer/products/new`
+**Available Query Params:** `?id=[draftId]` to resume a pending draft.
 
-The New Product page is a comprehensive enrollment form used to register a new digital asset (Product ID) into the manufacturer's global catalog. It defines the product's technical specifications, visual branding, and regulatory metadata.
-
----
-
-## 🎨 Visual Details & Layout
-- **Multi-Step Form Sections**: A structured form organized into high-fidelity interaction groups:
-  - **Identity Hub**: Fields for **Product Name**, **Brand**, and a unique **Product ID (SKU)**.
-  - **Categorization**: A dropdown for selecting the product's functional category (e.g., Antibiotic, Cardiac).
-  - **Visual Asset Manager**: A specialized uploader for packaging photos. Supports drag-and-drop and provides an "Inventory Preview".
-  - **Technical Core**: Fields for **Chemical Composition**, **Description**, and **Medical Context**.
-- **Primary CTA**: A high-z-index "Enroll Product" button that registers the asset on the secure ledger.
+This wizard allows manufacturers to define a master product template in the system. It enforces high-fidelity metadata collection—especially critical product images—since consumers use these records to visually verify their physical medicine against the authoritative manufacturer source.
 
 ---
 
-## 🔗 URL & Navigation (Link Generation)
-The agent should direct manufacturers to this route when they need to expand their digital portfolio:
+## 🎨 What the User Sees (Visual Context)
 
-| Destination | Route | Description |
-| :--- | :--- | :--- |
-| **Asset Enrollment** | `/manufacturer/products/new` | Start the process for a new product SKU. |
+Like batch enrollment, this is a linear 3-step wizard with a persistent "Wallet Connection Required" overlay if no Web3 wallet is connected.
 
-**AI Rule:** When a manufacturer asks "How do I add a new medicine?", provide the link to the [Enrollment Wizard](/manufacturer/products/new).
-
----
-
-## 🛠️ Tool Integration & AI Guidance
-
-| User Intent | Tool Strategy | Notes |
-| :--- | :--- | :--- |
-| "Help me register a medication." | `get_page_guide` | Explain the field requirements for the **Identity Hub**. |
-| "What categories are available?" | `get_view_data` | Reference the manufacturer dashboard or existing catalog for category inspiration. |
+- **Step 1: Basic Details:**
+  - Standard text inputs for Product Name, Product ID (SKU/UPC), Composition, Brand.
+  - Category selector and a dropdown for standard Dose units (pills, ml, doses, etc).
+  - Drafts are auto-saved here. If a user drops off, they can return via the `?id=` query parameter.
+- **Step 2: Specifications:**
+  - Price (USDT equivalent) input and a rich Textarea for the primary drug description and dosage warnings.
+- **Step 3: Visual Identity:**
+  - An image upload grid. Users can add multiple high-res packaging photos.
+  - **Image Visibility:** Each uploaded image has an overlay button to toggle whether it is visible to consumers (a shield icon) or hidden (check mark).
+  - **Global Access Level:** A row of toggles to set global access: `Public`, `Verified Only`, or `Internal Only`.
+  - Finalizing this step uploads the images to the secure S3/MinIO bucket and finalizes the product in the MongoDB ledger.
 
 ---
 
-## 🚨 Error & Empty States
-- **ID Collision**: If a duplicate Product ID is submitted, the UI displays a "SKU already registered" error notification.
-- **Validation Blocks**: Mandatory fields (Name, ID, Category) show red outlines if left blank during submission.
+## 🧠 Behavioral Instructions for the Assistant
 
----
+When conversing with the manufacturer on this page:
 
-## 🧠 Operational Best Practices
-- **Visual Verification**: Remind the user that the first image uploaded will be the "Face of the Product" for customers during scan verification.
-- **Naming Standards**: Advise using Title Case for both the **Product Name** and **Brand** to maintain professional catalog standards.
-- **Catalog Review**: Always offer a link to the [Catalog](/manufacturer/products) to allow the user to review their existing assets before adding duplicates.
+- **Act as a Co-Pilot, not a Robot:** Do not declare the execution of internal tool commands. If a user asks what step 3 is for, simply explain: *"Step 3 is where you upload the official packaging photos. These are essential because your customers will compare their physical boxes against your photos to spot counterfeits."*
+- **Explain "Image Access Levels" Naturally:** If they ask what "Verified Only" means, explain that the images will only be visible to consumers who successfully scan an authentic, non-recalled QR code.
+- **Wallet Troubleshooting:** If they cannot type into the form, explain they must authorize the session by clicking the "Connect Wallet" button first.
+- **Resuming Work:** If they lost their spot, let them know they can easily resume since the system auto-saves their progress as a "Pending" record. You can provide a navigation link like `[action:navigate|href:/manufacturer/products/new?id=123|label:Resume Product Draft]`.

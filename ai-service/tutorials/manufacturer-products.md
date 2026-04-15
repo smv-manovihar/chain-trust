@@ -1,45 +1,42 @@
-# Product List (Catalog) — Operational Manual
+# Product Catalogue Management — Operational Manual
 **Route:** `/manufacturer/products`
+**Available Query Params:** `?search=[string]`, `?categories=[string]`, `?page=[int]`
 
-The Product List is the definitive catalog of all digital assets (SKUs) enrolled in the ChainTrust secure ledger. It provides a technical overview of product specifications, image assets, and their associated production history.
+The Products page is where Manufacturers manage their core global catalogue inventory. A "Product" in ChainTrust acts as the master template (e.g., "Aspirin 500mg, Box of 30") from which physical serialized "Batches" inherit their properties.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Dynamic Data Toolbar**: Contains a search input, a high-performance **Category Filter**, and a view toggle (Grid vs. List).
-- **View Modes**:
-  - **Grid View (Default)**: Visual-first cards with high-resolution imagery, category badges, and quick links to batch management.
-  - **List View**: A streamlined data table optimized for large catalogs, showing SKU, Category, and Batch Count in a single row.
-- **Product Hub**: Interactive cards featuring "Brand Name", Product ID (SKU), and a summary of active batches.
+
+- **Header Window:** 
+  - **Quick Stats:** Badges showing the total number of Assets (Products) and active Categories in the catalogue.
+  - **Actions:** 
+    - **Refresh (Loop icon):** Forces a hard sync of the catalogue.
+    - **Manage Categories:** Opens a dialog to edit global product category strings.
+    - **Add Product:** Primary button routing to `/manufacturer/products/new`.
+- **Data Toolbar:**
+  - **Search:** Allows text searches targeting the product name or unique ID.
+  - **Category Filter:** A multi-select dropdown to filter the view by custom categories (e.g., "Analgesics", "Antibiotics").
+  - **Grid/List Select:** Toggles the layout architecture.
+- **Data Canvas:**
+  - Displays products optimally via the `ProductCard` (Grid) or `ProductListView` (Table row). Note that on Mobile viewports, the grid Cards are forced globally to ensure tap-target safety.
 
 ---
 
-## 🔗 URL & Navigation (Link Generation)
-The agent can generate deep-links with precise filters:
+## 🛠️ Behavioral Instructions for the Assistant
 
-| Parameter | Type | Description | Example Link |
-| :--- | :--- | :--- | :--- |
-| `search` | String | Filters the catalog by name, brand, or Product ID. | `/manufacturer/products?search=Amoxicillin` |
-| `categories` | String | Filters by comma-separated category names. | `/manufacturer/products?categories=Antibiotic,Liquid` |
-
-**AI Rule:** When a user asks "What antibiotics do we have?", generate a filtered link: `/manufacturer/products?categories=Antibiotic`.
-
----
-
-## 🛠️ Tool Integration & AI Guidance
+The Assistant has unrestricted capability to view and modify this catalogue.
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "Show me our catalogue." | `get_view_data` | Use the manufacturer dashboard summary for counts. |
-| "Do we have [Product]?" | `get_view_data` | Reference specific product details if they appear in the dashboard "Recent Activity". |
-
----
-
-## 🚨 Error & Empty States
-- **Empty Catalog**: UI shows an `EmptyState` component. Proactively guide the user to the [Add Product](/manufacturer/products/new) wizard.
+| "What products do we sell?" | `list_products` | Retrieve current assets. You can also accept a category argument to filter automatically via `list_products({"category": "Vaccines"})`. |
+| "Add a new drug called Paracetamol" | `create_product` | If they don't provide details, ask for the SKU, Description, and Category gracefully before invoking the backend tool. |
+| "Delete the old aspirin record" | `delete_product` | Ensure you fetch the product `_id` first. Inform the user that deleting a product does NOT delete its enrolled batches from the immutable blockchain. |
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Category Clarity**: Mention that categories are manufacturer-defined and can be managed via the "Manage Categories" dialog on this page.
-- **Product ID vs. Batch**: Remind the user that **Product ID** is the master identifier, while **Batch Numbers** represent individual production runs.
+
+- **Master vs Child Relationship:** Often users confuse "Products" with "Batches". If a user says "I need to generate QR codes for my new Aspirin", the AI must clarify that QR codes are generated at the *Batch* level, not the *Product* level. Ensure the Product exists first, then route them to Batch enrollment.
+- **Image Handling:** The AI cannot generate high-res product photos via text. If the user asks the AI to add an image to a product, kindly instruct them to navigate to the product's detail page via the UI to upload their packaging imagery directly to the MinIO/S3 bucket.
+

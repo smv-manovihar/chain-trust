@@ -1,44 +1,40 @@
-# Agent Chat (AI Assistant) — Operational Manual
-**Route:** `/customer/agent`
+# AI Agent Interface — Operational Manual
+**Route:** `/customer/agent` (Full Screen) & Component Mode
+**Available Query Params:** None
 
-The Agent Chat is the high-performance interface for ChainTrust's role-aware AI. It provides the user with an intelligent, conversational assistant that has real-time visibility into the patient's records, prescriptions, and the global blockchain ledger.
+The Agent Interface provides users with a persistent, intelligent assistant capable of both conversational guidance and direct interaction with the ChainTrust platform via The Assistant functional tools.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Glassmorphic Converse Aperture**: A focused, high-fidelity chat experience with translucent message bubbles.
-- **Dynamic Context Bar**: A subtle, top-level indicator showing "Synchronized with [Page Name]" to confirm situational awareness.
-- **Session Sidebar**: (Desktop) A retractable panel for navigating historical conversation threads.
-- **Aesthetic Flourishes**: Smooth scrolling transitions, real-time typing indicators, and high-visibility action buttons for "Regenerate" and "Stop".
+
+- **Header Window:** a glassmorphic top navigation bar.
+  - **Thread Selection:** Contains a dropdown/menu to view previous historical conversations.
+  - **New Chat (+):** Instantly creates a blank session state.
+  - **Search:** A search input to filter through historical chat threads by title.
+- **Message List Area:** The main conversational timeline.
+  - The agent's output is rendered in full Markdown (supporting tables, bolding, and lists).
+  - Hovering over individual messages brings up micro-actions: **Edit** (pencil), **Retry** (reload icon), and **Delete** (trash).
+- **Composer Window (Input):** The bottom persistent input box. Automatically expands as the user types long queries. Features a solid "Send" button that animates into a loading state while processing.
+- **Floating Agent Variant:** The agent may optionally appear as a floating circle in the bottom corner of non-agent routes (via `floating-agent`), allowing users to click and summon a compact overlay of this exact interface.
 
 ---
 
-## 🔗 URL & Navigation (Link Generation)
-The agent can generate links to specific conversation threads:
+## 🛠️ Tool Integration & Situational Awareness
 
-| Filter | Route | Description |
-| :--- | :--- | :--- |
-| **Active Session** | `/customer/agent?session=[id]` | Resumes a specific historical conversation. |
+The Agent is context-aware. It receives the user's `currentContext` (their current Route and URL parameters) on every message.
 
-**AI Rule:** When asked to "remember our last talk," provide the active [Session Link](/customer/agent?session=...).
-
----
-
-## 🛠️ Tool Integration & AI Guidance
-
-| User Intent | Tool Strategy | Notes |
-| :--- | :--- | :--- |
-| "What are we talking about?" | `get_view_data` | Aggregates the message history and current situational context. |
-| "Start fresh." | `get_page_guide` | Explain the assistant's capabilities and offer to clear the active buffer. |
-
----
-
-## 🚨 Error & Empty States
-- **Synchronization Offline**: Displays a "Neural Link Interrupted" status. AI should clarify that it's currently unable to "see" your active page data due to connectivity issues.
+| Architectural Rule | Implication |
+| :--- | :--- |
+| **Visible UI Match** | You (the AI) can "see" what the user sees via the `get_view_data` tool. Use it *before* explaining how a page works. |
+| **Proactive Routing** | Since you know their current URL, if they ask how to scan a medicine while they are already on `/verify`, adapt your language to say "You're already on the right page, just look at the camera window." |
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Role Continuity**: Always maintain the persona of an "Advanced Medical Security Agent."
-- **Contextual Recall**: Use `get_view_data` before answering any question about "this page" or "my medicines."
-- **Direct Linkage**: If the user is on mobile, guide them to the [Agent Portal](/customer/agent) for a full-screen conversational experience.
+
+- **Never output raw Markdown artifacts incorrectly.** Do not write raw HTML. Use standard GitHub Flavored Markdown.
+- **Respect User Tone:** Provide concise, direct answers. Do not prepend every answer with "I can help with that."
+- **Handle System Delays Gracefully:** Since blockchain queries or heavy OCR extractions can take seconds, inform the user you are starting the task before they wait. (e.g., "I'm checking the decentralized ledger right now.")
+- **Acknowledge Edits:** If the user utilizes the "Edit" micro-action on an old message to change their prompt, parse the newly generated context properly rather than getting confused by the timeline shift.
+

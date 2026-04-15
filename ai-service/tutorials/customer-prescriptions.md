@@ -1,50 +1,43 @@
-# Prescriptions (Digitized Vault) — Operational Manual
+# My Prescriptions — Operational Manual
 **Route:** `/customer/prescriptions`
+**Available Query Params:** `?status=[all|active|completed]`
 
-The Prescriptions page is the secure, high-fidelity archive for a user's medical documents. It uses AI-driven text extraction to digitize paper prescriptions, making them searchable and linkable to the digital medicine cabinet.
+This page functions as a secure digital vault for all of the user's digitized medical documents and prescriptions. Documents uploaded here are parsed via OCR on the backend, allowing their textual contents to be searchable and AI-readable.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Data Toolbar**: Features a search input and a view toggle (Grid vs. List).
-- **View Modes**:
-  - **Vault Grid (Default)**: Visual-first cards showing the document preview, doctor name, and digitization status.
-  - **Technical List**: A dense table view showing **Doctor / Provider**, **Issued Date**, and **Linked Medicines** count.
-- **Digitization Status**:
-  - **Completed (Blue)**: Processing finished; content is searchable and readable via tools.
-  - **Processing (Amber)**: AI extraction in progress.
-  - **Failed (Red)**: Document unreadable or extraction error.
-- **Linked Medications**: A specific badge on each card/row showing the count of cabinet items associated with this prescription.
+
+- **Header Controls:** 
+  - **Upload New Document:** A primary button (hidden on mobile, replaced by a bottom sticky CTA) triggering the `PrescriptionUploadDialog`.
+- **Data Toolbar:** 
+  - **Search:** Allows searching the list specifically by the Prescription Label or the Doctor/Provider name.
+  - **Grid/List View Toggle:** Standard view control.
+- **Data Presentation:** 
+  - Documents are shown either in intuitive Grid Cards, or a detailed Table List (on Desktop).
+  - Listed metadata includes: **Prescription Label**, **Doctor / Provider**, **Issued Date**, and **Medicines** count (linking to the `LinkedMedications` dialog).
+- **Infinite Scrolling:** The interface utilizes an infinite scroll (loading an additional 12 cards dynamically) rather than explicit pagination buttons.
+- **Interactive Actions:**
+  - **View (Eye Icon):** Triggers the `DocumentViewerDialog`, presenting a full-screen, zoomable preview of the raw image or PDF.
+  - **Delete (Trash Icon):** Prompts a confirmation dialog to permanently delete the document.
 
 ---
 
-## 🔗 URL & Navigation (Link Generation)
-The agent can generate links to search results or filtered states:
+## 🛠️ Behavioral Instructions for the Assistant
 
-| Filter | Route | Description |
-| :--- | :--- | :--- |
-| **Search Content** | `/customer/prescriptions?search=Dr.Smith` | Filter by doctor, medication name, or clinic. |
-
-**AI Rule:** When a user asks "Show me my prescriptions for Paracetamol," use the `search` parameter in the link.
-
----
-
-## 🛠️ Tool Integration & AI Guidance
+The AI acts as a sophisticated query engine for these documents. Since OCR runs strictly in the backend during upload, the agent can actively search document *contents* even though the frontend search only hits labels and doctors.
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "What medications are on this?" | `read_prescription` | Use Document ID to read the digitized text line-by-line. |
-| "Did I upload Dr. X's note?" | `search_prescriptions` | Search across the content of all uploaded documents. |
-| "List my files." | `list_prescriptions` | Returns the registry items and their status. |
-
----
-
-## 🚨 Error & Empty States
-- **Empty Vault**: UI shows "No prescriptions found". Guide the user to upload their first file using the **Upload New Document** button.
-- **Failed Extraction**: Advise the user to re-upload with a clearer, higher-resolution photo.
+| "What prescriptions do I have?" | `list_prescriptions` | Provides a brief overview map without fetching heavy document text. |
+| "Read the one from Dr. Smith" | `read_prescription` | Uses the registry index from the `list_prescriptions` response to fetch the specific line-by-line OCR text. |
+| "Which prescription mentions ibuprofen?" | `search_prescriptions` | Executes a regex text-search directly across the raw OCR database. |
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Content Discovery**: If a user asks a medical question about an order, always `search_prescriptions` first before checking the cabinet.
-- **Vault Linkage**: Remind the user they can **Link to My Medicines** directly from the prescription record to keep their inventory accurate.
+
+- **Two-Step Reading Strategy:** Do NOT attempt to use `read_prescription` without first calling `list_prescriptions` to obtain the correct integer `registry_index`.
+- **Privacy Assurance:** If users upload sensitive documents, the agent should reassure them that these are stored securely in Private MinIO/S3 buckets and are inaccessible publicly.
+- **Search Superiority:** The agent's `search_prescriptions` tool is more powerful than the UI's data toolbar. If a user says "I can't find the prescription for my back pain", the agent should actively use the search tool to scan the actual OCR `content` layer.
+

@@ -1,47 +1,25 @@
-# Manufacturer Analytics — Operational Manual
+# Global Scan Analytics — Visual Context & Behavioral Guide
 **Route:** `/manufacturer/analytics`
+**Available Query Params:** `?tab=[all|product|batch]` (Scan volume grouping), `?from=[ISO_Date]`, `?to=[ISO_Date]` (Time filters)
 
-The Analytics page is the high-fidelity intelligence hub for geographic and security monitoring. It provides interactive visualizations of scan volume, market distribution, and potential threat clusters using real-time blockchain-verified data.
-
----
-
-## 🎨 Visual Details & Layout
-- **Dynamic Metrics (Bento Hub)**: Glassmorphic KPI cards for:
-  - **Scan Pulse**: Real-time scan activity over the selected period.
-  - **Market Reach**: Count of unique countries with verified scans.
-  - **Risk Vector**: Count of high-risk units detected.
-- **Geographic Coverage**: BAR chart visually representing global market penetration.
-- **Threat Timeline**: Chronological log of potential counterfeit signals.
+This is the macro-level intelligence dashboard. Manufacturers use this to track how frequently their enrolled products are being verified globally, giving them insight into supply chain velocity and counterfeiting hotspots.
 
 ---
 
-## 🔗 URL & Navigation (Link Generation)
-The agent can generate deep-links with precise filters to view specific data segments:
+## 🎨 What the User Sees (Visual Context)
 
-| Filter | Route | Description |
-| :--- | :--- | :--- |
-| **Product Focused** | `/manufacturer/analytics?productId=SKU-101` | Filters all charts for a specific product. |
-| **Batch Focused** | `/manufacturer/analytics?batchNumber=B-202` | Deep-link to a specific production run's analytics. |
-| **Custom Range** | `/manufacturer/analytics?from=2026-03-01&to=2026-03-31` | Date-filtered intelligence view. |
-
-**AI Rule:** Always provide the filtered link to the [Analytics](/manufacturer/analytics) page when discussing volume or threats.
+- **Header Controls:** A large Date Range picker to filter all charts simultaneously, and a "Scan Details" deep-dive button.
+- **Scan Volume (Trend Chart):** A line chart tracking verification scans over time. The user can toggle views (Total Scans vs By Products vs By Batches) using the large tabs next to the chart.
+- **Executive Summary:** A grid of 4 numerical KPI cards: Products, Active Batches, Total Scans, and an aggressively styled Incidents (Counterfeit) count.
+- **Regional Scans (Geo Chart):** A horizontal bar chart displaying which cities/countries are producing the most verification scans.
+- **Batch Performance (Table):** A ranked list of production batches that have the highest scan engagement. Clicking any row navigates directly to that batch's specific deep-dive analytic profile.
 
 ---
 
-## 🛠️ Tool Integration & AI Guidance
+## 🧠 Behavioral Instructions for the Assistant
 
-| User Intent | Tool Strategy | Notes |
-| :--- | :--- | :--- |
-| "Show me my global stats." | `get_scan_geography` | Aggregates country-level scan volume. |
-| "Are there any counterfeit risks?" | `get_threat_intelligence` | Identifies units with suspiciously high scan counts. |
+When conversing with the manufacturer on this page:
 
----
-
-## 🚨 Error & Empty States
-- **Zero-Scan Window**: If no data is returned for a date range, suggest the user expand their filters or check if any products were enrolled during that period.
-
----
-
-## 🧠 Operational Best Practices
-- **Prioritize Threats**: If `get_threat_intelligence` returns any data, mention them **before** discussing general volume.
-- **Deep-Link Linking**: Always link to the [Scan Analytics Deep Dive](/manufacturer/analytics/scans) for unit-level verification history.
+- **Act as a Co-Pilot, not a Robot:** Instead of stating "Your analytics data has been fetched", visually synthesize it: *"It looks like you have a high concentration of scans in New York this week, and Batch #123 is receiving the most engagement."*
+- **Navigating Deep Dives:** If a manufacturer wants to see exactly *which* units in a batch were scanned, tell them to either click a batch row in the Performance table or press the "Scan Details" button at the top. You can also generate a navigation link: `[action:navigate|href:/manufacturer/analytics/scans?batchNumber=123|label:View Batch #123 Scans]` using the batch number.
+- **Handling Date Queries:** If they want to see last month's data, instruct them to click the Calendar icon at the top of the page. You DO NOT change the date filters for them via tools; they must use the UI.

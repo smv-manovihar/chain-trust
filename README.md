@@ -6,6 +6,19 @@ Chain Trust is a full-stack web application that leverages the Ethereum blockcha
 
 ---
 
+## ✨ Key Features
+
+- **Instant Verification**: Universally compatible QR codes that allow any scanner to verify product authenticity, check for recalls, and view scan history via the ChainTrust platform.
+- **My Medicines**: Professional medication dashboard with precision dose tracking and automated inventory management.
+- **Intelligent AI Assistant**: A role-aware agent with deep contextual awareness of your data, providing proactive health insights and automated task execution.
+- **Precision Reminders**: High-accuracy in-app and email notifications for dosing schedules, upcoming expirations, product recalls, and low-stock alerts.
+- **Prescription Management**: Encrypted digital storage for medical prescriptions (PDF/Images) with seamless integration into your personal My Medicines list.
+- **Batch Management**: Manufacturer tools for enrolling production batches, generating cryptographic unit salts, and producing print-ready QR label sheets.
+- **Risk Analytics**: Advanced manufacturer dashboard featuring real-time scan maps, counterfeit detection, and supply chain engagement metrics.
+- **Session Control**: Enterprise-grade security with multi-device login, remote session management, and seamless Google OAuth integration.
+
+---
+
 ## 🏗️ Architecture
 
 ```text
@@ -24,26 +37,6 @@ ChainTrust/
 | **Blockchain** | Solidity, Web3.js             | Immutable product registration       |
 | **Database**   | MongoDB                       | User accounts, product metadata      |
 | **Storage**    | MinIO (S3-compatible)         | Product images and assets            |
-
----
-
-## 🎨 Design System & Mobile Experience
-
-ChainTrust follows a **Mobile-First** design philosophy. The UI is built using a custom design system that prioritizes speed, clarity, and accessibility.
-
-### Key Principles
-- **Responsive Dialogs**: All complex forms use a `ResponsiveDialog` pattern—rendering as a bottom-sheet **Drawer** on mobile and a centered **Dialog** on desktop.
-- **Glassmorphism**: High-density interfaces with `backdrop-blur` and subtle borders for a premium feel.
-- **No-Scroll Layouts**: Dashboard views are designed to fit within the viewport (`h-screen`) to prevent disorienting global page scrolls.
-
-### Essential Components
-| Component | Purpose | Location |
-| :--- | :--- | :--- |
-| `ResponsiveDialog` | Adaptive form container | `components/ui/responsive-dialog.tsx` |
-| `StatCard` | KPI and metric display | `components/ui/stat-card.tsx` |
-| `AgentChat` | AI assistant interface | `components/chat/agent-chat.tsx` |
-| `BrandLogo` | Consistent branding | `components/layout/brand-logo.tsx` |
-
 
 ---
 
@@ -223,18 +216,6 @@ The application will be available at `http://localhost:3000`.
 | `NEXT_PUBLIC_CONTRACT_ADDRESS` | Smart contract address  |
 | `NEXT_PUBLIC_RPC_URL`          | Blockchain RPC endpoint |
 | `NEXT_PUBLIC_API_URL`          | Backend API base URL    |
-
----
-
-## 🧪 How It Works
-
-1. **Manufacturer** logs in, fills out a product form, and submits it.
-2. The frontend calls the **smart contract** via MetaMask to register the product on-chain.
-3. The blockchain returns a **transaction hash** (digital receipt).
-4. The frontend sends the product data + hash to the **backend API**.
-5. The backend saves everything in **MongoDB** for fast lookups.
-6. A **consumer** enters a Product ID on the verification page.
-7. The app checks both the **blockchain** (for trust) and the **database** (for details) to confirm authenticity.
 
 ---
 

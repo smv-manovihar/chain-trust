@@ -1,48 +1,59 @@
-# Medicine Detail (Cabinet Item) — Operational Manual
+# Medicine Details — Operational Manual
 **Route:** `/customer/cabinet/[id]`
 
-The Medicine Detail page is the comprehensive command center for a specific medication. It manages dosages, tracking logs, inventory replenishment, and security synchronization with the ChainTrust blockchain.
+This page provides an atomic, detailed view of a single medication within the user's digital cabinet. It acts as the primary interface for managing dose schedules, tracing historical adherence, and exploring attached medical media.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Vital Header**: Displays the product name and current **Adherence Streak** (Flame icon with pulse).
-- **Glassmorphic Quick Stats**: Cards for "Active Dosage", "Last Taken", and "Remaining Units".
-- **Interaction Hub**: Large, sticky "Take Dose" (Zap icon) and "Undo Dose" (RotateCcw icon) buttons.
-- **Dynamic Charting**: Historical dosage pulse chart showing adherence consistency.
-- **Inventory Bar**: Real-time progress bar showing stock levels (Red below 5 units).
+
+### 1. Header Bar & Core Actions
+- **Title Block:** Displays the Medicine Name, Brand, Batch Code (if verified), and safety status badges (e.g., "Authentic", "Inactive").
+- **Top Right Actions:** 
+  - **Take Dose (Primary):** A prominent green button to log a dose. If recently pressed, it turns gray and reads "Dose Recorded".
+  - **Refill:** A button to add new stock to the current inventory total.
+  - **Deactivate/Activate:** An "Eye" icon to toggle whether the medicine appears in the daily schedule. Deactivated medicines are suppressed from reminders.
+  - **Undo (RotateCcw):** Appears conditionally if a dose was recently taken.
+
+### 2. Adherence Hero Console
+A large, prominent visual banner providing immediate contextual tracking:
+- **Next Dosage:** Displays exactly when the next pill is due (e.g., "Tomorrow at 19:00").
+- **Smart Tags:** Contextual tags for the upcoming dose, including a countdown (e.g., "In 5h 30m") and Meal Context (e.g., "After meal").
+- **Current Streak:** An orange, pulsing Flame badge indicating consecutive days without a missed dose.
+- **Current Stock:** A large numerical counter showing remaining units. A pulsating "Low Stock" warning appears if units drop below 5.
+- **Last Recorded:** Precisely when the user last clicked "Take Dose".
+
+### 3. Management Tabs
+The lower section divides complex configuration into three tabs:
+
+- **Schedule & Settings:** 
+  - Allows robust configuration of "Smart Reminders" (Time, Days of Week, Frequency, Meal Context).
+- **History:** 
+  - A comprehensive timeline of the 20 most recent dose events. Events are marked distinctly as Punctual (green check) or Late (amber warning).
+- **Details & Media:** 
+  - **Prescriptions:** Attached OCR-scanned prescription documents.
+  - **Product Imaging:** Verified high-resolution product photography (fetched automatically if blockchain verified) or allowing manual image uploads.
+  - **Form Data:** Doctor name, raw dosage strings, composition, and personal notes.
 
 ---
 
-## 🔗 URL & Navigation (Link Generation)
-The agent should generate deep-links for specific actions on this page:
+## 🛠️ Behavioral Instructions for the Assistant
 
-| Parameter | Type | Description |
-| :--- | :--- | :--- |
-| `edit` | Boolean | Triggers the edit modal for name or schedule. |
-| `logs` | Boolean | Opens the historical dossier of all past dosages. |
-
-**AI Rule:** When a user asks about a specific medicine's history, provide the direct [History Link](/customer/cabinet/[id]?logs=true).
-
----
-
-## 🛠️ Tool Integration & AI Guidance
+This is the most feature-dense page for the user. Consequently, the agent can powerfully manipulate these settings conversationally.
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "What's my streak for X?" | `get_cabinet_item` | Checks the `currentStreak` and `longestStreak`. |
-| "How much medication is left?" | `get_cabinet_item` | Reference `currentQuantity` vs. `totalQuantity`. |
-| "Record a dose." | `mark_dose_taken` | Advise the user that this will increment their streak. |
-
----
-
-## 🚨 Error & Empty States
-- **Low Stock Warning**: When inventory is < 5, a high-visibility amber prompt appears. AI should suggest checking for open prescriptions or refills.
-- **Missed Dose Alert**: If a scheduled dose is missed, the header status shifts to "Inactive". AI should offer "Reset Reminders" guidance.
+| "I took this pill." | `mark_dose_taken` | Matches the primary green button action. |
+| "Undo that dose" | `undo_dose` | Restores inventory and deletes the recent dose log. |
+| "Set a reminder for 5 PM" | `add_reminder` | Automatically configures the Schedule logic accurately. |
+| "Show me the prescription for this" | `list_prescriptions` + `read_prescription` | The AI can search through the user's available prescriptions or read the active one. |
+| "I got a refill of 30 pills" | `update_medicine` | Safely update the `currentQuantity` property. |
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Streak Motivation**: Proactively congratulate users on high streaks (> 7 days).
-- **Inventory Proactivity**: If inventory is low, check `list_prescriptions` for the user and suggest a refill link.
-- **Safety Sync**: If the medicine is blockchain-verified, reassure the user that "This product is being monitored for safety updates 24/7."
+
+- **Intelligent Refills:** If a user says "I got a refill", ask them for the quantity before executing `update_medicine`.
+- **Missed Doses vs Late Doses:** Emphasize that taking a dose "Late" is visually distinct in the History tab, but it preserves overall tracking integrity better than entirely skipping the dose.
+- **Medication Deactivation:** If a user finishes a treatment course, seamlessly advise them (and use `update_medicine`) to set `status="inactive"` rather than deleting it. This preserves their dosage history.
+

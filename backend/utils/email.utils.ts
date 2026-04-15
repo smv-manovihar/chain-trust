@@ -268,3 +268,246 @@ export const sendDoseReminder = async (
 		return false;
 	}
 };
+
+export const sendBatchRecallAlert = async (
+	email: string,
+	name: string,
+	medicineName: string,
+	batchNumber: string,
+): Promise<boolean> => {
+	const content = `
+		<p class="text">Hello <strong>${name}</strong>, this is an urgent safety notification.</p>
+		
+		<div class="card" style="border-color: #ef4444; background-color: #fef2f2;">
+			<div class="label" style="color: #ef4444;">Safety Recall Alert</div>
+			<div class="otp" style="font-size: 24px; color: #18181b; letter-spacing: normal;">${medicineName}</div>
+			<p class="text" style="margin-top: 8px;">Batch: <strong>${batchNumber}</strong></p>
+			
+			<div class="divider"></div>
+			<p class="text" style="color: #b91c1c; font-weight: 600;">Please discontinue use immediately.</p>
+		</div>
+
+		<p class="text">The manufacturer has issued a recall for this batch. Please consult your healthcare provider or pharmacy for replacement options.</p>
+
+		<div class="btn-wrapper">
+			<a href="${FRONTEND_URL}/customer/cabinet" class="btn" style="background-color: #ef4444;">Check My Cabinet</a>
+		</div>
+	`;
+
+	const mailOptions = {
+		from: EMAIL_FROM,
+		to: email,
+		subject: `URGENT: Safety Recall for ${medicineName}`,
+		html: wrapTemplate('Safety Recall Alert', content),
+	};
+
+	try {
+		await transporter.sendMail(mailOptions);
+		return true;
+	} catch (error) {
+		console.error('Error sending batch recall email:', error);
+		return false;
+	}
+};
+
+export const sendBatchRestoredAlert = async (
+	email: string,
+	name: string,
+	medicineName: string,
+	batchNumber: string,
+): Promise<boolean> => {
+	const content = `
+		<p class="text">Hello <strong>${name}</strong>, we have a safety update regarding your medication.</p>
+		
+		<div class="card card-blue">
+			<div class="label label-blue">Safety Update: Restored</div>
+			<div class="otp" style="font-size: 24px; color: #18181b; letter-spacing: normal;">${medicineName}</div>
+			<p class="text" style="margin-top: 8px;">Batch: <strong>${batchNumber}</strong></p>
+			
+			<div class="divider"></div>
+			<p class="text" style="color: #059669; font-weight: 600;">Status: Safe to Use</p>
+		</div>
+
+		<p class="text">The manufacturer has resolved the previous safety concerns for this batch. It has been restored and is now marked as authentic and safe.</p>
+
+		<div class="btn-wrapper">
+			<a href="${FRONTEND_URL}/customer/cabinet" class="btn">View Details</a>
+		</div>
+	`;
+
+	const mailOptions = {
+		from: EMAIL_FROM,
+		to: email,
+		subject: `Update: ${medicineName} has been Restored`,
+		html: wrapTemplate('Medicine Safety Update', content),
+	};
+
+	try {
+		await transporter.sendMail(mailOptions);
+		return true;
+	} catch (error) {
+		console.error('Error sending batch restored email:', error);
+		return false;
+	}
+};
+
+export const sendLowStockAlert = async (
+	email: string,
+	name: string,
+	medicineName: string,
+	currentQuantity: number,
+): Promise<boolean> => {
+	const content = `
+		<p class="text">Hello <strong>${name}</strong>, your medication supply is running low.</p>
+		
+		<div class="card" style="background-color: #fffbeb; border-color: #fcd34d;">
+			<div class="label" style="color: #b45309;">Low Stock Warning</div>
+			<div class="otp" style="font-size: 24px; color: #18181b; letter-spacing: normal;">${medicineName}</div>
+			
+			<div class="divider"></div>
+			<div class="highlight-date" style="color: #d97706;">${currentQuantity} Remaining</div>
+		</div>
+
+		<p class="text">Based on your current schedule, you have less than a 3-day supply remaining. We recommend replenishing your stock soon.</p>
+
+		<div class="btn-wrapper">
+			<a href="${FRONTEND_URL}/customer/cabinet" class="btn" style="background-color: #d97706;">Open Cabinet</a>
+		</div>
+	`;
+
+	const mailOptions = {
+		from: EMAIL_FROM,
+		to: email,
+		subject: `Low Stock Alert: ${medicineName}`,
+		html: wrapTemplate('Refill Reminder', content),
+	};
+
+	try {
+		await transporter.sendMail(mailOptions);
+		return true;
+	} catch (error) {
+		console.error('Error sending low stock alert email:', error);
+		return false;
+	}
+};
+
+export const sendSuspiciousScanAlert = async (
+	email: string,
+	name: string,
+	productName: string,
+	batchNumber: string,
+	reason: string,
+): Promise<boolean> => {
+	const content = `
+		<p class="text">Hello <strong>${name}</strong>, a potential security incident has been flagged.</p>
+		
+		<div class="card" style="border-color: #ef4444; background-color: #fef2f2;">
+			<div class="label" style="color: #ef4444;">Suspicious Activity Detected</div>
+			<div class="otp" style="font-size: 20px; color: #18181b; letter-spacing: normal;">${productName}</div>
+			<p class="text" style="font-size: 13px; margin-top: 4px;">Batch: ${batchNumber}</p>
+			
+			<div class="divider"></div>
+			<p class="label">Primary Flag</p>
+			<p class="text" style="color: #b91c1c; font-weight: 600; margin-bottom: 0;">${reason}</p>
+		</div>
+
+		<p class="text">A scan for one of your products was flagged as high-risk. Please review the scan analytics to determine if further action is required.</p>
+
+		<div class="btn-wrapper">
+			<a href="${FRONTEND_URL}/manufacturer/analytics" class="btn" style="background-color: #18181b;">View Threat Intelligence</a>
+		</div>
+	`;
+
+	const mailOptions = {
+		from: EMAIL_FROM,
+		to: email,
+		subject: `Security Alert: Suspicious Scan Detected`,
+		html: wrapTemplate('Security Alert', content),
+	};
+
+	try {
+		await transporter.sendMail(mailOptions);
+		return true;
+	} catch (error) {
+		console.error('Error sending suspicious scan alert email:', error);
+		return false;
+	}
+};
+
+export const sendScanMilestoneAlert = async (
+	email: string,
+	name: string,
+	batchNumber: string,
+	scanCount: number,
+): Promise<boolean> => {
+	const content = `
+		<p class="text">Congratulations <strong>${name}</strong>! Your batch has reached a new engagement milestone.</p>
+		
+		<div class="card card-blue">
+			<div class="label label-blue">Adoption Milestone</div>
+			<div class="otp" style="font-size: 48px; color: #1d4ed8;">${scanCount}</div>
+			<p class="label" style="margin-top: 8px;">Total Verified Scans</p>
+			
+			<div class="divider"></div>
+			<p class="text" style="font-size: 14px; margin-bottom: 0;">Batch: <strong>${batchNumber}</strong></p>
+		</div>
+
+		<p class="text">Your product is successfully reaching consumers. This milestone indicates growing trust and active verification in the field.</p>
+
+		<div class="btn-wrapper">
+			<a href="${FRONTEND_URL}/manufacturer/batches" class="btn">View Batch Analytics</a>
+		</div>
+	`;
+
+	const mailOptions = {
+		from: EMAIL_FROM,
+		to: email,
+		subject: `Milestone Achieved: ${scanCount} Scans for Batch ${batchNumber}`,
+		html: wrapTemplate('Milestone Achievement', content),
+	};
+
+	try {
+		await transporter.sendMail(mailOptions);
+		return true;
+	} catch (error) {
+		console.error('Error sending scan milestone alert email:', error);
+		return false;
+	}
+};
+
+export const sendSystemNotification = async (
+	email: string,
+	name: string,
+	subject: string,
+	message: string,
+): Promise<boolean> => {
+	const content = `
+		<p class="text">Hello <strong>${name}</strong>, you have a new system update from ChainTrust.</p>
+		
+		<div class="card">
+			<div class="label">Message Summary</div>
+			<p class="text" style="font-weight: 600; margin-bottom: 12px;">${subject}</p>
+			<div class="divider"></div>
+			<p class="text" style="font-size: 14px; text-align: left; margin-bottom: 0;">${message}</p>
+		</div>
+
+		<div class="btn-wrapper">
+			<a href="${FRONTEND_URL}" class="btn">Go to Dashboard</a>
+		</div>
+	`;
+
+	const mailOptions = {
+		from: EMAIL_FROM,
+		to: email,
+		subject: `ChainTrust System Update: ${subject}`,
+		html: wrapTemplate('System Notification', content),
+	};
+
+	try {
+		await transporter.sendMail(mailOptions);
+		return true;
+	} catch (error) {
+		console.error('Error sending system notification email:', error);
+		return false;
+	}
+};

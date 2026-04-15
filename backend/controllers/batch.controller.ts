@@ -9,10 +9,10 @@ import geoip from 'geoip-lite';
 import requestIp from 'request-ip';
 import { calculateSuspiciousness } from '../utils/suspicious.util.js';
 import { getGeoLocation } from '../utils/geo.util.js';
-import Notification from '../models/notification.model.js';
 import CabinetItem from '../models/cabinet.model.js';
 import { resolveItem } from '../utils/identifier.util.js';
 import { getOnChainBatch } from '../services/blockchain.service.js';
+import { sendNotification, sendBulkNotifications } from '../services/notification.service.js';
 import NodeCache from 'node-cache';
 
 const BATCH_NUMBER_REGEX = /^[a-zA-Z0-9\-_.]+$/;
@@ -520,8 +520,8 @@ export const verifyScan = async (req: Request, res: Response) => {
 		if (suspiciousResult.isSuspicious) {
 			console.log(`\x1b[33m[Verification]\x1b[0m Flagged Suspicious | Reason: ${suspiciousResult.reason} | Batch: ${batch.batchNumber} | Unit: #${unitIndex+1}`);
 			try {
-				await Notification.create({
-					user: batch.createdBy,
+				await sendNotification({
+					user: batch.createdBy.toString(),
 					type: 'suspicious_scan',
 					title: 'Suspicious Scan Detected',
 					message: `A suspicious scan was flagged for ${batch.productName} (Batch: ${batch.batchNumber}). Reason: ${suspiciousResult.reason}`,
@@ -530,7 +530,9 @@ export const verifyScan = async (req: Request, res: Response) => {
 						batchId: batch._id,
 						productId: batch.product,
 						ip,
-						medicineName: batch.productName
+						medicineName: batch.productName,
+						batchNumber: batch.batchNumber,
+						reason: suspiciousResult.reason
 					}
 				});
 			} catch (notifError) {
@@ -580,8 +582,8 @@ export const verifyScan = async (req: Request, res: Response) => {
 				
 				if (milestones.includes(totalScans)) {
 					try {
-						await Notification.create({
-							user: batch.createdBy,
+						await sendNotification({
+							user: batch.createdBy.toString(),
 							type: 'scan_milestone',
 							title: 'Scan Milestone Reached',
 							message: `Batch ${batch.batchNumber} has reached ${totalScans} total scans!`,
@@ -589,7 +591,9 @@ export const verifyScan = async (req: Request, res: Response) => {
 							metadata: {
 								batchId: batch._id,
 								productId: batch.product,
-								medicineName: batch.productName
+								medicineName: batch.productName,
+								batchNumber: batch.batchNumber,
+								scanCount: totalScans
 							}
 						});
 					} catch (milestoneError) {
@@ -688,8 +692,8 @@ export const recallBatch = async (req: Request, res: Response) => {
 
 			if (affectedCabinetItems.length > 0) {
 				const notifications = affectedCabinetItems.map(item => ({
-					user: item.userId,
-					type: 'batch_recall',
+					user: item.userId.toString(),
+					type: 'batch_recall' as const,
 					title: 'Safety Recall Alert',
 					message: `The product "${item.name}" (Batch: ${item.batchNumber}) has been recalled by the manufacturer for safety reasons. Please discontinue use immediately and contact your pharmacy.`,
 					link: `/customer/cabinet/${item._id}`,
@@ -697,11 +701,12 @@ export const recallBatch = async (req: Request, res: Response) => {
 						batchId: batchToRecall._id,
 						productId: batchToRecall.product,
 						cabinetItemId: item._id,
-						medicineName: item.name
+						medicineName: item.name,
+						batchNumber: item.batchNumber
 					}
 				}));
 
-				await Notification.insertMany(notifications);
+				await sendBulkNotifications(notifications);
 			}
 		} catch (notificationError) {
 			console.error('Error creating recall notifications:', notificationError);
@@ -755,8 +760,8 @@ export const restoreBatch = async (req: Request, res: Response) => {
 
 			if (affectedCabinetItems.length > 0) {
 				const notifications = affectedCabinetItems.map(item => ({
-					user: item.userId,
-					type: 'batch_restored',
+					user: item.userId.toString(),
+					type: 'batch_restored' as const,
 					title: 'Medicine Safety Update',
 					message: `The product "${item.name}" (Batch: ${item.batchNumber}) has been restored. The manufacturer has resolved the previous safety concerns.`,
 					link: `/customer/cabinet/${item._id}`,
@@ -764,11 +769,12 @@ export const restoreBatch = async (req: Request, res: Response) => {
 						batchId: batchToRestore._id,
 						productId: batchToRestore.product,
 						cabinetItemId: item._id,
-						medicineName: item.name
+						medicineName: item.name,
+						batchNumber: item.batchNumber
 					}
 				}));
 
-				await Notification.insertMany(notifications);
+				await sendBulkNotifications(notifications);
 			}
 		} catch (notificationError) {
 			console.error('Error creating restore notifications:', notificationError);

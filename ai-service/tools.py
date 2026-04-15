@@ -690,7 +690,7 @@ class Tools:
             return self._format_output("ERROR", f"Failed to list guides: {e}")
 
     async def get_page_guide(self, guide_name: str = None) -> str:
-        """Retrieves UI tutorial for a route or specific guide name. **Use** to learn features. **Do NOT use** for live data."""
+        """Retrieves the visual context and behavioral reference for a page. **Use** as your own guide on how to behave on the page. **CRITICAL**: Do not leak internal tool integration details to the user."""
         filename = guide_name
         route = self._normalize_route(self.current_route)
 
@@ -729,7 +729,7 @@ class Tools:
         if not filename:
             return self._format_output(
                 "ERROR",
-                f"No guide automatically mapped for route '{route}'. Use list_page_guides to see available manuals and specify one via the 'guide_name' parameter.",
+                f"No guide automatically mapped for route '{route}'. FALLBACK: Use `list_page_guides` to see all available manuals and explicitly specify one via the 'guide_name' parameter.",
             )
 
         try:
@@ -763,11 +763,14 @@ class Tools:
                 target_route, self.user_id, self.role, raw_params
             )
             return self._format_output(
-                "SUCCESS", f"View data for {target_route} synchronized.", data
+                "SUCCESS", 
+                f"View data for {target_route} synchronized. NEXT STEP: If you need to understand the visual layout or user actions for this data, run `get_page_guide` for this route.", 
+                data
             )
         except Exception as e:
             return self._format_output(
-                "ERROR", f"View data synchronization failed: {e}"
+                "ERROR", 
+                f"View data synchronization failed for {target_route}: {e}. FALLBACK: The route might be unsupported or invalid. Try running `list_page_guides` to find the correct page manual, or manually fetch data using specific tools like `list_batches` or `list_my_medicines`."
             )
 
     async def list_notifications(self, limit: int = 20) -> str:
@@ -881,7 +884,7 @@ class Tools:
                 if unresolved:
                     return self._format_output(
                         "ERROR",
-                        f"Prescription proxy ID(s) {unresolved} not found. Run list_prescriptions to see valid IDs.",
+                        f"Prescription ID(s) {unresolved} not found. FALLBACK: Run `list_prescriptions` to see valid IDs.",
                     )
                 kwargs["prescription_ids"] = resolved_ids
 
@@ -892,7 +895,7 @@ class Tools:
                 )
             return self._format_output(
                 "ERROR",
-                "Failed to add medication. Ensure 'name' and 'brand' are provided. If it already exists, use update_medicine instead.",
+                "Failed to add medication. Ensure 'name' and 'brand' are provided. FALLBACK: If it already exists, use `update_medicine` instead.",
             )
         except Exception as e:
             return self._format_output(
@@ -934,7 +937,7 @@ class Tools:
                 )
             return self._format_output(
                 "ERROR",
-                f"Medication '{medicine_id}' not found or update failed. Verify the medication ID and ensure you are only updating editable fields.",
+                f"Medication '{medicine_id}' not found or update failed. FALLBACK: Verify the medication ID (e.g. using `list_my_medicines`) and ensure you are only updating editable fields.",
             )
         except Exception as e:
             return self._format_output(
@@ -951,7 +954,7 @@ class Tools:
                     "SUCCESS", f"Medication {medicine_id} permanently removed."
                 )
             return self._format_output(
-                "ERROR", f"Medication '{medicine_id}' not found."
+                "ERROR", f"Medication '{medicine_id}' not found. FALLBACK: Verify the ID with `list_my_medicines`."
             )
         except Exception as e:
             return self._format_output("ERROR", f"Removal failed: {e}.")
@@ -966,7 +969,7 @@ class Tools:
                 )
             return self._format_output(
                 "ERROR",
-                "Could not mark dose. Verify the medication ID is correct and there is enough stock (currentQuantity > 0).",
+                "Could not mark dose. FALLBACK: Verify the medication ID is correct and there is enough stock (currentQuantity > 0). If out of stock, use `update_medicine` to refill quantity.",
             )
         except Exception as e:
             return self._format_output("ERROR", f"Action failed: {e}.")
@@ -981,7 +984,7 @@ class Tools:
                 )
             return self._format_output(
                 "ERROR",
-                "Could not undo dose. No recent dose log found or the medication ID is incorrect.",
+                "Could not undo dose. FALLBACK: No recent dose log found or the medication ID is incorrect. Check ID with `list_my_medicines`.",
             )
         except Exception as e:
             return self._format_output("ERROR", f"Undo action failed: {e}.")
@@ -1037,7 +1040,7 @@ class Tools:
                 )
             return self._format_output(
                 "ERROR",
-                f"Could not remove reminder at index {reminder_index}. Verify the index is correct (use get_view_data to see current reminders).",
+                f"Could not remove reminder at index {reminder_index}. FALLBACK: Verify the index is correct (use `get_view_data` to see current reminders for the item).",
             )
         except Exception as e:
             return self._format_output("ERROR", f"Failed to remove reminder: {e}.")
@@ -1086,7 +1089,7 @@ class Tools:
         if not doc:
             return self._format_output(
                 "ERROR",
-                f"Document ID [{doc_id}] is invalid. Run list_prescriptions to see valid indices.",
+                f"Document ID [{doc_id}] is invalid. FALLBACK: Run `list_prescriptions` first to see valid document index numbers.",
             )
 
         # Priority: On-demand fetch (since list_prescriptions excludes content)
@@ -1226,7 +1229,7 @@ class Tools:
         product = await tool_store.get_product_by_id(product_id, self.user_id)
         if not product:
             return self._format_output(
-                "ERROR", f"Product ID '{product_id}' not found in your catalog."
+                "ERROR", f"Product ID '{product_id}' not found. FALLBACK: Run `list_products` or `search_products` to find correct SKU."
             )
         return self._format_output(
             "SUCCESS", f"Metadata for {product_id}:", json.dumps(product, indent=2)
@@ -1237,7 +1240,7 @@ class Tools:
         batch = await tool_store.get_batch_details(batch_number, self.user_id)
         if not batch:
             return self._format_output(
-                "ERROR", f"Batch Number '{batch_number}' not found."
+                "ERROR", f"Batch Number '{batch_number}' not found. FALLBACK: Run `list_batches` or `search_batches` to find valid batch numbers."
             )
         return self._format_output(
             "SUCCESS", f"Summary for Batch {batch_number}:", json.dumps(batch, indent=2)

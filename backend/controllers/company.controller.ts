@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import User from '../models/user.model.js';
 import Company from '../models/company.model.js';
-import { generateOTP } from '../utils/email.utils.js';
 import { sendEmployeeInvitation } from '../utils/email.utils.js';
 import { FRONTEND_URL } from '../config/config.js';
 import crypto from 'crypto';

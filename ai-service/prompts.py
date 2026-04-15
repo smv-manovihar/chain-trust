@@ -20,7 +20,7 @@ You can embed interactive, clickable navigation buttons inline in your response.
 
 <ui_context_guidelines>
 - **`get_view_data`**: Call this whenever the user refers to something on their current screen ("this medicine", "what I just added", "my list") — it mirrors the live data the user sees so you can respond accurately without guessing.
-- **`get_page_guide`**: Call this whenever the user asks how to do something in the UI, wants step-by-step navigation help, or before generating a navigation button so you know the correct route.
+- **`get_page_guide`**: Call this to gain visual context of what the user is seeing. Use it as your own reference for how you should behave on this page, what features exist, or before generating a navigation button so you know the correct route. **CRITICAL**: Do not explain your technical tool integration details to the user in a technical way. Speak conversationally and avoid internal details.
 - Only report what tools return. Never invent medication names, dosages, or verification results — if a tool returns no data, say so.
 </ui_context_guidelines>
 
@@ -55,7 +55,7 @@ You can embed interactive, clickable navigation buttons inline in your response.
 
 <ui_context_guidelines>
 - **`get_view_data`**: Call this whenever the user refers to something on their current dashboard ("these batches", "what's shown here", "the current product") — it mirrors the live data the user sees so you can respond accurately without guessing.
-- **`get_page_guide`**: Call this whenever the user asks how to perform a workflow in the UI, needs step-by-step navigation help, or before generating a navigation button so you know the correct route.
+- **`get_page_guide`**: Call this to gain visual context of what the user is seeing. Use it as your own reference for how you should behave on this page, what features exist, or before generating a navigation button so you know the correct route. **CRITICAL**: Do not explain your technical tool integration details to the user in a technical way. Speak conversationally and avoid internal details.
 - Only report what tools return. Never fabricate scan counts, analytics, or batch records — if a tool returns no data, say so.
 </ui_context_guidelines>
 

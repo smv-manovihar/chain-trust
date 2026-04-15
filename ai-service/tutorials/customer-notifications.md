@@ -1,50 +1,44 @@
-# Notifications (Alert Center) — Operational Manual
+# Notifications Hub — Operational Manual
 **Route:** `/customer/notifications`
+**Available Query Params:** `?type=[all|unread|security|system]`
 
-The Notifications page is the security-centric ledger for all account and product-level alerts. It serves as the primary channel for high-priority security risks (Recalls), inventory warnings (Low Stock), and adherence schedule updates.
+The Notifications Hub is a centralized inbox tracking urgent platform alerts. It routes complex backend event systems (like expiring medicines or sudden global recalls) into a unified reading pane for the consumer.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Dynamic Action Bar**: Top-level controls to "Mark all as Read" and filter by priority.
-- **Unified Notification Hub**:
-  - **Alert Hierarchy**: Color-coded cards indicating priority:
-    - **High Priority (Red)**: Safety recalls and security breach alerts.
-    - **Medium Priority (Amber)**: Low stock warnings and subscription updates.
-    - **Low Priority (Blue)**: General advice and adherence milestones.
-  - **Timestamped Feed**: Chronological list with human-readable timestamps and source attribution.
-- **Micro-Actions**: Individual cards support quick actions like "View Product", "Order Refill", or "Delete Alert".
+
+- **Main Header Area:** Displays the "Notifications" title alongside a dynamic **"Mark all read"** action button (which only appears if the unread count > 0).
+- **Segmented Tabs:**
+  - **Unread (Default):** Displays only active, unacknowledged alerts. Includes a numerical badge mapping exactly to `unreadCount`.
+  - **History (All):** Displays an archived scroll of all notifications, whether read or unread. Includes a "Load older history" pagination button at the bottom.
+- **Notification Cards:** Each alert renders a distinct Card component featuring:
+  - **Dynamic Iconography:**
+    - 🔴 **Red Alert Triangle:** Used for `batch_recall` (Critical Safety Alerts).
+    - 🟠 **Amber Alert Triangle:** Used for `medicine_expiry` warnings.
+    - 🟢 **Green Pill:** Used for scheduled `dose_reminder` nudges.
+    - 🔵 **Blue Shield:** Used for general `system` events.
+  - **Time Stamp:** Formatted in exact time ("HH:mm") alongside a relative suffix (e.g. "2 hours ago").
+  - **Unread Indicator:** A pulsing blue dot in the bottom right corner signals an unread state.
+  - **Quick Action Hover:** Hovering over an unread card reveals a quick "Check" button to explicitly mark it visually as read.
+  - **Deep Links (View details →):** Many cards include a primary hyperlink routing the user automatically to the impacted Medicine Cabinet item or Verification result.
 
 ---
 
-## 🔗 URL & Navigation (Link Generation)
-The agent can generate links to filtered views:
+## 🛠️ Behavioral Instructions for the Assistant
 
-| Filter | Route | Description |
-| :--- | :--- | :--- |
-| **Safety Alerts** | `/customer/notifications?type=security` | Focused view on high-priority security risks. |
-| **Medication Updates** | `/customer/notifications?type=medication` | Focused on stock and expiry alerts. |
-
-**AI Rule:** When a user asks "Is my medicine safe?", prioritize checking for any **High Priority** alerts before responding.
-
----
-
-## 🛠️ Tool Integration & AI Guidance
+The Assistant can actively intervene and assist with notification states.
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "What alerts do I have?" | `list_notifications` | Retrieves a summarized list of recent events. |
-| "Show me my security risks." | `get_view_data` | Use the route filter `type=security` to isolate risks. |
-
----
-
-## 🚨 Error & Empty States
-- **Clear Ledger State**: Displays a "Perfect Verification" state when no alerts are unread. AI should reassure the user: "Your medication safety ledger is clear."
-- **Overload State**: If unread counts are high, suggest using "Mark all as Read" to clear the noise.
+| "What alerts do I have?" | `list_notifications` | Fetches the same stream visible in the UI. Be sure to prioritize unread recalls or warnings. |
+| "Why did my phone beep?" | `list_notifications` | Sort by the most recent timestamp to infer the likely trigger. |
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Security-First Reporting**: Always report "Safety Recalls" immediately, over-riding any other topic.
-- **Direct Connectivity**: If a notification mentions a specific product, provide a link to that product's [Detail Page](/customer/cabinet/[id]).
-- **Proactive Refills**: If the user has a "Low Stock" notification, suggest using the **Refill Dialog** on the product page.
+
+- **Priority Filtering:** If the user asks the agent to review their notifications, the agent must check for **Recalls** first, **Expirations/Low Stock** second, and **Reminders** last. Never bury a recall beneath a standard pill reminder when summarizing.
+- **Deep Routing:** If a user asks "What medicine expired?", check the notification, read the text, and inform the user of the exact medicine name. Suggest they navigate to their cabinet to delete or refill it.
+- **Zero-State Handling:** If the user has no unread alerts, the UI displays an empty state ("You're up to date!"). The AI should mirror this calming assurance rather than outputting sterile technical zero results.
+

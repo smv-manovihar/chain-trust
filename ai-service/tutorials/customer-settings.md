@@ -1,47 +1,36 @@
 # Customer Settings — Operational Manual
 **Route:** `/customer/settings`
+**Available Query Params:** `?tab=[general|security|notifications|advanced]`
 
-The Settings page is the central hub for account identity, security configurations, and notification preferences. It is organized into a modular tabbed interface for precise management.
+The Settings nexus allows customers to govern their personal data, strict security flows, and precise notification delivery mechanisms.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Tabbed Navigation**:
-  - **General**: Personal profile details (Name, Phone, Address).
-  - **Security**: Authentication source (Email vs. Google) and password rotations.
-  - **Notifications**: Granular toggle matrix for **Safety Recalls**, **Expiry Alerts**, and **Dose Reminders**.
-  - **Advanced**: Account closure and data export options.
-- **Glassmorphic Cards**: Each section is wrapped in high-fidelity cards with subtle borders and clear section headers.
+
+- **Horizontal Tabs Configuration:**
+  - **General:** A dense form containing fields like Full Name, Phone Number, City, Address, Postal Code, Country. Note that the Email field is uniquely disabled (locked to auth providers).
+  - **Security:** Renders the `GoogleConnection` and `PasswordSettings` components. Contains a placeholder block teasing upcoming biometric Privacy Controls.
+  - **Notifications (Hub):** A finely detailed matrix (table on desktop, vertical cards on mobile). Allows enabling/disabling `In-App` and `Email` notifications for specific events: `Safety Recalls`, `Expiry Alerts`, `Dose Reminders`, `Low Stock`, and `System Updates`. 
+    - **Lead Time Input:** Crucially, the `Dose Reminders` row features a numerical input allowing users to configure exactly how many minutes *before* a dose they wish to be alerted.
+  - **Advanced:** Reveals the `DangerZoneSettings` (e.g. Account deletion vectors).
 
 ---
 
-## 🔗 URL & Navigation (Link Generation)
-The agent can generate links to specific tabs:
+## 🛠️ Behavioral Instructions for the Assistant
 
-| Destination | Route | Description |
-| :--- | :--- | :--- |
-| **Profile Settings** | `/customer/settings` | Main profile overview. |
-| **Notification Prefs** | `/customer/settings?tab=notifications` | Opens the notification matrix directly. |
-| **Account Security** | `/customer/settings?tab=security` | Opens authentication and security controls. |
-
----
-
-## 🛠️ Tool Integration & AI Guidance
+The Settings namespace is predominantly a frontend-driven UI, but the Agent can assist users in configuring these states.
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "Check my contact info." | `get_user_profile` | Retrieves current name, email, and location. |
-| "Am I authenticated with Google?" | `get_user_profile` | Check the `auth_label` and `isGoogleConnected` flag. |
-
----
-
-## 🚨 Error & Empty States
-- **Incomplete Profile**: If critical fields are missing, an amber warning appears. AI should recommend completing the profile for "Enhanced Account Security".
-- **External Auth Constraints**: If using Google Auth, password change options are disabled. AI should explain this context clearly.
+| "I want to change my phone number" | Standard Q&A | Instruct the user to navigate to Settings > General and click "Update Profile". |
+| "I'm getting too many emails" | `update_notification_preferences` | (If available via API) Help them selectively disable the `email` boolean for non-critical alerts like `system` or `low_stock`. |
+| "Warn me earlier before I take my pills" | `update_notification_preferences` | Explain you are adjusting their `dose_reminder` `leadTimeMinutes` value. |
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Privacy-First**: Never state the user's password or sensitive security keys.
-- **Direct Guidance**: If a user is missing alerts, guide them specifically to the **Notifications** tab using [this link](/customer/settings?tab=notifications).
-- **Proactive Security**: If a user hasn't connected Google, suggest it for "One-tap secure access."
+
+- **Never advise disabling Recall Emails.** If a user asks to turn off all emails, the AI should strongly advise leaving the `batch_recall` email toggle ON, as it concerns life-dependent safety logistics.
+- **Email Editability:** Be aware that the Email field in the General tab is permanently disabled. If the user asks the AI to change their email, the AI must inform them this is currently locked to their OAuth or initial sign-in methodology.
+

@@ -1,47 +1,26 @@
-# Executive Notifications (Threat Center) — Operational Manual
+# Manufacturer Notifications Center — Visual Context & Behavioral Guide
 **Route:** `/manufacturer/notifications`
+**Available Query Params:** `?type=[all|unread|security|system]`
 
-The Executive Notifications page is the security-centric command center for all production and batch-level alerts. It serves as the primary channel for high-priority security risks, suspicious scan patterns, and market intelligence updates.
-
----
-
-## 🎨 Visual Details & Layout
-- **Dynamic Action Bar**: Top-level controls to "Mark all as Read" and filter by threat intensity.
-- **Unified Command Hub**:
-  - **Identified Threat Hierarchy**: Individual glassmorphic cards for "Critical Risk", "Scan Intelligence", and "Product Update".
-  - **Timestamped Logs**: Deep-level chronological sorting with human-readable times.
-  - **Type Icons**: High-visibility icons for each category (Red Shield for Security Risks, Blue Document for Registry Updates).
-- **Executive Actions**: Quick-action buttons to "View Batch Scans" or "Enact Recall" directly from the notification card.
+This is the central inbox for manufacturers, delivering critical alerts regarding their supply chain, including suspected counterfeiting events, batch milestones, and regulatory system updates.
 
 ---
 
-## 🔗 URL & Navigation (Link Generation)
-The agent can generate links to specific notification types:
+## 🎨 What the User Sees (Visual Context)
 
-| Filter | Route | Description |
-| :--- | :--- | :--- |
-| **Security Risks** | `/manufacturer/notifications?type=security` | Focused view on counterfeit signals and supply chain risks. |
-| **Registry Updates** | `/manufacturer/notifications?type=registry` | Alerts regarding product enrollment and batch approvals. |
-
-**AI Rule:** When a manufacturer asks "Are there any threats?", prioritize checking the **Security Risks** feed.
-
----
-
-## 🛠️ Tool Integration & AI Guidance
-
-| User Intent | Tool Strategy | Notes |
-| :--- | :--- | :--- |
-| "What's the latest security news?" | `list_notifications` | Retrieves a summarized list of recent executive alerts. |
-| "Is my production line safe?" | `get_view_data` | Use route filter `type=security` to scan for active threats. |
+- **Header:** A clean inbox interface with a "Mark all as read" button.
+- **Filter Tabs:** Users can filter their inbox by `All`, `Unread`, `Security`, or `System` alerts.
+- **Alert Feed:** 
+  - **Security Alerts:** Highlighted heavily (often with red/destructive styling). These occur when a batch detects an anomalous scan cluster. They feature immediate action buttons like "View Scans" or "Recall Batch".
+  - **System Alerts:** Routine updates regarding profile changes or system compliance.
+- Empty states will show a relaxing graphic when there are no active threats or alerts to review.
 
 ---
 
-## 🚨 Error & Empty States
-- **Production Secure State**: Displays a "Secure & Verified" illustration when all alerts are acknowledged. AI should reassure: "All production runs are currently scanning within normal parameters."
+## 🧠 Behavioral Instructions for the Assistant
 
----
+When conversing with the manufacturer on this page:
 
-## 🧠 Operational Best Practices
-- **Security-First Reporting**: Always report "Security Risks" immediately, over-riding any other operational topic.
-- **Interactive Deep-Link**: If an alert mentions a suspicious batch, provide a link to the [Batch Detail Page](/manufacturer/batches/[id]).
-- **Proactive Analytics**: If a notification mentions a geographic scan cluster, suggest checking the [Geographic Heatmap](/manufacturer/analytics).
+- **Handling Alerts Naturally:** Do not mention querying notification models. Instead, actively summarize: *"You have 3 unread Security Alerts regarding Batch #123. It appears multiple suspicious scans occurred in London."*
+- **Take Action:** If a user is panicked about a security alert, guide them via UI: *"Click the 'View Scans' button attached to that alert to see the IP addresses involved."*
+- **Managing Inbox:** If their inbox is cluttered, instruct them to use the "Mark all as read" button at the top, or use the tabs to filter by specifically what they want to see.

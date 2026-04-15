@@ -1,50 +1,41 @@
-# Batch List (Production Runs) — Operational Manual
+# Batches Fleet Management — Operational Manual
 **Route:** `/manufacturer/batches`
+**Available Query Params:** `?search=[string]`, `?status=[all|pending|active|recalled]`, `?page=[int]`
 
-The Batch List is the central registry of every production run registered on the ChainTrust blockchain. It provides a real-time pulse on batch-level security (Recall Status), unit allocation, and collective scan velocity.
+The Batches interface serves as the macro-level fleet management screen for the manufacturer's active production runs. It surfaces immutable data pulled dynamically from the blockchain enriched with off-chain scan aggregations.
 
 ---
 
 ## 🎨 Visual Details & Layout
-- **Dynamic Batch Header**: A glassmorphic top header showing total "Active Registries" and global scan volume.
-- **Batch Table (Data-Rich)**: A professional grid providing:
-  - **Batch Number**: The unique production ID.
-  - **Linked Product**: Product Name and Brand.
-  - **Units**: Total units vs. verified scan counts.
-  - **Blockchain Status**: Real-time "On-Chain" vs. "Pending" status.
-  - **Security State**: Highly visible "Active" or "Recalled" badges.
-- **Quick Row Actions**: Direct buttons for "QR Sheet", "Analytics", and "Recall/Restore".
+
+- **Header Layer:** 
+  - Contains a `Total Batches` counter badge.
+  - **Export CSV:** A desktop-only button that dumps the currently filtered view into an offline spreadsheet containing deep metrics (Tx Hash, Scans, Dates).
+  - **Create Batch:** A prominent primary button linking to the multi-step enrollment wizard at `/manufacturer/batches/new`.
+- **Filtering Tools:** 
+  - **Search Bar:** Specifically indexes both the alpha-numeric Batch Number AND the human-readable Product Name.
+- **Data Presentation:** 
+  - The list renders as a Data Table on desktop and a Card Grid on mobile.
+  - **Key Metrics Displayed:** Batch Number, Product, Quantity (Total Units), Status Badge (Active vs Recalled), and Total Scans.
+  - **Click Routing Rules:** Clicking a row is context-aware. If the batch `status === 'pending'` (meaning the wizard was aborted mid-enrollment), it routes back to `/manufacturer/batches/new?id=X`. If fully enrolled, it routes to the macro detailed view at `/manufacturer/batches/[batchNumber]`.
+- **Pagination:** Unlike the consumer inbox, this enterprise grid relies on explicit numerical pagination (Next/Previous bounds) rather than infinite scrolling.
 
 ---
 
-## 🔗 URL & Navigation (Link Generation)
-The agent can generate deep-links with precise filters:
+## 🛠️ Behavioral Instructions for the Assistant
 
-| Parameter | Type | Description | Example Link |
-| :--- | :--- | :--- | :--- |
-| `search` | String | Filters batches by number or product name. | `/manufacturer/batches?search=B-702` |
-| `productId` | String | Filters batches for a specific Product ID. | `/manufacturer/batches?productId=SKU-101` |
-| `status` | String | Filter by `active`, `recalled`, or `all`. | `/manufacturer/batches?status=recalled` |
-
-**AI Rule:** When a user asks "Which batches are high risk?", link to the [Batch List](/manufacturer/batches?status=all) and suggest looking at those with scan counts > unit counts.
-
----
-
-## 🛠️ Tool Integration & AI Guidance
+The Assistant accesses this ledger via specific query tools to analyze supply chain integrity.
 
 | User Intent | Tool Strategy | Notes |
 | :--- | :--- | :--- |
-| "List my recent runs." | `get_view_data` | Use the batch list summary. |
-| "Show batches for [Product]." | `get_view_data` | Use the `productId` filter if known from `search_products`. |
-| "How many units were in B-101?" | `get_view_data` | Reference the total unit count for the batch. |
-
----
-
-## 🚨 Error & Empty States
-- **No Registries**: Shows an `EmptyState` component. Guide the user to "Create New Batch" via the [Enrollment Wizard](/manufacturer/batches/new).
+| "Export my batches" | Direct UI Guidance | Instruct the user to click the "Export CSV" button in the top right. AI cannot dispatch file downloads. |
+| "How many scans does Batch #123 have?" | `get_batch_details` | The UI aggregates scans across the fleet, but precise metrics require specific queries per batch. |
+| "Find pending batches" | `list_batches` | Query where `status === 'pending'` so the manufacturer can resume enrollment. |
 
 ---
 
 ## 🧠 Operational Best Practices
-- **Recall Immutability**: Remind the user that "Recall" is a permanent blockchain record; it remains "Recalled" in consumer history even if restored.
-- **Unit Integrity**: If `scanCount` > `totalUnits`, inform the user that multiple units in this batch are likely compromised.
+
+- **Fraud Surveillance:** The "Total Scans" column is a crucial security metric. If a batch of 1,000 units suddenly has 50,000 total scans, the AI should proactively identify this discrepancy as a high probability of counterfeiting or QR cloning.
+- **Resuming Workflows:** If a user complains "I started a batch but lost it", explain the "pending" state routing logic. They simply find it in the list and click it to resume where they left off.
+

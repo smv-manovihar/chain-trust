@@ -1,50 +1,37 @@
-# Batch Detail (QR Management) — Operational Manual
+# Batch Command Center — Visual Context & Behavioral Guide
 **Route:** `/manufacturer/batches/[batchNumber]`
+**Available Query Params:** None
 
-The Batch Detail page is the technical deep-dive for a specific production run. It provides access to unit-level scan data, blockchain verification status, and the specialized "QR Label Designer" for production printers.
+This is the ultimate control plane for a specific production batch. It allows manufacturers to monitor real-time scanner activity, detect counterfeiting clusters, adjust QR label designs, and enact catastrophic recall actions via the blockchain.
 
----
-
-## 🎨 Visual Details & Layout
-- **Batch Identity Banner**: High-fidelity information including Batch Number, Linked Product, and Blockchain Status (on-chain/pending).
-- **Scan Analytics Dashboard**:
-  - **Scan Velocity**: Interactive line chart showing scans over time.
-  - **Unit Distribution**: Visual map identifying which specific units in the batch are being scanned.
-- **Blockchain Actions Hub**: Primary toggle for **Recall Batch** and **Restore Batch**. These are high-stakes, direct-to-blockchain actions (require wallet interaction).
-- **QR Label Sheet (Print View)**:
-  - **Designer Controls**: Sidebar to adjust label size, padding, and text visibility.
-  - **Grid Sheets**: Special `@media print` layout that strips the UI for perfect physical printing.
-- **Unit Registry Table**: Lists every unit by and index, showing specific Salts and individual scan counters.
+Use this guide to understand what the user sees and how to assist them functionally and naturally, without relying on technical jargon or exposing your internal capabilities.
 
 ---
 
-## 🔗 URL & Navigation (Link Generation)
-The agent should generate links using the human-readable `batchNumber`:
+## 🎨 What the User Sees (Visual Context)
 
-| Destination | Route | Description |
-| :--- | :--- | :--- |
-| **Batch Overview** | `/manufacturer/batches/[batchNumber]` | Full technical view and QR management. |
-
-**AI Rule:** Always use the `batchNumber` (e.g., `B001`) in the URL, not a database ID. If you only have the ID, resolve it via `get_view_data` first.
-
----
-
-## 🛠️ Tool Integration & AI Guidance
-
-| User Intent | Tool Strategy | Notes |
-| :--- | :--- | :--- |
-| "Is this batch compromised?" | `get_view_data` | Check the **Scan Analytics** for units with scan counts > 5. |
-| "I need to recall a batch." | `get_page_guide` | Explain that the **Recall** button is on the detail page and requires blockchain signature. |
-| "Download my QR codes." | `get_page_guide` | Explain the "Print Sheet" functionality. |
+- **Header Window:** 
+  - Displays the Product Name, the strict Batch Number, and Total Units produced.
+  - **Blockchain Info (Tooltip):** Clicking the small Info icon reveals the low-level immutable ledger data (e.g., the SHA-256 Batch Salt root).
+  - **Download QR Labels:** A massive primary button that triggers a PDF download of the generated serialization labels for printing.
+- **Dual Tab Architecture:**
+  1. **Info Tab (Analytics & Governance):**
+     - **Scan Analytics Portal:** A prominent card linking to the deep-dive analytics suite for this specific batch.
+     - **KPI Grid:** Two massive data cards — `TOTAL SCANS` and `SUSPICIOUS CLUSTERS`. If the suspicious clusters card turns red, it means certain units in this batch have been scanned over 5 times, indicating extremely probable counterfeiting.
+     - **Blockchain Governance:** Depending on the batch state, a dangerous "Recall Batch" or "Restore Batch" button exists here. Pressing it triggers a Web3 wallet transaction (MetaMask/WalletConnect) to update the smart contract.
+  2. **Batch Units Tab (Serialization Grid):**
+     - **Visual Settings:** A small Settings wheel opens a "Customize Labels" dialog, allowing users to physically drag a slider to change the QR size (in millimeters) and toggle subtext (Unit Index, Batch Number, Name).
+     - **Unit Grid:** A paginated matrix of every single QR code in the batch. Units with excessive scans have red pulsing indicators directly over their barcodes.
 
 ---
 
-## 🚨 Error & Empty States
-- **Batch Not Found**: UI shows a 404 state. Guide the user back to the [Batch Registry](/manufacturer/batches).
-- **Blockchain Syncing**: If a batch was just created, tell the user to wait for the "On-Chain" status before printing.
+## 🧠 Behavioral Instructions for the Assistant
 
----
+When conversing with the manufacturer on this page:
 
-## 🧠 Operational Best Practices
-- **Security Guidance**: If multiple units show > 5 scans, advise the user to [Recall](/manufacturer/batches/[batchNumber]) the batch immediately.
-- **Printing Hygiene**: Remind manufacturers to use "System Print Dialog" and "No Margins" for the best QR alignment.
+- **Act as a Co-Pilot, not a Robot:** Do not say "I will now dispatch the `get_batch_details` tool." Instead, organically summarize the situation: *"Looking at Batch #123, I see you have 3 suspicious clusters. Let's investigate those."*
+- **Explain Features Naturally:** If the user asks "How do I make the QR codes bigger for printing?", do not explain the database schema. Tell them to *"Click the 'Batch Units' tab, open the Settings wheel, and use the slider to adjust the size in millimeters."*
+- **Emergency Recall Guidance:** If a user expresses alarm over high scan volumes or requests a recall, guide them firmly to the Info tab. Explain that they must click the "Recall Batch" button and confirm the transaction in their connected Web3 wallet. **You cannot execute blockchain transactions for them.**
+- **File Downloads:** If the user wants the labels, direct them to click the "QR Labels PDF" button in the top right. You cannot trigger file downloads through chat.
+- **Maintain Professional Authority:** If the user questions the validity of the data, remind them that the batch salt and creation event are securely anchored to the blockchain, making them immutable.
+

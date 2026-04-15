@@ -4,9 +4,9 @@ import Scan from '../models/scan.model.js';
 import Batch from '../models/batch.model.js';
 import Prescription from '../models/prescription.model.js';
 import DosageLog from '../models/dosage.model.js';
-import Notification from '../models/notification.model.js';
 import { AI_SERVICE_URL, INTERNAL_API_KEY } from '../config/config.js';
 import { generateIdSlug, resolveItem } from '../utils/identifier.util.js';
+import { sendNotification } from '../services/notification.service.js';
 import { isOccurrenceOnDay } from '../utils/medicine.util.js';
 
 const WINDOW_MINUTES = 180; // 3 hours window for "in time"
@@ -569,31 +569,20 @@ export const markDoseTaken = async (req: Request, res: Response): Promise<void> 
 		const lowStockThreshold = dailyRequirement * 3;
 
 		if (finalQuantity <= lowStockThreshold) {
-			const startOfDay = new Date();
-			startOfDay.setHours(0, 0, 0, 0);
-
-			const existingAlert = await Notification.findOne({
-				user: userId,
-				type: 'medicine_expiry', 
-				'metadata.cabinetItemId': item._id,
-				createdAt: { $gte: startOfDay }
+			await sendNotification({
+				user: userId.toString(),
+				type: 'low_stock',
+				title: 'Low Medication Stock',
+				message: `Your supply for "${item.name}" is low (${finalQuantity} remaining). This is less than a 3-day buffer based on your routine.`,
+				link: `/customer/cabinet/${item._id}`,
+				metadata: {
+					cabinetItemId: item._id,
+					medicineName: item.name,
+					currentQuantity: finalQuantity,
+					isLowStock: true
+				},
+				throttle: { window: 'daily', key: 'cabinetItemId' }
 			});
-
-			if (!existingAlert) {
-				await Notification.create({
-					user: userId,
-					type: 'medicine_expiry',
-					title: 'Low Medication Stock',
-					message: `Your supply for "${item.name}" is low (${finalQuantity} remaining). This is less than a 3-day buffer based on your routine.`,
-					link: `/customer/cabinet/${item._id}`,
-					metadata: {
-						cabinetItemId: item._id,
-						medicineName: item.name,
-						currentQuantity: finalQuantity,
-						isLowStock: true
-					}
-				});
-			}
 		}
 
 		res.json({ 

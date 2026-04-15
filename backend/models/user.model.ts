@@ -24,8 +24,10 @@ export interface IUser extends Document {
 		medicine_expiry: { inApp: boolean; email: boolean };
 		batch_recall: { inApp: boolean; email: boolean };
 		dose_reminder: { inApp: boolean; email: boolean; leadTimeMinutes: number };
+		low_stock: { inApp: boolean; email: boolean };
 		suspicious_scan: { inApp: boolean; email: boolean };
 		scan_milestone: { inApp: boolean; email: boolean };
+		batch_restored: { inApp: boolean; email: boolean };
 		system: { inApp: boolean; email: boolean };
 	};
 
@@ -104,6 +106,10 @@ const userSchema = new Schema<IUser>(
 				email: { type: Boolean, default: false },
 				leadTimeMinutes: { type: Number, default: 0 },
 			},
+			low_stock: {
+				inApp: { type: Boolean, default: true },
+				email: { type: Boolean, default: false },
+			},
 			suspicious_scan: {
 				inApp: { type: Boolean, default: true },
 				email: { type: Boolean, default: true },
@@ -111,6 +117,10 @@ const userSchema = new Schema<IUser>(
 			scan_milestone: {
 				inApp: { type: Boolean, default: true },
 				email: { type: Boolean, default: false },
+			},
+			batch_restored: {
+				inApp: { type: Boolean, default: true },
+				email: { type: Boolean, default: true },
 			},
 			system: {
 				inApp: { type: Boolean, default: true },
