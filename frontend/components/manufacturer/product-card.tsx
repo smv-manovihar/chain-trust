@@ -104,9 +104,9 @@ export function ProductCard({ product }: ProductCardProps) {
                     <TooltipTrigger asChild>
                       <div className="flex items-center gap-1 cursor-help">
                         <span className="text-xs font-bold text-foreground">
-                          {product.price.toLocaleString()}
+                          {product.price?.toLocaleString() ?? "—"}
                         </span>
-                        <span className="text-[10px] text-muted-foreground font-normal uppercase">USDT</span>
+                        <span className="text-[10px] text-muted-foreground font-normal uppercase">USD</span>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent className="bg-background/95 backdrop-blur-md border border-primary/20 p-2 shadow-xl">

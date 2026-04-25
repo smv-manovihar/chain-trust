@@ -18,9 +18,15 @@ import {
   Boxes,
   Plus,
   Calendar as CalendarIcon,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { createBatch, getBatch, updateBatch } from "@/api/batch.api";
+import {
+  createBatch,
+  getBatch,
+  updateBatch,
+  deleteBatch,
+} from "@/api/batch.api";
 import { listProducts } from "@/api/product.api";
 import { CategoryFilter } from "@/components/manufacturer/category-filter";
 import { registerBatchOnChain } from "@/api/web3-client";
@@ -37,6 +43,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { useDebounce } from "@/hooks/use-debounce";
 import { hashSHA256 } from "@/lib/crypto-utils";
@@ -63,7 +80,7 @@ export default function CreateBatchWizard() {
     const s = searchParams.get("step");
     return s ? parseInt(s) : 1;
   });
-  
+
   // Sync step to URL
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -75,6 +92,7 @@ export default function CreateBatchWizard() {
   }, [step, pathname, router, searchParams]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [txInFlight, setTxInFlight] = useState(false);
   const [registerProgress, setRegisterProgress] = useState(0);
   const [successId, setSuccessId] = useState<string | null>(null);
   const [resumeId, setResumeId] = useState<string | null>(null);
@@ -95,7 +113,10 @@ export default function CreateBatchWizard() {
     wizardData: selectedProduct,
     setWizardData: setSelectedProduct,
     clearWizardPersistence: clearProductPersistence,
-  } = useWizardPersistence<CatalogueProduct | null>("ct_new_batch_product", null);
+  } = useWizardPersistence<CatalogueProduct | null>(
+    "ct_new_batch_product",
+    null,
+  );
 
   const [productSearch, setProductSearch] = useState("");
   const debouncedSearch = useDebounce(productSearch, 500);
@@ -105,18 +126,23 @@ export default function CreateBatchWizard() {
     wizardData: batchData,
     setWizardData: setBatchData,
     clearWizardPersistence: clearBatchPersistence,
-  } = useWizardPersistence("ct_new_batch_data", {
-    batchNumber: "",
-    quantity: "",
-    manufactureDate: new Date() as Date | undefined,
-    expiryDate: undefined as Date | undefined,
-    description: "",
-  }, {
-    onLoad: (data) => {
-      if (data.manufactureDate) data.manufactureDate = new Date(data.manufactureDate);
-      if (data.expiryDate) data.expiryDate = new Date(data.expiryDate);
-    }
-  });
+  } = useWizardPersistence(
+    "ct_new_batch_data",
+    {
+      batchNumber: "",
+      quantity: "",
+      manufactureDate: new Date() as Date | undefined,
+      expiryDate: undefined as Date | undefined,
+      description: "",
+    },
+    {
+      onLoad: (data) => {
+        if (data.manufactureDate)
+          data.manufactureDate = new Date(data.manufactureDate);
+        if (data.expiryDate) data.expiryDate = new Date(data.expiryDate);
+      },
+    },
+  );
 
   const currentYear = new Date().getFullYear();
 
@@ -157,18 +183,20 @@ export default function CreateBatchWizard() {
     if (id && !successId) {
       setResumeId(id);
       setResumeLoading(true);
-      // Fetch the pending batch to populate form
-      fetch(`/api/batches/${id}`)
-        .then((res) => res.json())
+      // Fetch the pending batch to populate form using standardized API client
+      getBatch(id)
         .then((data) => {
           if (data.batch && data.batch.status === "pending") {
             const state = data.batch.wizardState || {};
-            if (state.selectedProduct) setSelectedProduct(state.selectedProduct);
+            if (state.selectedProduct)
+              setSelectedProduct(state.selectedProduct);
             if (state.batchData) {
               const bd = state.batchData;
               setBatchData({
                 ...bd,
-                manufactureDate: bd.manufactureDate ? new Date(bd.manufactureDate) : undefined,
+                manufactureDate: bd.manufactureDate
+                  ? new Date(bd.manufactureDate)
+                  : undefined,
                 expiryDate: bd.expiryDate ? new Date(bd.expiryDate) : undefined,
               });
             }
@@ -184,19 +212,21 @@ export default function CreateBatchWizard() {
   const filteredProducts = products;
 
   const handleCreate = async () => {
+    if (txInFlight && !error) return;
     setLoading(true);
+    setTxInFlight(true);
     setError("");
     setRegisterProgress(10);
 
     try {
       if (!selectedProduct) throw new Error("No product template selected.");
-      
+
       let batchId = resumeId;
       let targetSalt = "";
 
       // Step 1: Prepare salt (re-deriving or fetching)
       if (!resumeId) {
-        // This case should ideally not happen now with early initiation, 
+        // This case should ideally not happen now with early initiation,
         // but kept as fallback.
         const saltInput = `${selectedProduct.productId}-${batchData.batchNumber}-${Date.now()}-${crypto.getRandomValues(new Uint8Array(8)).join("")}`;
         targetSalt = hashSHA256(saltInput);
@@ -204,7 +234,7 @@ export default function CreateBatchWizard() {
         // We have a draft, we need a salt. Let's generate it now if it's the final commit
         const saltInput = `${selectedProduct.productId}-${batchData.batchNumber}-${Date.now()}-${crypto.getRandomValues(new Uint8Array(8)).join("")}`;
         targetSalt = hashSHA256(saltInput);
-        
+
         // Update the draft with full details before blockchain
         await updateBatch(resumeId, {
           ...batchData,
@@ -230,8 +260,12 @@ export default function CreateBatchWizard() {
           brand: selectedProduct.brand,
           batchNumber: batchData.batchNumber,
           batchSalt: targetSalt,
-          manufactureDate: Math.floor(batchData.manufactureDate!.getTime() / 1000),
-          expiryDate: batchData.expiryDate ? Math.floor(batchData.expiryDate.getTime() / 1000) : 0,
+          manufactureDate: Math.floor(
+            batchData.manufactureDate!.getTime() / 1000,
+          ),
+          expiryDate: batchData.expiryDate
+            ? Math.floor(batchData.expiryDate.getTime() / 1000)
+            : 0,
           quantity: parseInt(batchData.quantity),
         },
         walletAddress!,
@@ -248,16 +282,46 @@ export default function CreateBatchWizard() {
       setRegisterProgress(100);
       setSuccessId(batchId!);
       toast.success("Batch successfully committed to blockchain.");
-      
+
       // FIX-003: Clear persistence on success
       clearProductPersistence();
       clearBatchPersistence();
-      
+
       // Clean up the resume query
       window.history.replaceState(null, "", window.location.pathname);
+      setTxInFlight(false);
     } catch (err: any) {
-      setError(err.message || "Failed to create batch.");
-      toast.error(err.message || "Enrollment suspended. You can resume later.");
+      // MetaMask User Denied Transaction (Code 4001) or other cancellations
+      if (err.code === 4001 || err.message?.toLowerCase().includes("user denied")) {
+        setError("Transaction cancelled by user.");
+        toast.info("Transaction cancelled.");
+        setTxInFlight(false); // Allow immediate retry
+      } else if (err.message?.toLowerCase().includes("timeout")) {
+        // Unexpected RPC or provider timeout
+        setError("Blockchain connection timed out. Please check your wallet's activity before retrying.");
+        toast.warning("Connection timeout. Verify status in your wallet.");
+      } else {
+        setError(err.message || "Failed to create batch.");
+        toast.error(err.message || "Enrollment suspended. You can resume later.");
+        setTxInFlight(false);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    setLoading(true);
+    try {
+      if (resumeId) {
+        await deleteBatch(resumeId);
+      }
+      toast.success("Batch draft discarded.");
+      clearProductPersistence();
+      clearBatchPersistence();
+      router.push("/manufacturer/batches");
+    } catch (err: any) {
+      toast.error("Failed to discard draft.");
     } finally {
       setLoading(false);
     }
@@ -269,7 +333,7 @@ export default function CreateBatchWizard() {
         toast.error("Please select a product template first.");
         return;
       }
-      
+
       // Step 1 -> 2: Initiate DB record (FIX-001)
       if (!resumeId) {
         try {
@@ -288,7 +352,8 @@ export default function CreateBatchWizard() {
       }
     }
 
-    if (step === 2 &&
+    if (
+      step === 2 &&
       (!batchData.batchNumber ||
         !batchData.quantity ||
         !batchData.manufactureDate ||
@@ -353,7 +418,11 @@ export default function CreateBatchWizard() {
               )}
               Connect Wallet
             </Button>
-            <Button variant="outline" asChild className="w-full rounded-full h-11">
+            <Button
+              variant="outline"
+              asChild
+              className="w-full rounded-full h-11"
+            >
               <Link href="/manufacturer/batches">Cancel</Link>
             </Button>
           </div>
@@ -379,10 +448,15 @@ export default function CreateBatchWizard() {
           <div className="flex flex-col w-full gap-3 pt-4 border-t border-border/40">
             <Button asChild className="w-full gap-2 rounded-full h-11">
               <Link href={`/manufacturer/batches/${successId}`}>
-                <QrCode className="h-4 w-4" aria-hidden="true" /> Print Evidence Sheet
+                <QrCode className="h-4 w-4" aria-hidden="true" /> Print Evidence
+                Sheet
               </Link>
             </Button>
-            <Button variant="outline" asChild className="w-full rounded-full h-11">
+            <Button
+              variant="outline"
+              asChild
+              className="w-full rounded-full h-11"
+            >
               <Link href="/manufacturer/batches">Done</Link>
             </Button>
           </div>
@@ -459,7 +533,10 @@ export default function CreateBatchWizard() {
                   </div>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      <Search
+                        className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+                        aria-hidden="true"
+                      />
                       <Input
                         placeholder="Search products..."
                         value={productSearch}
@@ -478,7 +555,10 @@ export default function CreateBatchWizard() {
                     <div className="p-2 space-y-1">
                       {productsLoading ? (
                         <div className="flex h-32 items-center justify-center">
-                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+                          <Loader2
+                            className="h-6 w-6 animate-spin text-muted-foreground"
+                            aria-hidden="true"
+                          />
                         </div>
                       ) : filteredProducts.length === 0 ? (
                         <div className="p-8 text-center space-y-4">
@@ -494,9 +574,15 @@ export default function CreateBatchWizard() {
                               initiate a production batch for it.
                             </p>
                           </div>
-                          <Button asChild variant="outline" size="sm" className="gap-2 rounded-full active:scale-95 transition-all">
+                          <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 rounded-full active:scale-95 transition-all"
+                          >
                             <Link href="/manufacturer/products/new">
-                              <Plus className="h-4 w-4" aria-hidden="true" /> Add Product
+                              <Plus className="h-4 w-4" aria-hidden="true" />{" "}
+                              Add Product
                             </Link>
                           </Button>
                         </div>
@@ -520,7 +606,10 @@ export default function CreateBatchWizard() {
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
-                                <Package className="w-full h-full p-2 opacity-30" aria-hidden="true" />
+                                <Package
+                                  className="w-full h-full p-2 opacity-30"
+                                  aria-hidden="true"
+                                />
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
@@ -532,7 +621,10 @@ export default function CreateBatchWizard() {
                               </p>
                             </div>
                             {selectedProduct?._id === p._id && (
-                              <Check className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
+                              <Check
+                                className="h-4 w-4 text-primary shrink-0"
+                                aria-hidden="true"
+                              />
                             )}
                           </div>
                         ))
@@ -542,7 +634,7 @@ export default function CreateBatchWizard() {
                 </div>
               )}
 
-               {step === 2 && (
+              {step === 2 && (
                 <div className="space-y-6">
                   <div>
                     <h2 className="text-lg font-semibold">Batch Metadata</h2>
@@ -610,7 +702,10 @@ export default function CreateBatchWizard() {
                                 "text-muted-foreground",
                             )}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
+                            <CalendarIcon
+                              className="mr-2 h-4 w-4"
+                              aria-hidden="true"
+                            />
                             {batchData.manufactureDate ? (
                               format(batchData.manufactureDate, "PPP")
                             ) : (
@@ -651,7 +746,10 @@ export default function CreateBatchWizard() {
                               !batchData.expiryDate && "text-muted-foreground",
                             )}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
+                            <CalendarIcon
+                              className="mr-2 h-4 w-4"
+                              aria-hidden="true"
+                            />
                             {batchData.expiryDate ? (
                               format(batchData.expiryDate, "PPP")
                             ) : (
@@ -683,10 +781,12 @@ export default function CreateBatchWizard() {
                 </div>
               )}
 
-               {step === 3 && (
+              {step === 3 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-lg font-semibold">Blockchain Deployment</h2>
+                    <h2 className="text-lg font-semibold">
+                      Blockchain Deployment
+                    </h2>
                     <p className="text-sm text-muted-foreground">
                       Secure cryptographic enrollment on the public ledger
                     </p>
@@ -715,7 +815,10 @@ export default function CreateBatchWizard() {
                           Quantity
                         </p>
                         <p className="text-sm font-medium">
-                          {parseInt(batchData.quantity).toLocaleString()} Units
+                          {batchData.quantity
+                            ? parseInt(batchData.quantity).toLocaleString()
+                            : "—"}{" "}
+                          Units
                         </p>
                       </div>
                       <div>
@@ -732,7 +835,10 @@ export default function CreateBatchWizard() {
                   </div>
 
                   <div className="p-4 rounded-lg bg-primary/10 text-primary flex items-start gap-3">
-                    <Boxes className="h-5 w-5 shrink-0 mt-0.5" aria-hidden="true" />
+                    <Boxes
+                      className="h-5 w-5 shrink-0 mt-0.5"
+                      aria-hidden="true"
+                    />
                     <p className="text-sm leading-relaxed">
                       By committing this batch, you authorize the generation of{" "}
                       {batchData.quantity || "0"} unique cryptographic
@@ -764,31 +870,87 @@ export default function CreateBatchWizard() {
           {/* Navigation Bar */}
           <div className="flex justify-between items-center pt-8 mt-8 border-t border-border/40">
             {step > 1 ? (
-              <Button variant="outline" onClick={prevStep} disabled={loading} className="rounded-full h-10 px-6 active:scale-95 transition-all">
+              <Button
+                variant="outline"
+                onClick={prevStep}
+                disabled={loading}
+                className="rounded-full h-10 px-6 active:scale-95 transition-all"
+              >
                 Back
               </Button>
             ) : (
               <div /> // Spacer
             )}
 
-            {step < 3 ? (
-              <Button onClick={nextStep} className="gap-2 rounded-full h-10 px-8 active:scale-95 transition-all">
-                Next <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            ) : (
-              <Button
-                onClick={handleCreate}
-                disabled={loading}
-                className="gap-2 rounded-full h-10 px-8 active:scale-95 transition-all"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                )}
-                {loading ? "Processing..." : "Create Batch"}
-              </Button>
-            )}
+            <div className="flex items-center gap-3">
+              {resumeId && !successId && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      disabled={loading}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full h-10 px-4 active:scale-95 transition-all"
+                    >
+                      Cancel Draft
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="rounded-3xl border-border/40">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Discard Batch Draft?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete your work on this batch
+                        run. This action is irreversible.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="rounded-full">
+                        Continue Editing
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleCancel}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full"
+                      >
+                        Discard Draft
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+
+              {step < 3 ? (
+                <Button
+                  onClick={nextStep}
+                  className="gap-2 rounded-full h-10 px-8 active:scale-95 transition-all"
+                >
+                  Next <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleCreate}
+                  disabled={loading || (txInFlight && !error)}
+                  className={cn(
+                    "gap-2 rounded-full h-10 px-8 active:scale-95 transition-all",
+                    txInFlight && error && "bg-amber-500 hover:bg-amber-600",
+                  )}
+                >
+                  {loading ? (
+                    <Loader2
+                      className="h-4 w-4 animate-spin"
+                      aria-hidden="true"
+                    />
+                  ) : txInFlight && error ? (
+                    <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  {loading
+                    ? "Processing..."
+                    : txInFlight && error
+                      ? "Retry (Check Wallet)"
+                      : "Create Batch"}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </Card>

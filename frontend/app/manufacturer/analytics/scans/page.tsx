@@ -724,13 +724,13 @@ function ScanAnalysisContent() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div
-                    className="p-2 rounded-lg"
+                    className="p-2.5 rounded-full flex items-center justify-center transition-colors text-center"
                     style={{
-                      backgroundColor: `${batchColor.replace("60%)", "10%)")}`,
-                      color: batchColor,
+                      backgroundColor: selectedBatchNumber ? `hsl(${getEntityColor(selectedBatchNumber).match(/\d+/g)?.[0] || 0}, 80%, 50%, 0.15)` : "hsl(var(--primary) / 0.1)",
+                      color: selectedBatchNumber ? getEntityColor(selectedBatchNumber) : "hsl(var(--primary))",
                     }}
                   >
-                    <TrendingUp className="h-4 w-4" aria-hidden="true" />
+                    <TrendingUp className="h-5 w-5" aria-hidden="true" />
                   </div>
                   <div>
                     <h3 className="text-base font-bold">Activity Trend</h3>

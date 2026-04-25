@@ -11,6 +11,7 @@ import {
 	getBatchScanDetails,
 	updateBatchStatus,
 	updateBatch,
+	deleteBatch,
 } from '../controllers/batch.controller.js';
 import { authenticateJWT, authenticateJWTOptional, checkRole } from '../middlewares/auth.middleware.js';
 import { verificationLimiter } from '../middlewares/rate-limit.middleware.js';
@@ -32,5 +33,6 @@ router.post('/:batchNumber/recall', authenticateJWT, checkManufacturer, recallBa
 router.post('/:batchNumber/restore', authenticateJWT, checkManufacturer, restoreBatch);
 router.patch('/:id/status', authenticateJWT, checkManufacturer, updateBatchStatus);
 router.put('/:id', authenticateJWT, checkManufacturer, updateBatch);
+router.delete('/:id', authenticateJWT, checkManufacturer, deleteBatch);
 
 export default router;

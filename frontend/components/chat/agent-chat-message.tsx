@@ -221,19 +221,21 @@ export const AgentChatMessage = memo(function AgentChatMessage({
                 />
               </div>
             </div>
-            {message.content && message.status !== "generating" && (
-              <div className="flex items-center gap-1 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <CopyButton
-                      value={sanitizeForCopy(message.content || "")}
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground"
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent>Copy Message</TooltipContent>
-                </Tooltip>
+            {message.status !== "generating" && (
+              <div className="flex items-center gap-1 animate-in fade-in slide-in-from-top-2 duration-300">
+                {message.content && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <CopyButton
+                        value={sanitizeForCopy(message.content || "")}
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>Copy Message</TooltipContent>
+                  </Tooltip>
+                )}
                 {onRetry && (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -367,6 +369,7 @@ export const AgentChatMessage = memo(function AgentChatMessage({
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-7 w-7 sm:h-8 sm:w-8"
                       disabled={isGenerating}
                       onClick={() => setIsEditing(true)}
                     >

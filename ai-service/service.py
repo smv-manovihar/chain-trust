@@ -296,6 +296,13 @@ class ChatService:
                 },
             )
 
+            # Explicitly broadcast completion status before closing the stream
+            await sse_manager.broadcast(
+                session_id,
+                "status",
+                {"status": "completed", "message_id": assistant_message_id},
+            )
+
         except Exception as e:
             await sse_manager.broadcast(
                 session_id,

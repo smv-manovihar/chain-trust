@@ -15,7 +15,7 @@ Like batch enrollment, this is a linear 3-step wizard with a persistent "Wallet 
   - Category selector and a dropdown for standard Dose units (pills, ml, doses, etc).
   - Drafts are auto-saved here. If a user drops off, they can return via the `?id=` query parameter.
 - **Step 2: Specifications:**
-  - Price (USDT equivalent) input and a rich Textarea for the primary drug description and dosage warnings.
+  - Price (USD $) input and a rich Textarea for the primary drug description and dosage warnings.
 - **Step 3: Visual Identity:**
   - An image upload grid. Users can add multiple high-res packaging photos.
   - **Image Visibility:** Each uploaded image has an overlay button to toggle whether it is visible to consumers (a shield icon) or hidden (check mark).

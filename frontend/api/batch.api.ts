@@ -76,3 +76,8 @@ export const updateBatch = async (id: string, data: Partial<CreateBatchDto>, sig
 	const response = await client.put(`/batches/${id}`, data, { signal });
 	return response.data;
 };
+
+export const deleteBatch = async (id: string, signal?: AbortSignal) => {
+	const response = await client.delete(`/batches/${id}`, { signal });
+	return response.data;
+};

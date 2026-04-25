@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createProduct, getProduct, updateProduct } from "@/api/product.api";
+import { createProduct, getProduct, updateProduct, deleteProduct } from "@/api/product.api";
 import { uploadImages } from "@/api/upload.api";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { toast } from "sonner";
@@ -40,6 +40,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Command,
   CommandEmpty,
@@ -199,6 +210,22 @@ export default function NewProductWizard() {
       toast.error(
         err.message || "Failed to create product. You can resume later.",
       );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    setSaving(true);
+    try {
+      if (resumeId) {
+        await deleteProduct(resumeId);
+      }
+      toast.success("Product draft discarded.");
+      clearWizardPersistence();
+      router.push("/manufacturer/products");
+    } catch (err: any) {
+      toast.error("Failed to discard draft.");
     } finally {
       setSaving(false);
     }
@@ -472,7 +499,7 @@ export default function NewProductWizard() {
                   </div>
                   <div className="space-y-6">
                     <div className="space-y-2 sm:w-1/2">
-                      <Label>Price (USDT equivalent)</Label>
+                      <Label>Price (USD)</Label>
                       <Input
                         type="number"
                         placeholder="0.00"
@@ -646,27 +673,60 @@ export default function NewProductWizard() {
               <div /> // Spacer
             )}
 
-            {step < 3 ? (
-              <Button
-                onClick={nextStep}
-                className="gap-2 rounded-full h-10 px-8"
-              >
-                Next <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            ) : (
-              <Button
-                onClick={handleSave}
-                disabled={saving}
-                className="gap-2 rounded-full h-10 px-8"
-              >
-                {saving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Save className="h-4 w-4" aria-hidden="true" />
-                )}
-                {saving ? "Saving..." : "Create Product"}
-              </Button>
-            )}
+            <div className="flex items-center gap-3">
+              {resumeId && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      disabled={saving}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full h-10 px-4 active:scale-95 transition-all"
+                    >
+                      Cancel Draft
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="rounded-3xl border-border/40">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Discard Product Draft?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to discard this product catalogue entry? All data entered will be permanently deleted.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="rounded-full">Continue Editing</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleCancel}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full"
+                      >
+                        Discard
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              
+              {step < 3 ? (
+                <Button
+                  onClick={nextStep}
+                  className="gap-2 rounded-full h-10 px-8"
+                >
+                  Next <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="gap-2 rounded-full h-10 px-8"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Save className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  {saving ? "Saving..." : "Create Product"}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </Card>

@@ -79,13 +79,13 @@ export const getContract = () => {
     return chainTrustContract;
 };
 
-// Reliability FIX-003: Blockchain Timeout wrapper
-const BLOCKCHAIN_TIMEOUT = 15000; // 15 seconds
-const withTimeout = (promise: Promise<any>, timeoutMs: number = BLOCKCHAIN_TIMEOUT) => {
+// RPC Read Timeout: Used only for non-interactive state-viewing calls (.call()) to prevent UI hangs if the RPC provider is unresponsive.
+const RPC_READ_TIMEOUT = 120000; // 120 seconds
+const withTimeout = (promise: Promise<any>, timeoutMs: number = RPC_READ_TIMEOUT) => {
     return Promise.race([
         promise,
         new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Blockchain transaction timeout')), timeoutMs)
+            setTimeout(() => reject(new Error('Blockchain RPC call timed out')), timeoutMs)
         )
     ]);
 };
@@ -141,7 +141,9 @@ export const registerBatchOnChain = async (batchData: BatchData, deployerAccount
     const contract = getContract();
     if (!contract) throw new Error("Could not initialize Web3 connection.");
 
-    return await withTimeout(contract.methods.registerBatch(
+    // Interaction-Aware Logic: We do NOT use withTimeout for writes (.send()). 
+    // MetaMask already manages interaction time; and writes can take minutes to mine depending on network congestion.
+    return await contract.methods.registerBatch(
         batchData.productId,
         batchData.productName,
         batchData.brand,
@@ -150,7 +152,7 @@ export const registerBatchOnChain = async (batchData: BatchData, deployerAccount
         batchData.manufactureDate,
         batchData.expiryDate,
         batchData.quantity
-    ).send({ from: deployerAccount, gas: '5000000' }));
+    ).send({ from: deployerAccount, gas: '5000000' });
 };
 
 /**
@@ -237,10 +239,11 @@ export async function recallProductOnChain(batchSalt: string, account: string): 
     throw new Error('Web3 Contract instance not found');
   }
 
-  return await withTimeout(contract.methods.recallBatch(formatBytes32(batchSalt)).send({
+  // Interaction-Aware Logic: We do NOT use withTimeout for writes (.send()).
+  return await contract.methods.recallBatch(formatBytes32(batchSalt)).send({
     from: account,
     gas: "500000"
-  }));
+  });
 }
 
 /**
@@ -252,10 +255,11 @@ export async function restoreProductOnChain(batchSalt: string, account: string):
     throw new Error('Web3 Contract instance not found');
   }
 
-  return await withTimeout(contract.methods.restoreBatch(formatBytes32(batchSalt)).send({
+  // Interaction-Aware Logic: We do NOT use withTimeout for writes (.send()).
+  return await contract.methods.restoreBatch(formatBytes32(batchSalt)).send({
     from: account,
     gas: "500000"
-  }));
+  });
 }
 
 /**

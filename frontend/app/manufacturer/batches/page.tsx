@@ -9,6 +9,7 @@ import {
   Loader2,
   ChevronRight,
   ChevronLeft,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,9 +25,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CategoryFilter } from "@/components/manufacturer/category-filter";
-import { listBatches } from "@/api/batch.api";
+import { listBatches, deleteBatch } from "@/api/batch.api";
 import { format } from "date-fns";
 import Link from "next/link";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -47,8 +59,6 @@ interface Batch {
   status: string;
 }
 
-
-
 export default function BatchesPage() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -58,9 +68,11 @@ export default function BatchesPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
+  const [searchTerm, setSearchTerm] = useState(
+    searchParams.get("search") || "",
+  );
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
-    searchParams.get("categories")?.split(",").filter(Boolean) || []
+    searchParams.get("categories")?.split(",").filter(Boolean) || [],
   );
   const [page, setPage] = useState(parseInt(searchParams.get("page") || "1"));
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -74,12 +86,15 @@ export default function BatchesPage() {
   // Sync state to URL
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
-    
+
     // Reset to page 1 on search or filter change
     let targetPage = page;
-    if (params.get("search") !== debouncedSearch || params.get("categories") !== debouncedCategories.join(",")) {
-        targetPage = 1;
-        setPage(1);
+    if (
+      params.get("search") !== debouncedSearch ||
+      params.get("categories") !== debouncedCategories.join(",")
+    ) {
+      targetPage = 1;
+      setPage(1);
     }
 
     if (debouncedSearch) {
@@ -108,7 +123,14 @@ export default function BatchesPage() {
       // Use replace to avoid polluting history with every debounce
       router.replace(url, { scroll: false });
     }
-  }, [debouncedSearch, debouncedCategories, page, pathname, router, searchParams]);
+  }, [
+    debouncedSearch,
+    debouncedCategories,
+    page,
+    pathname,
+    router,
+    searchParams,
+  ]);
 
   const fetchBatches = useCallback(async () => {
     if (fetchAbortRef.current) fetchAbortRef.current.abort();
@@ -118,16 +140,19 @@ export default function BatchesPage() {
     try {
       setIsRefreshing(true);
       setError("");
-      const res = await listBatches({
-        search: debouncedSearch,
-        categories: debouncedCategories,
-        page,
-        limit: PAGE_SIZE
-      }, controller.signal);
+      const res = await listBatches(
+        {
+          search: debouncedSearch,
+          categories: debouncedCategories,
+          page,
+          limit: PAGE_SIZE,
+        },
+        controller.signal,
+      );
       setBatches(res.batches || []);
       setTotal(res.total || 0);
     } catch (err: any) {
-      if (err.name === 'AbortError') return;
+      if (err.name === "AbortError") return;
       console.error("Failed to fetch batches:", err);
       toast.error("Failed to load batches.");
     } finally {
@@ -143,39 +168,61 @@ export default function BatchesPage() {
     return () => fetchAbortRef.current?.abort();
   }, [fetchBatches]);
 
-
-
   const handleExportCSV = () => {
     if (batches.length === 0) {
       toast.error("No batches to export.");
       return;
     }
 
-    const headers = ["Batch Number", "Product Name", "Product ID", "Quantity", "Manufacture Date", "Status", "Total Scans", "Tx Hash"];
-    const rows = batches.map(b => [
-      b.batchNumber,
+    const headers = [
+      "Batch Number",
+      "Product Name",
+      "Product ID",
+      "Quantity",
+      "Manufacture Date",
+      "Status",
+      "Total Scans",
+      "Tx Hash",
+    ];
+    const rows = batches.map((b) => [
+      b.batchNumber || "Draft",
       `"${b.productName}"`,
       b.productId,
-      b.quantity,
-      format(new Date(b.manufactureDate), "yyyy-MM-dd"),
-      b.isRecalled ? "Recalled" : "Active",
-      b.totalScans,
-      b.blockchainHash
+      b.quantity || 0,
+      b.manufactureDate
+        ? format(new Date(b.manufactureDate), "yyyy-MM-dd")
+        : "—",
+      b.status === "pending" ? "Draft" : b.isRecalled ? "Recalled" : "Active",
+      b.totalScans || 0,
+      b.blockchainHash || "Pending",
     ]);
 
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const csvContent = [headers, ...rows].map((e) => e.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `batches_report_${format(new Date(), "yyyy-MM-dd")}.csv`);
+    link.setAttribute(
+      "download",
+      `batches_report_${format(new Date(), "yyyy-MM-dd")}.csv`,
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     toast.success("CSV Export starting...");
   };
 
-
+  const handleDeleteBatch = async (id: string) => {
+    try {
+      await deleteBatch(id);
+      toast.success("Batch cancelled successfully.");
+      setBatches(prev => prev.filter(b => b._id !== id));
+      setTotal(prev => prev - 1);
+    } catch (err) {
+      console.error("Failed to delete batch:", err);
+      toast.error("Failed to cancel batch.");
+    }
+  };
 
   const filteredBatches = batches;
 
@@ -184,7 +231,10 @@ export default function BatchesPage() {
       <PageHeader
         title="Batches"
         stats={
-          <Badge variant="secondary" className="font-normal border-primary/20 bg-primary/10 text-primary h-5 text-[10px]">
+          <Badge
+            variant="secondary"
+            className="font-normal border-primary/20 bg-primary/10 text-primary h-5 text-[10px]"
+          >
             <Boxes className="w-3 h-3 mr-1.5 inline-block" aria-hidden="true" />
             {total} Total Batches
           </Badge>
@@ -200,7 +250,10 @@ export default function BatchesPage() {
               disabled={isRefreshing}
             >
               <RefreshCw
-                className={cn("h-4 w-4 text-primary", isRefreshing && "animate-spin")}
+                className={cn(
+                  "h-4 w-4 text-primary",
+                  isRefreshing && "animate-spin",
+                )}
                 aria-hidden="true"
               />
             </Button>
@@ -225,7 +278,6 @@ export default function BatchesPage() {
         }
       />
 
-
       <DataToolbar
         search={{
           value: searchTerm,
@@ -245,7 +297,10 @@ export default function BatchesPage() {
       <div className="px-1">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
-            <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" aria-hidden="true" />
+            <Loader2
+              className="h-10 w-10 animate-spin text-primary mb-4"
+              aria-hidden="true"
+            />
             <p className="text-sm font-bold">Synchronizing Batches...</p>
           </div>
         ) : (
@@ -269,38 +324,87 @@ export default function BatchesPage() {
                       key={batch._id}
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => {
-                        if (batch.status === 'pending') {
-                          router.push(`/manufacturer/batches/new?id=${batch._id}`);
+                        if (batch.status === "pending") {
+                          router.push(
+                            `/manufacturer/batches/new?id=${batch._id}`,
+                          );
                         } else {
-                          router.push(`/manufacturer/batches/${encodeURIComponent(batch.batchNumber)}`);
+                          router.push(
+                            `/manufacturer/batches/${encodeURIComponent(batch.batchNumber)}`,
+                          );
                         }
                       }}
                     >
                       <TableCell className="font-medium">
                         {batch.batchNumber}
                       </TableCell>
+                      <TableCell>{batch.productName}</TableCell>
                       <TableCell>
-                        {batch.productName}
+                        {batch.quantity?.toLocaleString() ?? "—"}
                       </TableCell>
                       <TableCell>
-                        {batch.quantity.toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        {batch.isRecalled ? (
-                          <Badge variant="destructive" className="font-normal text-xs px-2 py-0">
+                        {batch.status === "pending" ? (
+                          <Badge
+                            variant={"outline"}
+                            className="bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20 text-[10px] font-normal h-6"
+                          >
+                            Draft
+                          </Badge>
+                        ) : batch.isRecalled ? (
+                          <Badge
+                            variant="destructive"
+                            className="font-normal text-xs px-2 py-0"
+                          >
                             Recalled
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="font-normal text-xs px-2 py-0 border-emerald-500/20 bg-emerald-500/10 text-emerald-600">
+                          <Badge
+                            variant="outline"
+                            className="font-normal text-xs px-2 py-0 border-emerald-500/20 bg-emerald-500/10 text-emerald-600"
+                          >
                             Active
                           </Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {batch.totalScans.toLocaleString()}
+                        {batch.totalScans?.toLocaleString() ?? 0}
                       </TableCell>
                       <TableCell className="text-right">
-                        <ChevronRight className="h-5 w-5 text-muted-foreground opacity-50 ml-auto" aria-hidden="true" />
+                        <div className="flex items-center justify-end gap-2 text-muted-foreground">
+                          {batch.status === 'pending' && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 hover:text-destructive hover:bg-destructive/10 rounded-full"
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label="Cancel Draft"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="rounded-3xl border-border/40">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Discard Draft?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently remove the pending batch run from your dashboard. This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel className="rounded-full">Keep Draft</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleDeleteBatch(batch._id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full"
+                                  >
+                                    Discard Draft
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                          <ChevronRight className="h-5 w-5 opacity-50 ml-auto" aria-hidden="true" />
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -315,29 +419,44 @@ export default function BatchesPage() {
                   key={batch._id}
                   className="cursor-pointer hover:border-primary/40 transition-colors"
                   onClick={() => {
-                    if (batch.status === 'pending') {
+                    if (batch.status === "pending") {
                       router.push(`/manufacturer/batches/new?id=${batch._id}`);
                     } else {
-                      router.push(`/manufacturer/batches/${encodeURIComponent(batch.batchNumber)}`);
+                      router.push(
+                        `/manufacturer/batches/${encodeURIComponent(batch.batchNumber)}`,
+                      );
                     }
                   }}
                 >
                   <CardContent className="p-5">
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <Badge variant="outline" className="mb-2 font-medium text-xs text-primary bg-primary/5">
+                        <Badge
+                          variant="outline"
+                          className="mb-2 font-medium text-xs text-primary bg-primary/5"
+                        >
                           {batch.batchNumber}
                         </Badge>
                         <h3 className="font-semibold text-lg line-clamp-1">
                           {batch.productName}
                         </h3>
                       </div>
-                      {batch.isRecalled ? (
-                        <Badge variant="destructive" className="font-normal text-xs px-2 py-0.5 whitespace-nowrap">
+                      {batch.status === "pending" ? (
+                        <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20 text-[10px] font-bold h-6 whitespace-nowrap">
+                          Draft
+                        </Badge>
+                      ) : batch.isRecalled ? (
+                        <Badge
+                          variant="destructive"
+                          className="font-normal text-xs px-2 py-0.5 whitespace-nowrap"
+                        >
                           Recalled
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="font-normal text-xs px-2 py-0.5 border-emerald-500/20 bg-emerald-500/10 text-emerald-600 whitespace-nowrap">
+                        <Badge
+                          variant="outline"
+                          className="font-normal text-xs px-2 py-0.5 border-emerald-500/20 bg-emerald-500/10 text-emerald-600 whitespace-nowrap"
+                        >
                           Active
                         </Badge>
                       )}
@@ -345,14 +464,56 @@ export default function BatchesPage() {
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-muted/40 p-3 rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-1">Quantity</p>
-                        <p className="text-sm font-medium">{batch.quantity.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Quantity
+                        </p>
+                        <p className="text-sm font-medium">
+                          {batch.quantity?.toLocaleString() ?? "—"}
+                        </p>
                       </div>
                       <div className="bg-muted/40 p-3 rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-1">Total Scans</p>
-                        <p className="text-sm font-medium">{batch.totalScans.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Total Scans
+                        </p>
+                        <p className="text-sm font-medium">
+                          {batch.totalScans?.toLocaleString() ?? 0}
+                        </p>
                       </div>
                     </div>
+                    {batch.status === 'pending' && (
+                      <div className="mt-4 pt-4 border-t border-border/40 flex justify-end">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 rounded-full gap-2 px-3"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span className="text-xs font-semibold">Cancel Draft</span>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="rounded-2xl border-border/40">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Discard Draft?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to discard this batch prototype? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel className="rounded-full">Keep Draft</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => handleDeleteBatch(batch._id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full"
+                              >
+                                Discard
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -375,15 +536,23 @@ export default function BatchesPage() {
             {total > PAGE_SIZE && (
               <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-6">
                 <p className="text-sm text-muted-foreground">
-                  Showing <span className="font-medium text-foreground">{((page - 1) * PAGE_SIZE) + 1}</span> to{" "}
-                  <span className="font-medium text-foreground">{Math.min(page * PAGE_SIZE, total)}</span> of{" "}
-                  <span className="font-medium text-foreground">{total}</span> batches
+                  Showing{" "}
+                  <span className="font-medium text-foreground">
+                    {(page - 1) * PAGE_SIZE + 1}
+                  </span>{" "}
+                  to{" "}
+                  <span className="font-medium text-foreground">
+                    {Math.min(page * PAGE_SIZE, total)}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-medium text-foreground">{total}</span>{" "}
+                  batches
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
                     className="gap-1 rounded-full px-4"
                   >
@@ -393,7 +562,7 @@ export default function BatchesPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setPage(p => p + 1)}
+                    onClick={() => setPage((p) => p + 1)}
                     disabled={page * PAGE_SIZE >= total}
                     className="gap-1 rounded-full px-4"
                   >

@@ -871,3 +871,35 @@ export const getBatchScanDetails = async (req: Request, res: Response) => {
 		res.status(500).json({ message: 'Internal server error' });
 	}
 };
+
+// DELETE /api/batches/:id — Delete a batch (especially for cancelling drafts)
+export const deleteBatch = async (req: Request, res: Response) => {
+	try {
+		const { id } = req.params;
+		const userId = (req as any).user?.id;
+
+		const batch = await Batch.findOne({ _id: id, createdBy: userId });
+		if (!batch) {
+			return res.status(404).json({ message: 'Batch not found.' });
+		}
+
+		// Security check: only the creator can delete
+		if (batch.createdBy.toString() !== userId) {
+			return res.status(403).json({ message: 'Not authorized to delete this batch.' });
+		}
+
+		// Only allow deleting pending drafts
+		if (batch.status !== 'pending') {
+			return res.status(400).json({ 
+				message: 'Only pending draft batches can be cancelled. Completed batches must be recalled via blockchain if necessary.' 
+			});
+		}
+
+		await Batch.findByIdAndDelete(id);
+
+		res.json({ message: 'Batch draft cancelled successfully.' });
+	} catch (error) {
+		console.error('Delete batch error:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+};

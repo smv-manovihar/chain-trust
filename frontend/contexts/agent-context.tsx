@@ -185,6 +185,16 @@ function AgentProviderInner({ children }: { children: React.ReactNode }) {
       const msgId = data.message_id;
 
       switch (event) {
+        case "status":
+          if (msgId && data.status) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === msgId ? { ...m, status: data.status } : m,
+              ),
+            );
+          }
+          break;
+
         case "token":
           if (msgId && data.content) {
             setActiveMessageId(msgId);

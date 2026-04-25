@@ -155,8 +155,8 @@ export function ProductListView({ products, onDelete }: ProductListViewProps) {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="flex items-center gap-1 cursor-help">
-                            {product.price.toLocaleString()}
-                            <span className="text-[10px] font-normal text-muted-foreground uppercase">USDT</span>
+                            {product.price?.toLocaleString() ?? "—"}
+                            <span className="text-[10px] font-normal text-muted-foreground uppercase">USD</span>
                           </div>
                         </TooltipTrigger>
                         <TooltipContent className="bg-background/95 backdrop-blur-md border border-primary/20 p-2 shadow-xl">
