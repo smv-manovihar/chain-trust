@@ -30,6 +30,7 @@ function VerifyEmailContent() {
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+  const verificationStartedRef = useRef(false);
   const verifyAbortRef = useRef<AbortController | null>(null);
 
   const email = user?.email || searchParams.get("email") || "";
@@ -45,10 +46,11 @@ function VerifyEmailContent() {
   // Handle direct link verification if token is present
   useEffect(() => {
     const verifyToken = async () => {
-      if (token && !isLinkVerified) {
+      if (token && !isLinkVerified && !verificationStartedRef.current) {
         if (verifyAbortRef.current) verifyAbortRef.current.abort();
         const controller = new AbortController();
         verifyAbortRef.current = controller;
+        verificationStartedRef.current = true;
 
         setIsVerifying(true);
         try {
@@ -69,6 +71,7 @@ function VerifyEmailContent() {
           
         } catch (error: any) {
           if (error.name === 'AbortError') return;
+          verificationStartedRef.current = false;
           toast.error(error.message || "Verification failed");
         } finally {
           if (verifyAbortRef.current === controller) {

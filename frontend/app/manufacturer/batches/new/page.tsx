@@ -238,8 +238,8 @@ export default function CreateBatchWizard() {
         // Update the draft with full details before blockchain
         await updateBatch(resumeId, {
           ...batchData,
-          manufactureDate: batchData.manufactureDate?.toISOString(),
-          expiryDate: batchData.expiryDate?.toISOString(),
+          manufactureDate: batchData.manufactureDate ? new Date(batchData.manufactureDate).toISOString() : undefined,
+          expiryDate: batchData.expiryDate ? new Date(batchData.expiryDate).toISOString() : undefined,
           quantity: parseInt(batchData.quantity),
           batchSalt: targetSalt,
         });
@@ -261,10 +261,10 @@ export default function CreateBatchWizard() {
           batchNumber: batchData.batchNumber,
           batchSalt: targetSalt,
           manufactureDate: Math.floor(
-            batchData.manufactureDate!.getTime() / 1000,
+            new Date(batchData.manufactureDate!).getTime() / 1000,
           ),
           expiryDate: batchData.expiryDate
-            ? Math.floor(batchData.expiryDate.getTime() / 1000)
+            ? Math.floor(new Date(batchData.expiryDate).getTime() / 1000)
             : 0,
           quantity: parseInt(batchData.quantity),
         },
@@ -707,7 +707,7 @@ export default function CreateBatchWizard() {
                               aria-hidden="true"
                             />
                             {batchData.manufactureDate ? (
-                              format(batchData.manufactureDate, "PPP")
+                              format(new Date(batchData.manufactureDate), "PPP")
                             ) : (
                               <span>Pick a date</span>
                             )}
@@ -751,7 +751,7 @@ export default function CreateBatchWizard() {
                               aria-hidden="true"
                             />
                             {batchData.expiryDate ? (
-                              format(batchData.expiryDate, "PPP")
+                              format(new Date(batchData.expiryDate), "PPP")
                             ) : (
                               <span>Pick a date</span>
                             )}
@@ -827,7 +827,7 @@ export default function CreateBatchWizard() {
                         </p>
                         <p className="text-sm font-medium">
                           {batchData.manufactureDate
-                            ? format(batchData.manufactureDate, "PPP")
+                            ? format(new Date(batchData.manufactureDate), "PPP")
                             : "N/A"}
                         </p>
                       </div>

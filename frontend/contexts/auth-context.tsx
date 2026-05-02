@@ -5,6 +5,8 @@ import React, {
   useContext,
   useEffect,
   useState,
+  useCallback,
+  useMemo,
   ReactNode,
 } from "react";
 import { usePathname } from "next/navigation";
@@ -55,6 +57,28 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+const cacheAvatarBlob = async (url: string) => {
+  if (typeof window === "undefined" || !url) return;
+  try {
+    if (url.startsWith("data:")) {
+      localStorage.setItem("cached_avatar", url);
+      return;
+    }
+    const response = await fetch(url);
+    if (!response.ok) return;
+    const blob = await response.blob();
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (reader.result) {
+        localStorage.setItem("cached_avatar", reader.result as string);
+      }
+    };
+    reader.readAsDataURL(blob);
+  } catch (err) {
+    console.error("Failed to cache avatar blob:", err);
+  }
+};
+
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,31 +99,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [user, isLoading, pathname]);
 
-  const cacheAvatarBlob = async (url: string) => {
-    if (typeof window === "undefined" || !url) return;
-    try {
-      if (url.startsWith("data:")) {
-        localStorage.setItem("cached_avatar", url);
-        return;
-      }
-      const response = await fetch(url);
-      if (!response.ok) return;
-      const blob = await response.blob();
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (reader.result) {
-          localStorage.setItem("cached_avatar", reader.result as string);
-        }
-      };
-      reader.readAsDataURL(blob);
-    } catch (err) {
-      console.error("Failed to cache avatar blob:", err);
-    }
-  };
-
   const refreshAbortRef = React.useRef<AbortController | null>(null);
 
-  const refreshUser = async (signal?: AbortSignal) => {
+  const refreshUser = useCallback(async (signal?: AbortSignal) => {
     if (refreshAbortRef.current) refreshAbortRef.current.abort();
     const controller = new AbortController();
     refreshAbortRef.current = controller;
@@ -141,9 +143,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setIsLoading(false);
       }
     }
-  };
+  }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -171,9 +173,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const register = async (userData: {
+  const register = useCallback(async (userData: {
     email: string;
     password: string;
     name: string;
@@ -208,9 +210,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const googleLogin = (returnTo?: string) => {
+  const googleLogin = useCallback((returnTo?: string) => {
     setIsLoading(true);
     setError(null);
     // Redirect to backend Google auth endpoint
@@ -218,9 +220,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
     const query = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : "";
     window.location.href = `${baseUrl}/api/auth/google${query}`;
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await apiLogout();
     } catch (err) {
@@ -233,9 +235,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         window.location.href = "/login";
       }
     }
-  };
+  }, []);
 
-  const verifyEmailWithToken = async (token: string) => {
+  const verifyEmailWithToken = useCallback(async (token: string) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -253,9 +255,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [refreshUser]);
 
-  const verifyEmailWithOTP = async (data: { email: string; otp: string }) => {
+  const verifyEmailWithOTP = useCallback(async (data: { email: string; otp: string }) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -269,9 +271,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [refreshUser]);
 
-  const changeEmail = async (oldEmail: string, newEmail: string) => {
+  const changeEmail = useCallback(async (oldEmail: string, newEmail: string) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -290,14 +292,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     refreshUser();
     return () => refreshAbortRef.current?.abort();
   }, []);
 
-  const value: AuthContextType = {
+  const value: AuthContextType = useMemo(() => ({
     user,
     isLoading,
     isAuthenticated: !!user,
@@ -311,7 +313,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     verifyEmailWithToken,
     verifyEmailWithOTP,
     changeEmail,
-  };
+  }), [
+    user, 
+    isLoading, 
+    error, 
+    refreshUser, 
+    login, 
+    register, 
+    googleLogin, 
+    logout, 
+    verifyEmailWithToken, 
+    verifyEmailWithOTP, 
+    changeEmail
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

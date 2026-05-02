@@ -135,7 +135,7 @@ export default function NewProductWizard() {
           if (data.product && data.product.status === "pending") {
             const state = data.product.wizardState || {};
             if (state.form) {
-              setForm(state.form);
+              setForm((prev: any) => ({ ...prev, ...state.form }));
             } else if (data.product) {
               updateForm({
                 name: data.product.name,
@@ -160,11 +160,11 @@ export default function NewProductWizard() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
-    updateForm({ images: [...form.images, ...files] });
+    updateForm({ images: [...(form.images || []), ...files] });
   };
 
   const removeImage = (index: number) => {
-    updateForm({ images: form.images.filter((_, i) => i !== index) });
+    updateForm({ images: (form.images || []).filter((_, i) => i !== index) });
   };
 
   const handleSave = async () => {
@@ -187,7 +187,7 @@ export default function NewProductWizard() {
 
       // Step 2: Upload images
       let imageUrls: string[] = [];
-      if (form.images.length > 0) {
+      if (form.images && form.images.length > 0) {
         setUploading(true);
         imageUrls = await uploadImages(form.images);
         setUploading(false);
@@ -534,7 +534,7 @@ export default function NewProductWizard() {
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    {form.images.map((file, idx) => (
+                    {form.images?.map((file, idx) => (
                       <div
                         key={idx}
                         className="relative aspect-square rounded-xl overflow-hidden group border border-border"

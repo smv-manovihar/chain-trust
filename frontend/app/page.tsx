@@ -31,36 +31,36 @@ export default function Home() {
   const memberFeatures = [
     {
       icon: ShieldCheck,
-      title: "Zero-latency Authenticity Checks",
-      desc: "Instantly verify your medication using cryptographic signatures. Avoid counterfeit products.",
+      title: "Quick Authenticity Verification",
+      desc: "Scan a product's QR code to check if it's genuine using blockchain-backed cryptographic records.",
     },
     {
       icon: Smartphone,
-      title: "My Medicines Monitoring",
-      desc: "Track your active prescriptions securely on your mobile device.",
+      title: "My Medicines",
+      desc: "Keep track of your scanned medications in one place, accessible from your phone.",
     },
     {
       icon: Lock,
-      title: "Immediate Recall Alerts",
-      desc: "Get notified instantly if a product you scanned becomes subject to a manufacturer recall.",
+      title: "Recall Alerts",
+      desc: "Get notified if a product you've scanned is recalled by the manufacturer.",
     },
   ];
 
   const manufacturerFeatures = [
     {
       icon: Box,
-      title: "Secure Batch Management",
-      desc: "Granular control over specific manufacturing batches with on-demand recall capabilities.",
+      title: "Batch Management",
+      desc: "Register production batches, generate QR codes for units, and issue recalls when needed.",
     },
     {
       icon: Globe2,
-      title: "Global Supply Chain Visibility",
-      desc: "Instant insight into global product distribution to protect your brand reputation.",
+      title: "Product Distribution Tracking",
+      desc: "See where your products are being scanned and monitor distribution across regions.",
     },
     {
       icon: Zap,
-      title: "Anti-Counterfeit Analytics",
-      desc: "Real-time dashboard tracking anomalies, multiple scans, and potential supply chain breaches.",
+      title: "Scan Analytics",
+      desc: "View scan counts per batch and flag units that have been scanned an unusual number of times.",
     },
   ];
 
@@ -103,8 +103,8 @@ export default function Home() {
             delay={0.6}
             once={true}
           >
-            The immutable global standard for pharmaceutical authenticity and
-            patient safety.
+            A blockchain-based system for verifying pharmaceutical product
+            authenticity and tracking medication safety.
           </TextAnimate>
 
           <div className="flex flex-col items-center justify-center w-full mb-12 md:mb-20">
@@ -172,11 +172,11 @@ export default function Home() {
               by="word"
               once
             >
-              Designed for Supply Chain Velocity
+              What ChainTrust Does
             </TextAnimate>
             <p className="text-xl text-muted-foreground text-balance">
-              Everything you need to verify, track, and secure your products in
-              one powerful platform.
+              Tools for consumers to verify products and for manufacturers to
+              manage batches and monitor scans.
             </p>
           </div>
 
@@ -270,13 +270,13 @@ export default function Home() {
         >
           <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-8 max-w-3xl mx-auto">
             {isAuthenticated
-              ? "Your Dashboard Awaits"
-              : "Start Securing Your Supply Chain Today"}
+              ? "Go to Your Dashboard"
+              : "Get Started"}
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-12">
             {isAuthenticated
-              ? "Access your verification tools and manage your pharmaceutical products."
-              : "Join the network of trusted manufacturers building the future of pharma safety."}
+              ? "Open your dashboard to verify products or manage your batches."
+              : "Sign up as a consumer to verify medications, or register as a manufacturer to enroll your products."}
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             {isLoading ? (

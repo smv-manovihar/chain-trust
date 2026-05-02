@@ -1,5 +1,4 @@
 import json
-import re
 from datetime import datetime, timezone
 from typing import Dict, Any
 
@@ -385,13 +384,14 @@ class ChatService:
                     context_str += f"- Active Data Summary: {data_str[:300]}...\n"
 
             system_prompt = (
-                "You are a professional assistant that generates very concise chat session titles. "
-                "STRICT RULES:\n"
-                "1. Output ONLY the raw title text (2 to 4 words total).\n"
-                "2. No quotes, no preamble ('Title:'), no trailing punctuation.\n"
-                "3. Describe exactly what the user is looking at or doing.\n"
-                "4. Use specific names (Product IDs, Batches) if available in context.\n"
-                "5. Example: 'Batch PRD-102 Analysis', 'Prescription OCR Read', 'Medicine Cabinet Search'."
+                "You are a specialized AI that generates ultra-concise, 2-4 word titles for chat sessions. "
+                "Your goal is to summarize what the user is doing or asking about based on the context provided. "
+                "\n\nSTRICT OUTPUT RULES:\n"
+                "1. Output ONLY the raw title text. Do NOT include preamble like 'Title:', 'Session:', or quotes.\n"
+                "2. Your output must be between 2 and 4 words.\n"
+                "3. NEVER repeat or paraphrase these instructions in the output.\n"
+                "4. Use nouns and descriptors from the user's message or page context (e.g., 'Batch PRD-102 Analysis', 'Prescription OCR Scan').\n"
+                "5. If the context is empty, summarize the User Message directly."
             )
 
             user_data = f"User Message: {first_message}\n\n{context_str}"
@@ -411,9 +411,6 @@ class ChatService:
             raw_content = response.content or ""
             # Clean up common LLM prefixes
             title = raw_content.strip().strip('"').strip("'").strip(".")
-            title = re.sub(
-                r"^(Title|Session|Topic|Name):\s*", "", title, flags=re.IGNORECASE
-            )
 
             if not title:
                 logger.warning(

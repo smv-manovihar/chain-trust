@@ -25,8 +25,8 @@ export function useWizardPersistence<T>(
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as T;
-        setData(parsed);
         if (options.onLoad) options.onLoad(parsed);
+        setData({ ...initialState, ...parsed });
       } catch (err) {
         console.error("Failed to parse wizard persistence data", err);
       }

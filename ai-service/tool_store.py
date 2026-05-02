@@ -24,7 +24,11 @@ class ToolStore:
         if not doc:
             return None
 
-        if keep_id:
+        # Create a shallow copy to avoid destroying the original MongoDB document 
+        # which might be needed for further processing in the caller (e.g. ID lookups).
+        doc = doc.copy()
+
+        if keep_id and "_id" in doc:
             doc["id"] = str(doc["_id"])
 
         if "_id" in doc:

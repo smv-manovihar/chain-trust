@@ -57,25 +57,6 @@ export function UploadScanner({
     [onScanSuccess],
   );
 
-  // ── Clipboard Paste Listener ──
-  useEffect(() => {
-    const handlePaste = async (e: ClipboardEvent) => {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      for (const item of Array.from(items)) {
-        if (item.type.startsWith("image/")) {
-          const file = item.getAsFile();
-          if (file) {
-            e.preventDefault();
-            processFile(file);
-            return;
-          }
-        }
-      }
-    };
-    window.addEventListener("paste", handlePaste);
-    return () => window.removeEventListener("paste", handlePaste);
-  }, [processFile]);
 
   // ── Drag Handlers ──
   const handleDragOver = (e: React.DragEvent) => {

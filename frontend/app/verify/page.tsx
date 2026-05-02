@@ -36,12 +36,17 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { AppShell } from "@/components/layout/app-shell";
 import { AppSidebar, MobileAppSidebar } from "@/components/layout/app-sidebar";
-import { CUSTOMER_NAV_GROUPS, MANUFACTURER_NAV_GROUPS } from "@/lib/constants/navigation";
+import {
+  CUSTOMER_NAV_GROUPS,
+  MANUFACTURER_NAV_GROUPS,
+} from "@/lib/constants/navigation";
 import { VideoScanner } from "@/components/verify/video-scanner";
 import { UploadScanner } from "@/components/verify/upload-scanner";
 import { useDevice } from "@/hooks/use-device";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { SaveMedicineDialog } from "@/components/verify/save-medicine-dialog";
+import { DocumentViewerDialog } from "@/components/common/document-viewer";
+import { Html5Qrcode } from "html5-qrcode";
 
 interface ScanResult {
   isValid: boolean;
@@ -195,7 +200,10 @@ function InteractiveResultCard({
           ) : scanStats.isSuspicious ? (
             <AlertTriangle className="w-32 h-32 sm:w-48 sm:h-48" />
           ) : (
-            <CheckCircle2 className="w-32 h-32 sm:w-48 sm:h-48" aria-hidden="true" />
+            <CheckCircle2
+              className="w-32 h-32 sm:w-48 sm:h-48"
+              aria-hidden="true"
+            />
           )}
         </div>
 
@@ -270,36 +278,6 @@ function InteractiveResultCard({
               </p>
             </div>
           </div>
-
-          {/* Product Media Gallery integrated into the card */}
-          {product?.images && product.images.length > 0 && (
-            <div className="mt-8 pt-8 border-t border-border/50 pointer-events-auto">
-              <div className="flex items-center justify-between mb-4 px-1">
-                <p className="text-muted-foreground text-[10px] font-black">
-                  Product media assets
-                </p>
-                <div className="flex gap-1.5">
-                  {product.images.map((_, i) => (
-                    <div key={i} className="h-1 w-3 rounded-full bg-primary/20" />
-                  ))}
-                </div>
-              </div>
-              <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory hide-scrollbar">
-                {product.images.map((img, i) => (
-                  <div
-                    key={i}
-                    className="shrink-0 w-[180px] h-[120px] sm:w-[240px] sm:h-[160px] rounded-2xl overflow-hidden border border-border/50 bg-muted/20 snap-center relative shadow-sm hover:border-primary/30 transition-all"
-                  >
-                    <img
-                      src={resolveMediaUrl(img)}
-                      alt={`${product.productName} ${i+1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -331,6 +309,11 @@ function VerifyContent() {
   const { setActiveData } = useAgent();
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<{
+    url: string;
+    label: string;
+  } | null>(null);
+  const [showImageViewer, setShowImageViewer] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -340,7 +323,10 @@ function VerifyContent() {
   const [scanView, setScanView] = useState<ScanView | null>(null);
 
   useEffect(() => {
-    const autoScanSalt = searchParams.get("s") || searchParams.get("salt") || searchParams.get("id");
+    const autoScanSalt =
+      searchParams.get("s") ||
+      searchParams.get("salt") ||
+      searchParams.get("id");
     if (autoScanSalt && !scanned && !loading) {
       setQrInput(autoScanSalt);
       handleScan(autoScanSalt);
@@ -387,7 +373,8 @@ function VerifyContent() {
             isInvalid: true,
             isRecalled: false,
             errorTitle: "Tampered QR Code",
-            errorDescription: "This sequence has been altered. Cryptographic integrity check failed.",
+            errorDescription:
+              "This sequence has been altered. Cryptographic integrity check failed.",
           });
           setScanned(true);
           setLoading(false);
@@ -396,14 +383,18 @@ function VerifyContent() {
       }
 
       // 3. Blockchain Verification (Primary Source of Truth)
-      const blockchainResult = await verifyOnBlockchain(batchSalt, controller.signal);
+      const blockchainResult = await verifyOnBlockchain(
+        batchSalt,
+        controller.signal,
+      );
 
       if (!blockchainResult.isValid || !blockchainResult.record) {
         setVerificationStatus({
           isInvalid: true,
           isRecalled: false,
           errorTitle: "Product Not Found",
-          errorDescription: "This product is not registered on the ChainTrust blockchain network.",
+          errorDescription:
+            "This product is not registered on the ChainTrust blockchain network.",
         });
         setScanned(true);
         setLoading(false);
@@ -415,13 +406,17 @@ function VerifyContent() {
         productName: blockchainResult.record.productName,
         brand: blockchainResult.record.manufacturerName,
         batchNumber: blockchainResult.record.batchId,
-        manufactureDate: new Date(blockchainResult.record.timestamp).toISOString(),
+        manufactureDate: new Date(
+          blockchainResult.record.timestamp,
+        ).toISOString(),
         images: blockchainResult.record.images || [],
         composition: "",
         unitIndex,
         unitNumber: unitIndex + 1,
         totalUnits: 0,
-        expiryDate: blockchainResult.record.expiryDate ? new Date(blockchainResult.record.expiryDate).toISOString() : undefined,
+        expiryDate: blockchainResult.record.expiryDate
+          ? new Date(blockchainResult.record.expiryDate).toISOString()
+          : undefined,
       };
 
       let finalStats = {
@@ -435,7 +430,13 @@ function VerifyContent() {
 
       // 4. Enrich from Backend if possible
       try {
-        const result: ScanResult = await verifyScan(saltToVerify, getVisitorId(), undefined, undefined, controller.signal);
+        const result: ScanResult = await verifyScan(
+          saltToVerify,
+          getVisitorId(),
+          undefined,
+          undefined,
+          controller.signal,
+        );
         if (result.isValid && result.product) {
           finalProduct = { ...finalProduct, ...result.product };
           finalStats = {
@@ -446,10 +447,13 @@ function VerifyContent() {
           };
         } else if (result.isRecalled && !blockchainResult.isValid) {
           isRecalled = true;
-          if (result.product) finalProduct = { ...finalProduct, ...result.product };
+          if (result.product)
+            finalProduct = { ...finalProduct, ...result.product };
         }
       } catch (err) {
-        console.warn("Backend metadata unavailable, relying on blockchain safety record.");
+        console.warn(
+          "Backend metadata unavailable, relying on blockchain safety record.",
+        );
       }
 
       setProduct(finalProduct);
@@ -458,13 +462,19 @@ function VerifyContent() {
         isInvalid: false,
         isRecalled: isRecalled,
         errorTitle: isRecalled ? "Safety Recall" : "",
-        errorDescription: isRecalled ? "CRITICAL: This batch of medicines has been recalled by the manufacturer. Do not consume." : "",
+        errorDescription: isRecalled
+          ? "CRITICAL: This batch of medicines has been recalled by the manufacturer. Do not consume."
+          : "",
       });
       setScanned(true);
 
       if (searchParams.has("salt") || searchParams.has("id")) {
         // Persist salt in AgentContext before clearing from URL so AI can see it
-        setActiveData({ salt: saltToVerify, product: finalProduct, stats: finalStats });
+        setActiveData({
+          salt: saltToVerify,
+          product: finalProduct,
+          stats: finalStats,
+        });
         router.replace("/verify", { scroll: false });
       }
     } catch (err: any) {
@@ -490,14 +500,20 @@ function VerifyContent() {
     try {
       const url = new URL(decodedText);
       const isVerifyPath = url.pathname.includes("/verify");
-      const hasSalt = url.searchParams.has("s") || url.searchParams.has("salt") || url.searchParams.has("id");
+      const hasSalt =
+        url.searchParams.has("s") ||
+        url.searchParams.has("salt") ||
+        url.searchParams.has("id");
 
       if (!isVerifyPath || !hasSalt) {
         toast.error("Unrecognized QR Code");
         return;
       }
 
-      const salt = url.searchParams.get("s") || url.searchParams.get("salt") || url.searchParams.get("id");
+      const salt =
+        url.searchParams.get("s") ||
+        url.searchParams.get("salt") ||
+        url.searchParams.get("id");
       if (salt) {
         setQrInput(salt);
         handleScan(salt);
@@ -512,6 +528,42 @@ function VerifyContent() {
     }
   };
 
+  // ── Global Paste Listener (Moved to page level for consistent cross-view availability) ──
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      // Avoid intercepting if user is in an input
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            setLoading(true);
+            try {
+              // We use a dedicated hidden region for global paste scanning
+              const html5QrCode = new Html5Qrcode("qr-global-paste-region");
+              const decodedText = await html5QrCode.scanFile(file, true);
+              onScanSuccess(decodedText);
+            } catch (err) {
+              toast.error("No QR code detected in pasted image.");
+            } finally {
+              setLoading(false);
+            }
+            return;
+          }
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [onScanSuccess]);
+
   if (scanView === null) {
     return (
       <div className="h-screen bg-background flex flex-col items-center justify-center">
@@ -524,15 +576,26 @@ function VerifyContent() {
   }
 
   const isManufacturer = user?.role === "manufacturer";
-  const isMobileFullscreenCamera = isMobileDevice && scanView === "camera" && !scanned && !loading;
+  const isMobileFullscreenCamera =
+    isMobileDevice && scanView === "camera" && !scanned && !loading;
 
   return (
-    <div className={cn("relative font-sans h-full flex flex-col", !isAuthenticated && "layout-contained bg-muted/30 min-h-screen")}>
-      {!isAuthenticated && !isMobileFullscreenCamera && <div className="absolute inset-0 bg-grid-pattern-global opacity-30 pointer-events-none" />}
+    <div
+      className={cn(
+        "relative font-sans h-full flex flex-col",
+        !isAuthenticated && "layout-contained bg-muted/30 min-h-screen",
+      )}
+    >
+      {!isAuthenticated && !isMobileFullscreenCamera && (
+        <div className="absolute inset-0 bg-grid-pattern-global opacity-30 pointer-events-none" />
+      )}
       {!isAuthenticated && !isMobileFullscreenCamera && (
         <header className="h-14 lg:h-16 border-b bg-background/80 backdrop-blur-md flex items-center px-4 lg:px-8 shrink-0 z-20">
           <Link href="/" className="flex items-center gap-2 group">
-            <ChevronLeft className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" aria-hidden="true" />
+            <ChevronLeft
+              className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors"
+              aria-hidden="true"
+            />
             <span className="font-bold text-lg tracking-tight text-foreground">
               ChainTrust <span className="text-primary">Verify</span>
             </span>
@@ -542,30 +605,43 @@ function VerifyContent() {
 
       <main className="overflow-hidden relative flex-1 flex flex-col">
         {loading ? (
-          <LoadingScreen message="Verifying with Blockchain..." className="flex-1" />
+          <LoadingScreen
+            message="Verifying with Blockchain..."
+            className="flex-1"
+          />
         ) : !scanned ? (
-          <div className={cn("flex-1 flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300", isMobileFullscreenCamera ? "p-0" : !isAuthenticated && "p-4 sm:p-8", "min-h-0")}>
+          <div
+            className={cn(
+              "flex-1 flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300",
+              isMobileFullscreenCamera
+                ? "p-0"
+                : !isAuthenticated && "p-4 sm:p-8",
+              "min-h-0",
+            )}
+          >
             {isMobileFullscreenCamera ? (
-              <VideoScanner 
-                isMobileDevice={true} 
-                onScanSuccess={onScanSuccess} 
-                onSwitchToUpload={() => setScanView("upload")} 
-                onClose={() => router.back()} 
+              <VideoScanner
+                isMobileDevice={true}
+                onScanSuccess={onScanSuccess}
+                onSwitchToUpload={() => setScanView("upload")}
+                onClose={() => router.back()}
               />
             ) : (
               <div className="max-w-3xl mx-auto w-full flex-1 flex flex-col min-h-0 gap-6 justify-center">
                 <div className="flex-1 max-h-[600px] flex flex-col items-center justify-center bg-card/50 rounded-3xl border border-border/50 border-dashed p-4 sm:p-8 shadow-sm relative overflow-hidden">
                   {scanView === "camera" ? (
-                    <VideoScanner 
-                      isMobileDevice={false} 
-                      onScanSuccess={onScanSuccess} 
-                      onSwitchToUpload={() => setScanView("upload")} 
-                      onClose={() => setScanView("upload")} 
+                    <VideoScanner
+                      isMobileDevice={false}
+                      onScanSuccess={onScanSuccess}
+                      onSwitchToUpload={() => setScanView("upload")}
+                      onClose={() => setScanView("upload")}
                     />
                   ) : (
-                    <UploadScanner 
-                      onScanSuccess={onScanSuccess} 
-                      onSwitchToCamera={hasCameraAPI ? () => setScanView("camera") : undefined} 
+                    <UploadScanner
+                      onScanSuccess={onScanSuccess}
+                      onSwitchToCamera={
+                        hasCameraAPI ? () => setScanView("camera") : undefined
+                      }
                     />
                   )}
                 </div>
@@ -576,23 +652,43 @@ function VerifyContent() {
             )}
           </div>
         ) : (
-          <div className={cn("flex flex-col flex-1 min-h-0 animate-in fade-in zoom-in-95 duration-500", !isAuthenticated && "p-4 sm:p-8 lg:p-0")}>
+          <div
+            className={cn(
+              "flex flex-col flex-1 min-h-0 animate-in fade-in zoom-in-95 duration-500",
+              !isAuthenticated && "p-4 sm:p-8 lg:p-0",
+            )}
+          >
             <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col min-h-0 mt-2 sm:mt-8 px-2 sm:px-6 relative z-10">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 mb-6 sm:mb-8">
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">Verification result</h2>
+                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                    Verification result
+                  </h2>
                   <p className="text-muted-foreground text-sm font-medium mt-1">
                     Blockchain record confirmed for {product?.productName}
                   </p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                  <Button variant="outline" onClick={() => { setScanned(false); setScanView(defaultView); }} className="rounded-full px-6 w-full sm:w-auto h-12 sm:h-10 font-bold active:scale-95 transition-all">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setScanned(false);
+                      setScanView(defaultView);
+                    }}
+                    className="rounded-full px-6 w-full sm:w-auto h-12 sm:h-10 font-bold active:scale-95 transition-all"
+                  >
                     Scan new
                   </Button>
                   {!isManufacturer && (
-                    <Button onClick={handleSaveToCabinet} className="rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 px-6 transition-all duration-300 w-full sm:w-auto h-12 sm:h-10 font-black active:scale-95">
-                      <BookmarkPlus className="mr-2 h-5 w-5 sm:h-4 sm:w-4" aria-hidden="true" />
+                    <Button
+                      onClick={handleSaveToCabinet}
+                      className="rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 px-6 transition-all duration-300 w-full sm:w-auto h-12 sm:h-10 font-black active:scale-95"
+                    >
+                      <BookmarkPlus
+                        className="mr-2 h-5 w-5 sm:h-4 sm:w-4"
+                        aria-hidden="true"
+                      />
                       Save to My Medicines
                     </Button>
                   )}
@@ -600,62 +696,202 @@ function VerifyContent() {
               </div>
 
               <div className="flex-1 flex flex-col gap-6 sm:gap-8 pb-12">
-                <InteractiveResultCard 
-                  product={product} 
-                  scanStats={scanStats} 
-                  isMobileDevice={isMobileDevice} 
-                  isAuthenticated={isAuthenticated} 
-                  isInvalid={verificationStatus.isInvalid} 
-                  isRecalled={verificationStatus.isRecalled} 
-                  errorTitle={verificationStatus.errorTitle} 
-                  errorDescription={verificationStatus.errorDescription} 
+                <InteractiveResultCard
+                  product={product}
+                  scanStats={scanStats}
+                  isMobileDevice={isMobileDevice}
+                  isAuthenticated={isAuthenticated}
+                  isInvalid={verificationStatus.isInvalid}
+                  isRecalled={verificationStatus.isRecalled}
+                  errorTitle={verificationStatus.errorTitle}
+                  errorDescription={verificationStatus.errorDescription}
                 />
 
+                {/* Product Media Gallery placed outside the card */}
+                {product?.images && product.images.length > 0 && (
+                  <div className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 p-6 sm:p-8 bg-card/50 border border-border/50 rounded-3xl shadow-sm">
+                    <div className="flex items-center justify-between mb-4 px-1">
+                      <p className="text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+                        Product media assets
+                      </p>
+                      <div className="flex gap-1.5">
+                        {product.images.map((_, i) => (
+                          <div
+                            key={i}
+                            className="h-1 w-3 rounded-full bg-primary/20"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory hide-scrollbar">
+                      {product.images.map((img, i) => (
+                        <div
+                          key={i}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            setSelectedImage({
+                              url: img,
+                              label: `${product.productName} - Image ${i + 1}`,
+                            });
+                            setShowImageViewer(true);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              setSelectedImage({
+                                url: img,
+                                label: `${product.productName} - Image ${i + 1}`,
+                              });
+                              setShowImageViewer(true);
+                            }
+                          }}
+                          className="shrink-0 w-[180px] h-[120px] sm:w-[240px] sm:h-[160px] rounded-2xl overflow-hidden border border-border/50 bg-muted/10 snap-center relative shadow-sm hover:border-primary/30 transition-all cursor-zoom-in"
+                        >
+                          <img
+                            src={resolveMediaUrl(img)}
+                            alt={`${product.productName} ${i + 1}`}
+                            className="w-full h-full object-cover transition-transform hover:scale-110 duration-500"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-                  <Card className={cn("sm:col-span-3 p-6 sm:p-8 border rounded-3xl flex flex-col md:flex-row items-start md:items-center gap-6 shadow-sm", scanStats.isSuspicious ? "bg-amber-500/5 border-amber-500/30" : (verificationStatus.isInvalid || verificationStatus.isRecalled) ? "bg-destructive/5 border-destructive/30" : "bg-green-500/5 border-green-500/30")}>
-                    <div className={cn("h-16 w-16 sm:h-20 sm:w-20 rounded-full flex items-center justify-center shrink-0 shadow-inner", (verificationStatus.isInvalid || verificationStatus.isRecalled) ? "bg-destructive/20" : scanStats.isSuspicious ? "bg-amber-500/20" : "bg-green-500/20")}>
-                      {(verificationStatus.isInvalid || verificationStatus.isRecalled) ? <AlertTriangle className="h-8 w-8 sm:h-10 sm:w-10 text-destructive" aria-hidden="true" /> : scanStats.isSuspicious ? <AlertTriangle className="h-8 w-8 sm:h-10 sm:w-10 text-amber-600" aria-hidden="true" /> : <ShieldCheck className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" aria-hidden="true" />}
+                  <Card
+                    className={cn(
+                      "sm:col-span-3 p-6 sm:p-8 border rounded-3xl flex flex-col md:flex-row items-start md:items-center gap-6 shadow-sm",
+                      scanStats.isSuspicious
+                        ? "bg-amber-500/5 border-amber-500/30"
+                        : verificationStatus.isInvalid ||
+                            verificationStatus.isRecalled
+                          ? "bg-destructive/5 border-destructive/30"
+                          : "bg-green-500/5 border-green-500/30",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "h-16 w-16 sm:h-20 sm:w-20 rounded-full flex items-center justify-center shrink-0 shadow-inner",
+                        verificationStatus.isInvalid ||
+                          verificationStatus.isRecalled
+                          ? "bg-destructive/20"
+                          : scanStats.isSuspicious
+                            ? "bg-amber-500/20"
+                            : "bg-green-500/20",
+                      )}
+                    >
+                      {verificationStatus.isInvalid ||
+                      verificationStatus.isRecalled ? (
+                        <AlertTriangle
+                          className="h-8 w-8 sm:h-10 sm:w-10 text-destructive"
+                          aria-hidden="true"
+                        />
+                      ) : scanStats.isSuspicious ? (
+                        <AlertTriangle
+                          className="h-8 w-8 sm:h-10 sm:w-10 text-amber-600"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <ShieldCheck
+                          className="h-8 w-8 sm:h-10 sm:w-10 text-green-600"
+                          aria-hidden="true"
+                        />
+                      )}
                     </div>
                     <div className="flex-1 w-full">
                       <div className="mb-2">
-                        <span className={cn("text-[10px] font-black px-2 py-0.5 rounded-full border", (verificationStatus.isInvalid || verificationStatus.isRecalled) ? "text-destructive border-destructive/30 bg-destructive/10" : scanStats.isSuspicious ? "text-amber-600 border-amber-500/30 bg-amber-500/10" : "text-green-600 border-green-500/30 bg-green-500/10")}>
-                          {verificationStatus.isRecalled ? "Public Recall" : verificationStatus.isInvalid ? "Security Alert" : scanStats.isSuspicious ? "Suspicion Alert" : "Authentic Status"}
+                        <span
+                          className={cn(
+                            "text-[10px] font-black px-2 py-0.5 rounded-full border",
+                            verificationStatus.isInvalid ||
+                              verificationStatus.isRecalled
+                              ? "text-destructive border-destructive/30 bg-destructive/10"
+                              : scanStats.isSuspicious
+                                ? "text-amber-600 border-amber-500/30 bg-amber-500/10"
+                                : "text-green-600 border-green-500/30 bg-green-500/10",
+                          )}
+                        >
+                          {verificationStatus.isRecalled
+                            ? "Public Recall"
+                            : verificationStatus.isInvalid
+                              ? "Security Alert"
+                              : scanStats.isSuspicious
+                                ? "Suspicion Alert"
+                                : "Authentic Status"}
                         </span>
                       </div>
                       <p className="text-xl sm:text-2xl font-black leading-tight text-foreground">
-                        {verificationStatus.isRecalled ? "RECALLED: Batch of medicines flagged unsafe" : verificationStatus.isInvalid ? "Security Warning: Invalid entry" : scanStats.isSuspicious ? "High scan activity warning" : "Verified secure & authentic"}
+                        {verificationStatus.isRecalled
+                          ? "RECALLED: Batch of medicines flagged unsafe"
+                          : verificationStatus.isInvalid
+                            ? "Security Warning: Invalid entry"
+                            : scanStats.isSuspicious
+                              ? "High scan activity warning"
+                              : "Verified secure & authentic"}
                       </p>
                       <p className="text-[10px] sm:text-xs text-muted-foreground mt-2 font-mono break-all opacity-70">
                         Blockchain Hash: {scanStats.blockchainHash}
                       </p>
                     </div>
                     <div className="flex flex-row md:flex-col justify-between items-center bg-background p-4 rounded-3xl border border-border/50 min-w-[120px] shadow-sm">
-                      <p className="text-[10px] font-black text-muted-foreground opacity-60">Scans</p>
-                      <p className={cn("text-3xl font-black tabular-nums", scanStats.isSuspicious ? "text-amber-600" : "text-primary")}>{scanStats.count}</p>
+                      <p className="text-[10px] font-black text-muted-foreground opacity-60">
+                        Scans
+                      </p>
+                      <p
+                        className={cn(
+                          "text-3xl font-black tabular-nums",
+                          scanStats.isSuspicious
+                            ? "text-amber-600"
+                            : "text-primary",
+                        )}
+                      >
+                        {scanStats.count}
+                      </p>
                     </div>
                   </Card>
 
                   <Card className="p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border-border/50 bg-card/50 shadow-sm transition-all hover:bg-card">
-                    <p className="text-[10px] font-black text-muted-foreground mb-3 opacity-60">Expiration</p>
+                    <p className="text-[10px] font-black text-muted-foreground mb-3 opacity-60">
+                      Expiration
+                    </p>
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-xl text-primary"><Clock className="h-5 w-5" aria-hidden="true" /></div>
-                      <p className="font-black text-base text-foreground">{product?.expiryDate ? new Date(product.expiryDate).toLocaleDateString() : "N/A"}</p>
-                    </div>
-                  </Card>
-                  
-                  <Card className="p-5 sm:p-6 rounded-3xl border-border/50 bg-card/50 shadow-sm transition-all hover:bg-card">
-                    <p className="text-[10px] font-black text-muted-foreground mb-3 opacity-60">Unit serial</p>
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-xl text-primary"><PackageCheck className="h-5 w-5" aria-hidden="true" /></div>
-                      <p className="font-black text-base truncate text-foreground">#{product?.unitNumber}</p>
+                      <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                        <Clock className="h-5 w-5" aria-hidden="true" />
+                      </div>
+                      <p className="font-black text-base text-foreground">
+                        {product?.expiryDate
+                          ? new Date(product.expiryDate).toLocaleDateString()
+                          : "N/A"}
+                      </p>
                     </div>
                   </Card>
 
                   <Card className="p-5 sm:p-6 rounded-3xl border-border/50 bg-card/50 shadow-sm transition-all hover:bg-card">
-                    <p className="text-[10px] font-black text-muted-foreground mb-3 opacity-60">Provenance</p>
+                    <p className="text-[10px] font-black text-muted-foreground mb-3 opacity-60">
+                      Unit serial
+                    </p>
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-xl text-primary"><Building2 className="h-5 w-5" aria-hidden="true" /></div>
-                      <p className="font-black text-base truncate text-foreground">Blockchain</p>
+                      <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                        <PackageCheck className="h-5 w-5" aria-hidden="true" />
+                      </div>
+                      <p className="font-black text-base truncate text-foreground">
+                        #{product?.unitNumber}
+                      </p>
+                    </div>
+                  </Card>
+
+                  <Card className="p-5 sm:p-6 rounded-3xl border-border/50 bg-card/50 shadow-sm transition-all hover:bg-card">
+                    <p className="text-[10px] font-black text-muted-foreground mb-3 opacity-60">
+                      Provenance
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                        <Building2 className="h-5 w-5" aria-hidden="true" />
+                      </div>
+                      <p className="font-black text-base truncate text-foreground">
+                        Blockchain
+                      </p>
                     </div>
                   </Card>
                 </div>
@@ -665,16 +901,30 @@ function VerifyContent() {
         )}
       </main>
 
+      {/* Hidden processing div for global paste scanning - must be outside <main> so it survives loading state swaps */}
+      <div id="qr-global-paste-region" className="hidden" />
+
       {showLoginDialog && (
         <AlertDialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
           <AlertDialogContent className="rounded-3xl">
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-2xl font-black">Account required</AlertDialogTitle>
-              <AlertDialogDescription className="font-medium">Please log in to save medicines to your personalized list and receive safety alerts if this batch of medicines is ever recalled.</AlertDialogDescription>
+              <AlertDialogTitle className="text-2xl font-black">
+                Account required
+              </AlertDialogTitle>
+              <AlertDialogDescription className="font-medium">
+                Please log in to save medicines to your personalized list and
+                receive safety alerts if this batch of medicines is ever
+                recalled.
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className="rounded-full font-bold">Continue Browsing</AlertDialogCancel>
-              <AlertDialogAction className="rounded-full bg-primary hover:bg-primary/90 font-bold" asChild>
+              <AlertDialogCancel className="rounded-full font-bold">
+                Continue Browsing
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="rounded-full bg-primary hover:bg-primary/90 font-bold"
+                asChild
+              >
                 <Link href="/login">Login Now</Link>
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -683,11 +933,19 @@ function VerifyContent() {
       )}
 
       {showSaveDialog && product && (
-        <SaveMedicineDialog 
-          open={showSaveDialog} 
-          onOpenChange={setShowSaveDialog} 
-          product={product} 
+        <SaveMedicineDialog
+          open={showSaveDialog}
+          onOpenChange={setShowSaveDialog}
+          product={product}
           qrInput={qrInput}
+        />
+      )}
+
+      {showImageViewer && selectedImage && (
+        <DocumentViewerDialog
+          open={showImageViewer}
+          onOpenChange={setShowImageViewer}
+          document={selectedImage}
         />
       )}
     </div>
@@ -695,15 +953,32 @@ function VerifyContent() {
 }
 
 export default function VerifyPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
   const isManufacturer = user?.role === "manufacturer";
-  const navGroups = isManufacturer ? MANUFACTURER_NAV_GROUPS : CUSTOMER_NAV_GROUPS;
+  const navGroups = isManufacturer
+    ? MANUFACTURER_NAV_GROUPS
+    : CUSTOMER_NAV_GROUPS;
+
+  if (!isAuthenticated) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <VerifyContent />
+      </Suspense>
+    );
+  }
 
   return (
     <Suspense fallback={<LoadingScreen />}>
       <AppShell
         sidebar={<AppSidebar navGroups={navGroups} />}
-        mobileSidebar={(props) => <MobileAppSidebar {...props} navGroups={navGroups} />}
+        mobileSidebar={(props) => (
+          <MobileAppSidebar {...props} navGroups={navGroups} />
+        )}
       >
         <VerifyContent />
       </AppShell>

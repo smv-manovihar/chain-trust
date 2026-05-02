@@ -304,10 +304,14 @@ export const updateProductDetails = async (req: Request, res: Response) => {
 		const updates = req.body;
 
 		// Security: Only the creator can update
-		const product = await Product.findOne({
-			$or: [{ _id: id }, { productId: id }],
-			createdBy: userId
-		});
+		const query: any = { createdBy: userId };
+		if (isValidObjectId(id)) {
+			query.$or = [{ _id: id }, { productId: id }];
+		} else {
+			query.productId = id;
+		}
+
+		const product = await Product.findOne(query);
 
 		if (!product) {
 			return res.status(404).json({ message: 'Product not found.' });
@@ -317,7 +321,7 @@ export const updateProductDetails = async (req: Request, res: Response) => {
 		const allowedUpdates = [
 			'name', 'productId', 'categories', 'brand', 'price', 
 			'description', 'composition', 'unit', 'images', 
-			'imageAccessLevel', 'customerVisibleImages', 'status', 'wizardState'
+			'imageAccessLevel', 'customerVisibleImages', 'status', 'wizardState', 'qrSettings'
 		];
 
 		allowedUpdates.forEach(key => {

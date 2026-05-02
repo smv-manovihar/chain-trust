@@ -178,21 +178,29 @@ export function UpcomingDoseCarousel() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-bold tabular-nums text-foreground">
-                      {format(new Date(dose.scheduledTime), "h:mm a")}
-                    </div>
-                    <div
-                      className={cn(
-                        "text-xs font-medium",
-                        dose.isMissed
-                          ? "text-destructive"
-                          : "text-muted-foreground",
-                      )}
-                    >
-                      {formatDistanceToNow(new Date(dose.scheduledTime), {
-                        addSuffix: true,
-                      })}
-                    </div>
+                    {(() => {
+                      const d = new Date(dose.scheduledTime);
+                      const isValid = !isNaN(d.getTime());
+                      return (
+                        <>
+                          <div className="text-sm font-bold tabular-nums text-foreground">
+                            {isValid ? format(d, "h:mm a") : "--:--"}
+                          </div>
+                          <div
+                            className={cn(
+                              "text-xs font-medium",
+                              dose.isMissed
+                                ? "text-destructive"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            {isValid
+                              ? formatDistanceToNow(d, { addSuffix: true })
+                              : "Invalid date"}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 

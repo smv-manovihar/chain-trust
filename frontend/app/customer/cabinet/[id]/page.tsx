@@ -94,9 +94,14 @@ const safeFormatTime = (time: any) => {
   if (!time) return "";
   // Check if it's already HH:mm
   if (typeof time === "string" && /^\d{2}:\d{2}$/.test(time)) return time;
-  const d = new Date(time);
-  if (isNaN(d.getTime())) return "";
-  return format(d, "HH:mm");
+  
+  try {
+    const d = new Date(time);
+    if (isNaN(d.getTime())) return "";
+    return format(d, "HH:mm");
+  } catch (e) {
+    return "";
+  }
 };
 
 export default function MedicineDetailPage() {
@@ -481,7 +486,9 @@ export default function MedicineDetailPage() {
 
   const isDoseRecentlyTaken = useMemo(() => {
     if (!medicine?.lastDoseTaken) return false;
-    const lastTaken = new Date(medicine.lastDoseTaken).getTime();
+    const lastTakenDate = new Date(medicine.lastDoseTaken);
+    if (isNaN(lastTakenDate.getTime())) return false;
+    const lastTaken = lastTakenDate.getTime();
     const now = new Date().getTime();
     const window = 4 * 60 * 60 * 1000; // 4 hour status persistence
     return now - lastTaken < window;
@@ -490,6 +497,7 @@ export default function MedicineDetailPage() {
   const lastTakenText = useMemo(() => {
     if (!medicine?.lastDoseTaken) return null;
     const lastTaken = new Date(medicine.lastDoseTaken);
+    if (isNaN(lastTaken.getTime())) return null;
     const now = new Date();
     const diffMs = now.getTime() - lastTaken.getTime();
     const diffMins = Math.floor(diffMs / 1000 / 60);
@@ -508,12 +516,17 @@ export default function MedicineDetailPage() {
     const target = new Date(date);
     target.setHours(0, 0, 0, 0);
 
-    const anchorTimeRaw = reminder._id
-      ? reminder.time
-      : typeof reminder.time === "string" && reminder.time.includes(":")
-        ? new Date()
-        : reminder.time;
-    const anchor = new Date(anchorTimeRaw);
+    let anchor: Date;
+    if (typeof reminder.time === "string" && /^\d{2}:\d{2}$/.test(reminder.time)) {
+      // If it's just HH:mm, use today as the anchor date
+      const [h, m] = reminder.time.split(":").map(Number);
+      anchor = new Date();
+      anchor.setHours(h, m, 0, 0);
+    } else {
+      anchor = new Date(reminder.time);
+    }
+    
+    if (isNaN(anchor.getTime())) return false;
     anchor.setHours(0, 0, 0, 0);
 
     if (target.getTime() < anchor.getTime()) return false;
@@ -554,7 +567,21 @@ export default function MedicineDetailPage() {
 
         while (!found && iterations < 90) {
           if (isOccurrenceOnDay(r, checkDate)) {
-            const reminderDate = new Date(r.time);
+            let reminderDate: Date;
+            if (typeof r.time === "string" && /^\d{2}:\d{2}$/.test(r.time)) {
+              const [h, m] = r.time.split(":").map(Number);
+              reminderDate = new Date();
+              reminderDate.setHours(h, m, 0, 0);
+            } else {
+              reminderDate = new Date(r.time);
+            }
+
+            if (isNaN(reminderDate.getTime())) {
+              iterations++;
+              checkDate.setDate(checkDate.getDate() + 1);
+              continue;
+            }
+
             const occurrence = new Date(checkDate);
             occurrence.setHours(
               reminderDate.getHours(),
