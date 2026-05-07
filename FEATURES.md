@@ -1,6 +1,6 @@
 # ChainTrust — Feature List
 
-> **Source of truth for all implemented features as of April 2026.**
+> **Source of truth for all implemented features as of May 2026.**
 > Every feature listed here has been verified against the live codebase (frontend routes, backend controllers, and AI service tools). Legacy/unimplemented stubs have been excluded.
 
 ---
@@ -113,7 +113,9 @@ The verification page is the core consumer-facing feature. It is publicly access
   3. Records the scanner's IP address, geolocation, and timestamp using a **two-tier strategy**:
      - **Primary (synchronous):** `geoip-lite` performs a local, offline IP lookup immediately — this never blocks the scan response.
      - **Secondary (background, fire-and-forget):** `getGeoLocation()` (`backend/utils/geo.util.ts`) calls `https://freeipapi.com/api/json/{ip}` (no API key required) for higher-precision city/region enrichment. The result is logged but does not affect the response.
-  4. Returns the full product metadata enriched from MongoDB.
+  4. Calculates a **suspiciousness score** (`calculateSuspiciousness`) based on scan history (velocity, unique visitors, and IP frequency).
+  5. If flagged as suspicious, automatically dispatches a `suspicious_scan` notification to the manufacturer.
+  6. Returns the full product metadata enriched from MongoDB.
 - Rate-limited via `verificationLimiter`.
 
 ### 2.5 Interactive Result Card (`InteractiveResultCard`)
@@ -121,16 +123,23 @@ The result card provides three distinct visual states:
 
 | State | Trigger | Visual |
 |---|---|---|
-| **Authentic** | Blockchain confirmed, `isRecalled: false`, scan count ≤ 5 | Green checkmark, product name, expiry date, manufacturer info |
-| **Suspicious** | Scan count for this specific unit > 5 | Orange/amber warning, scan count displayed, counter-sign advice |
+| **Authentic** | Blockchain confirmed, `isRecalled: false`, `isSuspicious: false` | Green checkmark, product name, expiry date, manufacturer info |
+| **Suspicious** | `isSuspicious: true` (Velocity, mass-scan, or impossible travel) | Orange/amber warning, reason for suspicion, counter-sign advice |
 | **Recalled** | `isRecalled: true` (set via backend + blockchain recall action) | Red alert, recall reason, "Do not use" advisory |
 
-### 2.6 Add to My Medicines (Authenticated Users)
+### 2.6 Suspicious Scan Detection Logic
+The backend employs a multi-factor fraud detection engine (`backend/utils/suspicious.util.ts`) that analyzes the history of a specific unit index to identify potential clones:
+- **Impossible Travel (Velocity Check):** Uses the Haversine formula to calculate the distance between consecutive scans. Flags units moving at impossible speeds (e.g., >500km in <2 hours).
+- **Mass-Scan Threshold:** Flags any unit index scanned by more than 3 unique visitors.
+- **Geographic Dispersion:** Flags units detected in more than 2 unique cities within a 24-hour window.
+- **IP Flooding:** Flags units receiving 5+ scans within 1 hour or scans from 3+ distinct IPs simultaneously.
+
+### 2.7 Add to My Medicines (Authenticated Users)
 - If the user is logged in and the scan is authentic, the result card shows an **Add to My Medicines** button.
 - Tapping it opens the cabinet add-item flow pre-populated with the scanned product's data (name, brand, batch number, expiry date, product ID).
 - For unauthenticated users, the card shows a login prompt instead.
 
-### 2.7 Unauthenticated Restricted View
+### 2.8 Unauthenticated Restricted View
 - Unauthenticated users can still scan and verify. They see the product's authenticity status and basic metadata.
 - A login prompt banner is shown beneath the result card, encouraging sign-in to unlock the full feature set (My Medicines, dose tracking).
 
@@ -201,22 +210,30 @@ This is the primary medicine management interface. Data source: `cabinet_items` 
 #### Mark Dose Taken
 - **Route:** `POST /api/cabinet/mark-taken/:id`
 - Decrements `currentQuantity` by the item's `dosage` amount.
-- Creates a `dosage_log` entry with timestamp and `doseAmount`.
-- The button is protected by a **5-minute cooldown** guard. If a dose was taken within the last 5 minutes, the button is disabled with a visible countdown — prevents accidental double-logging.
+- Creates a `dosage_log` entry with timestamp, `doseAmount`, and `wasPunctual` flag.
+- **Frequency-aware punctuality:** `wasPunctual` is `true` only if the dose is taken within ±3 hours (`WINDOW_MINUTES`) of a reminder that is actually scheduled for today's calendar day (validated via `isOccurrenceOnDay`). Off-day doses are always recorded as Late.
+- **Daily Completion Flag (`isDoseDoneToday`):** The response includes `isDoseDoneToday: boolean`, computed by comparing the number of dose logs for today against the number of reminders scheduled for today. When `true`, the frontend disables the Take Dose button until the next UTC day.
+- **Button States (List & Detail pages):**
+  - **"Take Dose"** / **"Mark as taken"** — default active state.
+  - **"Recently Taken"** (5-min cooldown on list) / **"Dose Recorded"** (4-hour window on detail) — prevents accidental double-logging.
+  - **"Done Today"** / **"All doses done today"** (green, disabled) — all scheduled doses for the UTC day are logged.
 
 #### Undo Last Dose
 - **Route:** `POST /api/cabinet/undo-dose/:id`
 - Finds the most recent `dosage_log` entry for the item, deletes it, and restores `currentQuantity` by `doseAmount`.
-- The 5-minute cooldown on "Take Dose" does **not** block the Undo action.
+- The Undo action clears the "Done Today" state in the frontend, re-enabling the Take Dose button.
 
 #### Dose History Log
 - **Route:** `GET /api/cabinet/logs/:id`
 - Returns paginated `dosage_log` entries for an item, sorted by most recent.
-- Displayed in the item detail view as a timestamped history feed.
+- Displayed in the item detail view as a timestamped history feed with Punctual (green) / Late (amber) indicators.
 
-### 4.3 Adherence Tracking
-- `currentStreak` is computed from `dosage_logs`. Consecutive days with at least one logged dose increment the streak counter.
-- Displayed in the cabinet item detail as a streak counter.
+### 4.3 Adherence Streak Tracking
+- `currentStreak` is computed from `dosage_logs` by `calculateStreak` in the backend controller.
+- **Frequency-aware:** A day counts toward the streak only if the user logged at least one dose on a day when a reminder was actually scheduled (per its `frequencyType`, `daysOfWeek`, or `interval`). Logging on an off-day does not advance or break the streak.
+- **UTC-normalized:** All date boundary checks use `setUTCHours(0,0,0,0)` to avoid server-timezone drift. This matches the `isOccurrenceOnDay` utility which also uses UTC.
+- **Staleness prevention:** `getPersonalCabinet` runs a fire-and-forget background `refreshStreak` for any item whose `lastStreakUpdate` predates today's UTC midnight. The corrected value is served on the next page load without blocking the response.
+- Displayed as an orange flame badge (`bg-orange-500/20`, `fill-orange-500`) in the top-right of each medication card (list page) and as a pulsing badge in the Adherence Hero section (detail page).
 
 ### 4.4 Reminder Scheduler
 Each cabinet item can have multiple reminder times (`reminderTimes[]` array on schema).
@@ -651,4 +668,4 @@ All blockchain interactions are handled exclusively through `frontend/api/web3-c
 
 ---
 
-*Last verified: April 2026 — trace each feature to its source file before modifying this document.*
+*Last verified: May 2026 — trace each feature to its source file before modifying this document.*

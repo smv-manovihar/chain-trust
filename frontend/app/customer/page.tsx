@@ -69,7 +69,7 @@ export default function CustomerDashboard() {
       const res = await getNotifications(
         4,
         0,
-        "medicine_expiry,batch_recall,dose_reminder",
+        "medicine_expiry,batch_recall",
       );
       setAlerts(res.notifications || []);
       setUnreadAlerts(res.unreadCount || 0);

@@ -6,6 +6,7 @@ export interface INotification extends Document {
 		| 'medicine_expiry'    // Customer
 		| 'batch_recall'       // Customer
 		| 'dose_reminder'      // Customer
+		| 'missed_dose'        // Customer
 		| 'low_stock'          // Customer
 		| 'suspicious_scan'    // Manufacturer
 		| 'scan_milestone'     // Manufacturer
@@ -38,7 +39,7 @@ const notificationSchema = new Schema<INotification>(
 		type: {
 			type: String,
 			enum: [
-				'medicine_expiry', 'batch_recall', 'dose_reminder',
+				'medicine_expiry', 'batch_recall', 'dose_reminder', 'missed_dose',
 				'low_stock', 'suspicious_scan', 'scan_milestone', 'batch_restored', 'system'
 			],
 			required: true,

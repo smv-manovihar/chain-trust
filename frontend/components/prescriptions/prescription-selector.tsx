@@ -192,8 +192,8 @@ export function PrescriptionSelector({
             </div>
           </ResponsiveDialogHeader>
 
-          <ResponsiveDialogBody className="bg-muted/10">
-            <div className="p-4 sm:p-6">
+          <ResponsiveDialogBody className="p-4 sm:p-6">
+            <div className="space-y-2 pb-6">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-4">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -214,125 +214,107 @@ export function PrescriptionSelector({
                   className="bg-background border-dashed border-border/50 rounded-[2rem] py-12"
                 />
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 pb-4">
-                  {/* Action Card: Upload New */}
+                <div className="flex flex-col gap-2 pb-4">
+                  {/* Action Row: Upload New */}
                   <button
                     onClick={() => setIsUploadOpen(true)}
-                    className="group flex flex-col items-center justify-center gap-3 p-6 rounded-[2rem] border-2 border-dashed border-primary/20 bg-primary/5 hover:bg-primary/10 hover:border-primary/40 transition-colors min-h-[160px] w-full"
+                    className="group flex items-center gap-4 p-4 rounded-[1.5rem] border-2 border-dashed border-primary/20 bg-primary/5 hover:bg-primary/10 hover:border-primary/40 transition-all text-left mb-2"
                   >
-                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Plus className="h-6 w-6 text-primary" />
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
+                      <Plus className="h-5 w-5 text-primary" />
                     </div>
-                    <span className="font-bold text-primary text-sm">
-                      Upload new
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-primary text-sm">Upload New Prescription</span>
+                      <span className="text-xs text-primary/60">Add a new document to your records</span>
+                    </div>
                   </button>
 
-                  {/* Prescription Cards */}
-                  {filteredPrescriptions.map((p) => {
-                    const isSelected = selectedIds.includes(p._id);
-                    return (
-                      <div
-                        key={p._id}
-                        onClick={() => toggleSelection(p._id)}
-                        className={cn(
-                          "group relative rounded-[2rem] border transition-all cursor-pointer flex flex-col overflow-hidden min-h-[160px]",
-                          isSelected
-                            ? "bg-primary/5 border-primary shadow-sm"
-                            : "bg-background border-border hover:border-primary/40 hover:shadow-sm",
-                        )}
-                      >
-                        <div className="p-5 flex items-start gap-3 flex-1">
+                  <div className="space-y-2">
+                    {filteredPrescriptions.map((p) => {
+                      const isSelected = selectedIds.includes(p._id);
+                      return (
+                        <div
+                          key={p._id}
+                          onClick={() => toggleSelection(p._id)}
+                          className={cn(
+                            "group relative rounded-[1.5rem] border transition-all cursor-pointer flex items-center p-3 gap-4",
+                            isSelected
+                              ? "bg-primary/5 border-primary shadow-sm"
+                              : "bg-background border-border hover:border-primary/40",
+                          )}
+                        >
+                          {/* Selection Indicator */}
                           <div
                             className={cn(
-                              "mt-0.5 flex items-center justify-center shrink-0 h-5 w-5 rounded-full border transition-colors",
+                              "flex items-center justify-center shrink-0 h-6 w-6 rounded-full border-2 transition-colors",
                               isSelected
                                 ? "bg-primary border-primary text-primary-foreground"
-                                : "border-input bg-background group-hover:border-primary/50",
+                                : "border-muted-foreground/30 bg-background group-hover:border-primary/50",
                             )}
                           >
-                            {isSelected && <Check className="h-3 w-3" />}
+                            {isSelected && <Check className="h-3.5 w-3.5 stroke-[3]" />}
                           </div>
 
-                          <div className="flex flex-col min-w-0 flex-1 space-y-1">
-                            <span
-                              className={cn(
-                                "text-sm font-semibold truncate",
-                                isSelected ? "text-primary" : "text-foreground",
-                              )}
-                            >
+                          {/* Info Area */}
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <span className={cn(
+                              "text-sm font-bold truncate",
+                              isSelected ? "text-primary" : "text-foreground"
+                            )}>
                               {p.label}
                             </span>
+                            <div className="flex items-center gap-3 mt-0.5">
+                              {p.doctorName && (
+                                <span className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
+                                  <Stethoscope className="h-3 w-3" />
+                                  {p.doctorName}
+                                </span>
+                              )}
+                              {p.issuedDate && (
+                                <span className="text-[11px] text-muted-foreground flex items-center gap-1 shrink-0">
+                                  <Calendar className="h-3 w-3" />
+                                  {format(new Date(p.issuedDate), "MMM d, yy")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
 
-                            {(p.doctorName || p.issuedDate) && (
-                              <div className="flex flex-col gap-1.5 mt-2">
-                                {p.doctorName && (
-                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <Stethoscope className="h-3.5 w-3.5 shrink-0" />
-                                    <span className="truncate">
-                                      {p.doctorName}
-                                    </span>
-                                  </div>
-                                )}
-                                {p.issuedDate && (
-                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <Calendar className="h-3.5 w-3.5 shrink-0" />
-                                    <span>
-                                      {format(
-                                        new Date(p.issuedDate),
-                                        "MMM dd, yyyy",
-                                      )}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                          {/* Actions */}
+                          <div className="flex items-center gap-1 shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                              onClick={() => setPreviewDoc({ url: p.url, label: p.label })}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              onClick={(e) => handleDelete(e, p._id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-
-                        {/* Action Row */}
-                        <div
-                          className="flex items-center justify-end gap-2 px-3 py-2.5 border-t border-border/40 bg-muted/20"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="h-9 sm:h-8 px-4 text-sm sm:text-xs font-bold rounded-full"
-                            onClick={() =>
-                              setPreviewDoc({ url: p.url, label: p.label })
-                            }
-                          >
-                            <Eye className="h-4 w-4 sm:h-3.5 sm:w-3.5 mr-2" />
-                            View
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-9 sm:h-8 px-4 text-sm sm:text-xs font-bold text-destructive hover:bg-destructive/10 hover:text-destructive rounded-full"
-                            onClick={(e) => handleDelete(e, p._id)}
-                          >
-                            <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5 mr-2" />
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
 
                   {/* Empty Search Results */}
-                  {prescriptions.length > 0 &&
-                    filteredPrescriptions.length === 0 && (
-                      <div className="col-span-full py-8 text-center text-muted-foreground font-medium text-sm">
-                        No prescriptions match your search.
-                      </div>
-                    )}
+                  {prescriptions.length > 0 && filteredPrescriptions.length === 0 && (
+                    <div className="py-12 text-center text-muted-foreground font-medium text-sm">
+                      No prescriptions match your search.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </ResponsiveDialogBody>
 
-          <ResponsiveDialogFooter className="p-4 sm:p-6 border-t border-border/50 bg-background shrink-0 mt-auto">
+          <ResponsiveDialogFooter className="p-4 sm:px-6 sm:py-4 border-t border-border/50 bg-background shrink-0 mt-auto">
             <Button
               className="w-full h-12 rounded-full font-bold text-base"
               onClick={handleConfirm}

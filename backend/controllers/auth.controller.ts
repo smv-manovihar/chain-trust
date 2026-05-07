@@ -371,8 +371,8 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
 			emailVerificationOtp: verificationOtp,
 			emailVerificationOtpExpiresAt: otpExpiry,
 			
-			// Security FIX-007: Approval now defaults to false in the model
-			// isApprovedByAdmin is omitted to use model default
+			// Auto-approve for Demo mode (Reliability FIX-008)
+			isApprovedByAdmin: process.env.AUTO_APPROVE_USERS === 'true',
 		});
 
 		await newUser.save();

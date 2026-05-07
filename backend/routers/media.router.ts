@@ -69,9 +69,12 @@ router.post('/', protect, checkUploadAuth, upload.array('images', 5), async (req
 // 1. PUBLIC Product Images
 router.get('/products/*key', async (req, res) => {
 	try {
-		const keyList = req.params.key as unknown as string[];
-		const key = `products/${keyList.join('/')}`;
+		const keyParam = req.params.key as unknown;
+		const keyPath = Array.isArray(keyParam) ? keyParam.join('/') : (keyParam as string);
+		const key = `products/${keyPath}`;
 		
+		console.log(`[Media Proxy] Fetching product image: ${key} from bucket: ${S3_BUCKET}`);
+
 		const command = new GetObjectCommand({
 			Bucket: S3_BUCKET,
 			Key: key,
@@ -79,6 +82,7 @@ router.get('/products/*key', async (req, res) => {
 
 		const { Body, ContentType } = await s3Client.send(command);
 		if (!Body) {
+			console.warn(`[Media Proxy] 404: Body is empty for ${key}`);
 			return res.status(404).json({ message: 'File not found' });
 		}
 
@@ -87,6 +91,7 @@ router.get('/products/*key', async (req, res) => {
 		(Body as any).pipe(res);
 	} catch (error: any) {
 		if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+			console.warn(`[Media Proxy] 404: No such key ${error.Key || 'unknown'} in S3`);
 			return res.status(404).json({ message: 'File not found' });
 		}
 		console.error('Error proxying from S3:', error);
@@ -107,7 +112,9 @@ router.get('/customer-uploads/*key', protect, async (req, res) => {
 			return res.status(403).json({ message: 'Access denied: You do not own this file' });
 		}
 
-		const fullKey = `customer-uploads/${keyList.join('/')}`;
+		const keyParam = req.params.key as unknown;
+		const keyPath = Array.isArray(keyParam) ? keyParam.join('/') : (keyParam as string);
+		const fullKey = `customer-uploads/${keyPath}`;
 
 		const command = new GetObjectCommand({
 			Bucket: S3_BUCKET,
@@ -134,8 +141,8 @@ router.get('/customer-uploads/*key', protect, async (req, res) => {
 // Legacy catch-all for backward compatibility (optional but safer)
 router.get('/*key', async (req, res) => {
 	try {
-		const keyList = req.params.key as unknown as string[];
-		const key = keyList.join('/');
+		const keyParam = req.params.key as unknown;
+		const key = Array.isArray(keyParam) ? keyParam.join('/') : (keyParam as string);
 		// Don't allow access onto customer-uploads through public catch-all
 		if (key.startsWith('customer-uploads')) {
 			return res.status(401).json({ message: 'Authentication required' });

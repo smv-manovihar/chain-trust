@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 /**
  * Resolves a relative media path (e.g. `/api/media/products/abc.jpg`)
@@ -9,5 +9,5 @@ export function resolveMediaUrl(url: string): string {
   // Already an absolute URL
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
   // Relative path starting with /api/media → prepend backend origin
-  return `${API_BASE_URL}${url}`;
+  return `${BACKEND_URL}${url}`;
 }

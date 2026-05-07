@@ -7,7 +7,7 @@ export const getNotifications = async (req: Request, res: Response) => {
 		const limit = parseInt(req.query.limit as string) || 20;
 		const skip = parseInt(req.query.skip as string) || 0;
 
-		const query: any = { user: userId };
+		const query: any = { user: userId, channel: { $ne: 'email' } };
 		const type = req.query.type as string; // e.g. "medicine_expiry,batch_recall"
 		if (type) {
 			const types = type.split(',');
@@ -19,7 +19,7 @@ export const getNotifications = async (req: Request, res: Response) => {
 			.skip(skip)
 			.limit(limit);
 
-		const unreadCount = await Notification.countDocuments({ user: userId, isRead: false });
+		const unreadCount = await Notification.countDocuments({ user: userId, isRead: false, channel: { $ne: 'email' } });
 
 		res.json({ notifications, unreadCount });
 	} catch (error) {

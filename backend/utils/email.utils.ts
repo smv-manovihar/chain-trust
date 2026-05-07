@@ -10,7 +10,12 @@ export const generateVerificationToken = (): string => {
 	return crypto.randomBytes(32).toString('hex');
 };
 
-const wrapTemplate = (title: string, content: string) => `
+const wrapTemplate = (title: string, content: string, role: 'customer' | 'manufacturer' | 'common' = 'common') => {
+	const dashboardLink = role === 'customer' ? `${FRONTEND_URL}/customer/cabinet` : role === 'manufacturer' ? `${FRONTEND_URL}/manufacturer/analytics` : FRONTEND_URL;
+	const notificationsLink = role === 'customer' ? `${FRONTEND_URL}/customer/notifications` : role === 'manufacturer' ? `${FRONTEND_URL}/manufacturer/notifications` : `${FRONTEND_URL}/login`;
+	const settingsLink = role === 'customer' ? `${FRONTEND_URL}/customer/settings` : role === 'manufacturer' ? `${FRONTEND_URL}/manufacturer/settings` : `${FRONTEND_URL}/login`;
+
+	return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -54,6 +59,8 @@ const wrapTemplate = (title: string, content: string) => `
         
         /* Footer */
         .footer { padding: 24px 40px; text-align: center; background-color: #fafafa; border-top: 1px solid #e4e4e7; color: #a1a1aa; font-size: 13px; line-height: 1.6; }
+        .footer-links { margin: 16px 0; padding-top: 16px; border-top: 1px solid #e4e4e7; }
+        .footer-link { color: #71717a; text-decoration: underline; margin: 0 8px; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -71,6 +78,11 @@ const wrapTemplate = (title: string, content: string) => `
             <div class="footer">
                 <strong>ChainTrust Security</strong><br>
                 This is an automated message, please do not reply.<br>
+                <div class="footer-links">
+                    <a href="${dashboardLink}" class="footer-link">Dashboard</a>
+                    <a href="${notificationsLink}" class="footer-link">Notification Settings</a>
+                    <a href="${settingsLink}" class="footer-link">Privacy Policy</a>
+                </div>
                 &copy; ${new Date().getFullYear()} ChainTrust. All rights reserved.
             </div>
         </div>
@@ -78,6 +90,7 @@ const wrapTemplate = (title: string, content: string) => `
 </body>
 </html>
 `;
+};
 
 export const sendEmailVerification = async (
 	email: string,
@@ -107,7 +120,7 @@ export const sendEmailVerification = async (
 		from: EMAIL_FROM,
 		to: email,
 		subject: 'Verify your ChainTrust Account',
-		html: wrapTemplate('Verify your email', content),
+		html: wrapTemplate('Verify your email', content, 'common'),
 	};
 
 	try {
@@ -115,6 +128,11 @@ export const sendEmailVerification = async (
 		return true;
 	} catch (error) {
 		console.error('Error sending verification email:', error);
+		console.log('---------------------------------------------------------');
+		console.log(`[LOCAL DEV FALLBACK] Verification for: ${email}`);
+		console.log(`OTP: ${otp}`);
+		console.log(`Link: ${verificationUrl}`);
+		console.log('---------------------------------------------------------');
 		return false;
 	}
 };
@@ -137,7 +155,7 @@ export const sendPasswordResetOTP = async (
 		from: EMAIL_FROM,
 		to: email,
 		subject: 'Reset your ChainTrust password',
-		html: wrapTemplate('Password reset', content),
+		html: wrapTemplate('Password reset', content, 'common'),
 	};
 
 	try {
@@ -178,7 +196,7 @@ export const sendEmployeeInvitation = async (
 		from: EMAIL_FROM,
 		to: email,
 		subject: `Join ${companyName} on ChainTrust`,
-		html: wrapTemplate('You are invited', content),
+		html: wrapTemplate('You are invited', content, 'manufacturer'),
 	};
 
 	try {
@@ -195,7 +213,9 @@ export const sendExpiryAlert = async (
 	medicineName: string,
 	expiryDate: string,
 	daysLeft: number,
+	medicineId?: string,
 ): Promise<boolean> => {
+	const medicineUrl = medicineId ? `${FRONTEND_URL}/customer/cabinet/${medicineId}` : `${FRONTEND_URL}/customer/cabinet`;
 	const content = `
 		<p class="text">This is an automated alert regarding your medicine that is expiring soon.</p>
 		
@@ -211,7 +231,7 @@ export const sendExpiryAlert = async (
 		</div>
 
 		<div class="btn-wrapper">
-			<a href="${FRONTEND_URL}/customer/cabinet" class="btn">View My Medicines</a>
+			<a href="${medicineUrl}" class="btn">${medicineId ? 'View Medicine Details' : 'View My Medicines'}</a>
 		</div>
 	`;
 
@@ -219,7 +239,7 @@ export const sendExpiryAlert = async (
 		from: EMAIL_FROM,
 		to: email,
 		subject: `Medicine Expiry Alert: ${medicineName}`,
-		html: wrapTemplate('Expiry Alert', content),
+		html: wrapTemplate('Expiry Alert', content, 'customer'),
 	};
 
 	try {
@@ -237,7 +257,9 @@ export const sendDoseReminder = async (
 	dosage?: number,
 	mealContext?: string,
 	unit?: string,
+	medicineId?: string,
 ): Promise<boolean> => {
+	const medicineUrl = medicineId ? `${FRONTEND_URL}/customer/cabinet/${medicineId}` : `${FRONTEND_URL}/customer/cabinet`;
 	const mealText = mealContext ? `<p class="label label-blue">${mealContext.replace('_', ' ')}</p>` : '';
 	const unitText = unit ? ` ${unit}` : '';
 	const content = `
@@ -251,13 +273,17 @@ export const sendDoseReminder = async (
 		</div>
 
 		<p class="text" style="font-size: 13px; color: #71717a;">Please stay consistent with your medication for the best results.</p>
+		
+		<div class="btn-wrapper">
+			<a href="${medicineUrl}" class="btn">Log Medication Intake</a>
+		</div>
 	`;
 
 	const mailOptions = {
 		from: EMAIL_FROM,
 		to: email,
 		subject: `Dose Reminder: ${medicineName}`,
-		html: wrapTemplate('Medication Reminder', content),
+		html: wrapTemplate('Medication Reminder', content, 'customer'),
 	};
 
 	try {
@@ -269,12 +295,56 @@ export const sendDoseReminder = async (
 	}
 };
 
+export const sendMissedDoseAlert = async (
+	email: string,
+	name: string,
+	medicineName: string,
+	timeString: string,
+	medicineId?: string,
+): Promise<boolean> => {
+	const medicineUrl = medicineId ? `${FRONTEND_URL}/customer/cabinet/${medicineId}` : `${FRONTEND_URL}/customer/cabinet`;
+	const content = `
+		<p class="text">Hello <strong>${name}</strong>, you missed your scheduled medicine intake.</p>
+		
+		<div class="card" style="background-color: #fffbeb; border-color: #fcd34d;">
+			<div class="label" style="color: #b45309;">Missed Dose Alert</div>
+			<div class="otp" style="font-size: 24px; color: #18181b; letter-spacing: normal;">${medicineName}</div>
+			
+			<div class="divider"></div>
+			<p class="text" style="font-size: 14px; margin-top: 8px;">Scheduled Time: <strong>${timeString}</strong></p>
+		</div>
+
+		<p class="text">You can still record it as late if you take it now. Please consult your healthcare provider if you have questions about missed doses.</p>
+
+		<div class="btn-wrapper">
+			<a href="${medicineUrl}" class="btn" style="background-color: #d97706;">Check My Cabinet</a>
+		</div>
+	`;
+
+	const mailOptions = {
+		from: EMAIL_FROM,
+		to: email,
+		subject: `Missed Dose Alert: ${medicineName}`,
+		html: wrapTemplate('Missed Medicine', content, 'customer'),
+	};
+
+	try {
+		await transporter.sendMail(mailOptions);
+		return true;
+	} catch (error) {
+		console.error('Error sending missed dose alert email:', error);
+		return false;
+	}
+};
+
 export const sendBatchRecallAlert = async (
 	email: string,
 	name: string,
 	medicineName: string,
 	batchNumber: string,
+	medicineId?: string,
 ): Promise<boolean> => {
+	const medicineUrl = medicineId ? `${FRONTEND_URL}/customer/cabinet/${medicineId}` : `${FRONTEND_URL}/customer/cabinet`;
 	const content = `
 		<p class="text">Hello <strong>${name}</strong>, this is an urgent safety notification.</p>
 		
@@ -290,7 +360,7 @@ export const sendBatchRecallAlert = async (
 		<p class="text">The manufacturer has issued a recall for this batch. Please consult your healthcare provider or pharmacy for replacement options.</p>
 
 		<div class="btn-wrapper">
-			<a href="${FRONTEND_URL}/customer/cabinet" class="btn" style="background-color: #ef4444;">Check My Cabinet</a>
+			<a href="${medicineUrl}" class="btn" style="background-color: #ef4444;">Review Safety Information</a>
 		</div>
 	`;
 
@@ -298,7 +368,7 @@ export const sendBatchRecallAlert = async (
 		from: EMAIL_FROM,
 		to: email,
 		subject: `URGENT: Safety Recall for ${medicineName}`,
-		html: wrapTemplate('Safety Recall Alert', content),
+		html: wrapTemplate('Safety Recall Alert', content, 'customer'),
 	};
 
 	try {
@@ -315,7 +385,9 @@ export const sendBatchRestoredAlert = async (
 	name: string,
 	medicineName: string,
 	batchNumber: string,
+	medicineId?: string,
 ): Promise<boolean> => {
+	const medicineUrl = medicineId ? `${FRONTEND_URL}/customer/cabinet/${medicineId}` : `${FRONTEND_URL}/customer/cabinet`;
 	const content = `
 		<p class="text">Hello <strong>${name}</strong>, we have a safety update regarding your medication.</p>
 		
@@ -331,7 +403,7 @@ export const sendBatchRestoredAlert = async (
 		<p class="text">The manufacturer has resolved the previous safety concerns for this batch. It has been restored and is now marked as authentic and safe.</p>
 
 		<div class="btn-wrapper">
-			<a href="${FRONTEND_URL}/customer/cabinet" class="btn">View Details</a>
+			<a href="${medicineUrl}" class="btn">View Updated Details</a>
 		</div>
 	`;
 
@@ -339,7 +411,7 @@ export const sendBatchRestoredAlert = async (
 		from: EMAIL_FROM,
 		to: email,
 		subject: `Update: ${medicineName} has been Restored`,
-		html: wrapTemplate('Medicine Safety Update', content),
+		html: wrapTemplate('Medicine Safety Update', content, 'customer'),
 	};
 
 	try {
@@ -356,7 +428,9 @@ export const sendLowStockAlert = async (
 	name: string,
 	medicineName: string,
 	currentQuantity: number,
+	medicineId?: string,
 ): Promise<boolean> => {
+	const medicineUrl = medicineId ? `${FRONTEND_URL}/customer/cabinet/${medicineId}` : `${FRONTEND_URL}/customer/cabinet`;
 	const content = `
 		<p class="text">Hello <strong>${name}</strong>, your medication supply is running low.</p>
 		
@@ -371,7 +445,7 @@ export const sendLowStockAlert = async (
 		<p class="text">Based on your current schedule, you have less than a 3-day supply remaining. We recommend replenishing your stock soon.</p>
 
 		<div class="btn-wrapper">
-			<a href="${FRONTEND_URL}/customer/cabinet" class="btn" style="background-color: #d97706;">Open Cabinet</a>
+			<a href="${medicineUrl}" class="btn" style="background-color: #d97706;">Refill Medicine</a>
 		</div>
 	`;
 
@@ -379,7 +453,7 @@ export const sendLowStockAlert = async (
 		from: EMAIL_FROM,
 		to: email,
 		subject: `Low Stock Alert: ${medicineName}`,
-		html: wrapTemplate('Refill Reminder', content),
+		html: wrapTemplate('Refill Reminder', content, 'customer'),
 	};
 
 	try {
@@ -397,7 +471,9 @@ export const sendSuspiciousScanAlert = async (
 	productName: string,
 	batchNumber: string,
 	reason: string,
+	batchId?: string,
 ): Promise<boolean> => {
+	const analyticsUrl = batchId ? `${FRONTEND_URL}/manufacturer/batches/${batchId}` : `${FRONTEND_URL}/manufacturer/analytics`;
 	const content = `
 		<p class="text">Hello <strong>${name}</strong>, a potential security incident has been flagged.</p>
 		
@@ -414,7 +490,7 @@ export const sendSuspiciousScanAlert = async (
 		<p class="text">A scan for one of your products was flagged as high-risk. Please review the scan analytics to determine if further action is required.</p>
 
 		<div class="btn-wrapper">
-			<a href="${FRONTEND_URL}/manufacturer/analytics" class="btn" style="background-color: #18181b;">View Threat Intelligence</a>
+			<a href="${analyticsUrl}" class="btn" style="background-color: #18181b;">View Threat Intelligence</a>
 		</div>
 	`;
 
@@ -422,7 +498,7 @@ export const sendSuspiciousScanAlert = async (
 		from: EMAIL_FROM,
 		to: email,
 		subject: `Security Alert: Suspicious Scan Detected`,
-		html: wrapTemplate('Security Alert', content),
+		html: wrapTemplate('Security Alert', content, 'manufacturer'),
 	};
 
 	try {
@@ -439,7 +515,9 @@ export const sendScanMilestoneAlert = async (
 	name: string,
 	batchNumber: string,
 	scanCount: number,
+	batchId?: string,
 ): Promise<boolean> => {
+	const batchUrl = batchId ? `${FRONTEND_URL}/manufacturer/batches/${batchId}` : `${FRONTEND_URL}/manufacturer/batches`;
 	const content = `
 		<p class="text">Congratulations <strong>${name}</strong>! Your batch has reached a new engagement milestone.</p>
 		
@@ -455,7 +533,7 @@ export const sendScanMilestoneAlert = async (
 		<p class="text">Your product is successfully reaching consumers. This milestone indicates growing trust and active verification in the field.</p>
 
 		<div class="btn-wrapper">
-			<a href="${FRONTEND_URL}/manufacturer/batches" class="btn">View Batch Analytics</a>
+			<a href="${batchUrl}" class="btn">View Batch Analytics</a>
 		</div>
 	`;
 
@@ -463,7 +541,7 @@ export const sendScanMilestoneAlert = async (
 		from: EMAIL_FROM,
 		to: email,
 		subject: `Milestone Achieved: ${scanCount} Scans for Batch ${batchNumber}`,
-		html: wrapTemplate('Milestone Achievement', content),
+		html: wrapTemplate('Milestone Achievement', content, 'manufacturer'),
 	};
 
 	try {
@@ -500,7 +578,7 @@ export const sendSystemNotification = async (
 		from: EMAIL_FROM,
 		to: email,
 		subject: `ChainTrust System Update: ${subject}`,
-		html: wrapTemplate('System Notification', content),
+		html: wrapTemplate('System Notification', content, 'common'),
 	};
 
 	try {

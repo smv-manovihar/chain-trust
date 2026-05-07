@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     # OCR Settings
     TESSERACT_CMD: str | None = None
     INTERNAL_API_KEY: str = "chaintrust_internal_2026_secret"
+    BACKEND_URL: str = "http://localhost:5000"
+    FRONTEND_URL: str = "http://localhost:3000"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

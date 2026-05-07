@@ -22,7 +22,7 @@ if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
     setTimeout(() => {
         if (IS_LOCAL || !CLIENT_ID) {
             // Local Dev -> Ensure Ganache
-            switchNetwork('0x539').catch(console.error);
+            switchNetwork(GANACHE_CHAIN_ID).catch(console.error);
         } else if (CLIENT_ID) {
             // Production -> Ensure Mainnet (or other configured network)
             switchNetwork('0x1').catch(console.error);
@@ -41,7 +41,7 @@ if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
 }
 
 const GANACHE_CHAIN_ID = '0x539'; // 1337 in hex
-const GANACHE_RPC_URL = 'http://127.0.0.1:7545';
+const GANACHE_RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'http://127.0.0.1:7545';
 
 // Contract Address - Should ideally come from env vars, but using the deployed address here
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xfC6617A16Ff9f9AE967D51247Ab3540727215141';
@@ -167,13 +167,21 @@ export async function verifyOnBlockchain(batchSalt: string, signal?: AbortSignal
         throw new Error('Web3 connection not initialized');
     }
 
-    if (signal?.aborted) throw new Error('AbortError');
+    if (signal?.aborted) {
+        const err = new Error('Verification aborted');
+        err.name = 'AbortError';
+        throw err;
+    }
 
       try {
         // Query using bytes32 salt with timeout (Reliability FIX-003)
         const batch: any = await withTimeout(contract.methods.getBatch(formatBytes32(batchSalt)).call());
 
-        if (signal?.aborted) throw new Error('AbortError');
+        if (signal?.aborted) {
+            const err = new Error('Verification aborted');
+            err.name = 'AbortError';
+            throw err;
+        }
 
         // Check if it exists
         if (!batch.exists) {
@@ -207,25 +215,43 @@ export async function verifyOnBlockchain(batchSalt: string, signal?: AbortSignal
       };
 
     } catch (e: any) {
-        console.warn("Blockchain query failed or Batch not found:", e.message);
+        if (e.name === 'AbortError') return {
+          isValid: false,
+          isRecalled: false,
+          record: null,
+          verificationDate: Date.now(),
+          trustScore: 0,
+          warnings: ['Verification process was interrupted.'],
+        };
+        
+        console.warn(`Blockchain query failed [RPC: ${(web3?.eth.currentProvider as any)?.host || 'unknown'}]:`, e.message);
+        
         return {
           isValid: false,
           isRecalled: false,
           record: null,
           verificationDate: Date.now(),
           trustScore: 0,
-          warnings: ['Product not found on the secure public ledger. This may be a counterfeit.'],
+          warnings: [
+            e.message.includes('timeout') 
+              ? 'Verification timed out. The secure ledger is responding slowly.'
+              : `Product not found on the secure public ledger (${e.message}). This may be a counterfeit.`
+          ],
         }
     }
-  } catch (error) {
-    console.error("Blockchain Connection Error:", error);
+  } catch (error: any) {
+    if (error.name === 'AbortError') throw error;
+    
+    if (error.name !== 'AbortError') {
+        console.error("Blockchain Connection Error:", error);
+    }
     return {
       isValid: false,
       isRecalled: false,
       record: null,
       verificationDate: Date.now(),
       trustScore: 0,
-      warnings: ['Unable to reach the secure verification network. Please check your connection.'],
+      warnings: [`Unable to reach the secure verification network (${error.message}). Please check your connection.`],
     }
   }
 }
@@ -274,15 +300,15 @@ export const switchNetwork = async (chainId: string) => {
             });
         } catch (switchError: any) {
             // This error code indicates that the chain has not been added to MetaMask.
-            if (switchError.code === 4902 && chainId === '0x539') {
+            if (switchError.code === 4902 && chainId === GANACHE_CHAIN_ID) {
                 try {
                     await window.ethereum.request({
                         method: 'wallet_addEthereumChain',
                         params: [
                             {
-                                chainId: '0x539',
+                                chainId: GANACHE_CHAIN_ID,
                                 chainName: 'Ganache Local',
-                                rpcUrls: ['http://127.0.0.1:7545'],
+                                rpcUrls: [GANACHE_RPC_URL],
                                 nativeCurrency: {
                                     name: 'ETH',
                                     symbol: 'ETH',
@@ -303,4 +329,4 @@ export const switchNetwork = async (chainId: string) => {
 /**
  * Switch MetaMask to Ganache network (Legacy wrapper)
  */
-export const switchToGanache = () => switchNetwork('0x539');
+export const switchToGanache = () => switchNetwork(GANACHE_CHAIN_ID);

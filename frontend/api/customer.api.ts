@@ -40,9 +40,12 @@ export interface CabinetItem {
     medicine_expiry?: { inApp?: boolean; email?: boolean };
     batch_recall?: { inApp?: boolean; email?: boolean };
     dose_reminder?: { inApp?: boolean; email?: boolean };
+    missed_dose?: { inApp?: boolean; email?: boolean };
   };
   status?: "active" | "inactive";
   currentStreak?: number;
+  /** True when all reminder-scheduled doses for today have been logged. Prevents accidental over-logging. */
+  isDoseDoneToday?: boolean;
 }
 
 export const addToCabinet = async (data: Partial<CabinetItem>, signal?: AbortSignal) => {

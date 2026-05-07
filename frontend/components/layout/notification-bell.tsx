@@ -9,6 +9,7 @@ import {
   Zap,
   MoreHorizontal,
   Inbox,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -93,7 +94,13 @@ export function NotificationBell() {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case "alert":
+      case "batch_recall":
+      case "suspicious_scan":
         return <AlertTriangle className="h-4 w-4 text-destructive" />;
+      case "medicine_expiry":
+        return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+      case "missed_dose":
+        return <Clock className="h-4 w-4 text-orange-500" />;
       case "scan_milestone":
         return <Zap className="h-4 w-4 text-emerald-500" />;
       case "system":

@@ -4,6 +4,7 @@ import Scan from '../models/scan.model.js';
 import Batch from '../models/batch.model.js';
 import Prescription from '../models/prescription.model.js';
 import DosageLog from '../models/dosage.model.js';
+import User from '../models/user.model.js';
 import { AI_SERVICE_URL, INTERNAL_API_KEY } from '../config/config.js';
 import { generateIdSlug, resolveItem } from '../utils/identifier.util.js';
 import { sendNotification } from '../services/notification.service.js';
@@ -11,16 +12,33 @@ import { isOccurrenceOnDay } from '../utils/medicine.util.js';
 
 const WINDOW_MINUTES = 180; // 3 hours window for "in time"
 
-const calculateStreak = async (item: any): Promise<number> => {
+const calculateStreak = async (item: any, userTimezone: string = 'UTC'): Promise<number> => {
 	if (!item.reminderTimes || item.reminderTimes.length === 0) return 0;
 
 	const now = new Date();
-	const startOfToday = new Date(now);
-	startOfToday.setHours(0, 0, 0, 0);
+	
+	// Normalize "Start of Today" based on user's timezone to prevent server-drift resets
+	let startOfToday: Date;
+	try {
+		const formatter = new Intl.DateTimeFormat('en-US', {
+			timeZone: userTimezone,
+			year: 'numeric',
+			month: 'numeric',
+			day: 'numeric',
+		});
+		const parts = formatter.formatToParts(now);
+		const m = parts.find(p => p.type === 'month')?.value;
+		const d = parts.find(p => p.type === 'day')?.value;
+		const y = parts.find(p => p.type === 'year')?.value;
+		// Construct UTC literal for the user's local start-of-day
+		startOfToday = new Date(`${y}-${m?.padStart(2, '0')}-${d?.padStart(2, '0')}T00:00:00Z`);
+	} catch (e) {
+		// Fallback to UTC if timezone is invalid
+		startOfToday = new Date(now);
+		startOfToday.setUTCHours(0, 0, 0, 0);
+	}
 
 	// Get logs for this item sorted DESC
-	// Reliability: Limit search to last 200 logs to prevent O(N) scaling crashes.
-	// 200 logs cover ~2-3 months for most users, sufficient for streak verification.
 	const logs = await DosageLog.find({ cabinetItemId: item._id })
 		.sort({ timestamp: -1 })
 		.limit(200)
@@ -34,22 +52,18 @@ const calculateStreak = async (item: any): Promise<number> => {
 		const remindersDueOnDay = item.reminderTimes.filter((r: any) => isOccurrenceOnDay(r, day));
 		const reminderCount = remindersDueOnDay.length;
 
-		// If no reminders were due and no logs were found, it's perfect (a rest day)
 		if (reminderCount === 0) return dayLogs.length === 0;
 		if (dayLogs.length !== reminderCount) return false;
 
-		// Optimization: If logs have the 'wasPunctual' flag, use it directly.
 		return dayLogs.every(log => {
 			if (log.wasPunctual !== undefined) return log.wasPunctual;
 			
-			// Fallback for legacy logs
 			const dayReminders = [...remindersDueOnDay].sort((a: any, b: any) => {
 				const da = new Date(a.time);
 				const db = new Date(b.time);
 				return (da.getHours() * 60 + da.getMinutes()) - (db.getHours() * 60 + db.getMinutes());
 			});
 			
-			// For legacy, we still need a sorted comparison
 			const sortedLogs = [...dayLogs].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 			const logIndex = sortedLogs.indexOf(log);
 			const reminderTime = new Date(dayReminders[logIndex].time);
@@ -62,24 +76,21 @@ const calculateStreak = async (item: any): Promise<number> => {
 
 	// Function to check if Today is still "On Track"
 	const isTodayOnTrack = (dayLogs: any[]): boolean => {
-		const remindersDueToday = item.reminderTimes.filter((r: any) => isOccurrenceOnDay(r, now));
+		const remindersDueToday = item.reminderTimes.filter((r: any) => isOccurrenceOnDay(r, startOfToday));
 		const dayReminders = [...remindersDueToday].sort((a: any, b: any) => {
 			const da = new Date(a.time);
 			const db = new Date(b.time);
 			return (da.getHours() * 60 + da.getMinutes()) - (db.getHours() * 60 + db.getMinutes());
 		});
 
-		// Check each reminder due so far today
 		for (let i = 0; i < dayReminders.length; i++) {
 			const reminderTime = new Date(dayReminders[i].time);
-			const scheduled = new Date(now);
+			const scheduled = new Date(startOfToday);
 			scheduled.setHours(reminderTime.getHours(), reminderTime.getMinutes(), 0, 0);
 
 			if (scheduled.getTime() < now.getTime() - (WINDOW_MINUTES * 60 * 1000)) {
-				// Past due (outside window). Must have a punctual log.
 				const matchingLog = dayLogs.find(l => {
 					if (l.wasPunctual !== undefined) return l.wasPunctual;
-					// Legacy fallback
 					const diffMins = Math.abs(l.timestamp.getTime() - scheduled.getTime()) / (1000 * 60);
 					return diffMins <= WINDOW_MINUTES;
 				});
@@ -92,10 +103,10 @@ const calculateStreak = async (item: any): Promise<number> => {
 
 	// 1. Check Today
 	const logsToday = logs.filter(l => l.timestamp >= startOfToday);
-	if (!isTodayOnTrack(logsToday)) return 0; // Missed today
+	if (!isTodayOnTrack(logsToday)) return 0;
 
-	// If today is actually finished (all doses taken for the day), count it
-	const remindersDueTodayCount = item.reminderTimes.filter((r: any) => isOccurrenceOnDay(r, now)).length;
+	// If today is actually finished, count it
+	const remindersDueTodayCount = item.reminderTimes.filter((r: any) => isOccurrenceOnDay(r, startOfToday)).length;
 	if (remindersDueTodayCount > 0 && logsToday.length === remindersDueTodayCount && isDayPerfect(startOfToday, logsToday)) {
 		streak++;
 	}
@@ -114,21 +125,33 @@ const calculateStreak = async (item: any): Promise<number> => {
 		} else {
 			break;
 		}
-		
-		if (streak > 365) break; // Safety break
+		if (streak > 365) break;
 	}
 
 	return streak;
 };
 
-const refreshStreak = async (itemId: string): Promise<number> => {
+const refreshStreak = async (itemId: string, userTimezone: string = 'UTC'): Promise<number> => {
 	const item = await CabinetItem.findById(itemId);
 	if (!item) return 0;
-	const streak = await calculateStreak(item);
+	const streak = await calculateStreak(item, userTimezone);
 	item.currentStreak = streak;
 	item.lastStreakUpdate = new Date();
 	await item.save();
 	return streak;
+};
+
+export const refreshStreakHandler = async (req: Request, res: Response): Promise<void> => {
+	try {
+		const { id } = req.params;
+		const timezoneHeader = req.headers['x-timezone'];
+		const userTimezone = (Array.isArray(timezoneHeader) ? timezoneHeader[0] : timezoneHeader) || 'UTC';
+		const streak = await refreshStreak(id as string, userTimezone);
+		res.json({ streak });
+	} catch (err) {
+		console.error("Error refreshing streak:", err);
+		res.status(500).json({ message: 'Server error' });
+	}
 };
 
 /**
@@ -138,10 +161,11 @@ const refreshStreak = async (itemId: string): Promise<number> => {
 export const getUpcomingDoses = async (req: Request, res: Response): Promise<void> => {
 	try {
 		const userId = (req as any).user.id;
-		const startOfDay = new Date();
-		startOfDay.setHours(0, 0, 0, 0);
-		const endOfDay = new Date();
-		endOfDay.setHours(23, 59, 59, 999);
+		const now = new Date();
+		const startOfDay = new Date(now);
+		startOfDay.setUTCHours(0, 0, 0, 0);
+		const endOfDay = new Date(now);
+		endOfDay.setUTCHours(23, 59, 59, 999);
 
 		const items = await CabinetItem.find({ 
 			userId, 
@@ -150,7 +174,6 @@ export const getUpcomingDoses = async (req: Request, res: Response): Promise<voi
 		}).lean();
 		
 		const upcoming: any[] = [];
-		const now = new Date();
 
 		for (const item of items) {
 			if (!item.reminderTimes) continue;
@@ -171,9 +194,9 @@ export const getUpcomingDoses = async (req: Request, res: Response): Promise<voi
 					if (isOccurrenceOnDay(reminder, checkDate)) {
 						const rTime = new Date(reminder.time);
 						const scheduled = new Date(checkDate);
-						scheduled.setHours(rTime.getHours(), rTime.getMinutes(), 0, 0);
+						scheduled.setUTCHours(rTime.getUTCHours(), rTime.getUTCMinutes(), 0, 0);
 
-						const isToday = checkDate.toDateString() === now.toDateString();
+						const isToday = checkDate.toISOString().split('T')[0] === now.toISOString().split('T')[0];
 						
 						// If it's today, we need to see if it's already fulfilled
 						if (isToday) {
@@ -183,7 +206,7 @@ export const getUpcomingDoses = async (req: Request, res: Response): Promise<voi
 								.sort((a: any, b: any) => {
 									const da = new Date(a.time);
 									const db = new Date(b.time);
-									return (da.getHours() * 60 + da.getMinutes()) - (db.getHours() * 60 + db.getMinutes());
+									return (da.getUTCHours() * 60 + da.getUTCMinutes()) - (db.getUTCHours() * 60 + db.getUTCMinutes());
 								});
 							
 							const index = remindersToday.findIndex((r: any) => r._id?.toString() === (reminder as any)._id?.toString() || r.time === reminder.time);
@@ -335,9 +358,27 @@ export const getPersonalCabinet = async (req: Request, res: Response): Promise<v
 			});
 		}
 
+		// Bulk-fetch today's dose log counts to compute isDoseDoneToday without N+1 queries
+		const startOfTodayUTC = new Date();
+		startOfTodayUTC.setUTCHours(0, 0, 0, 0);
+		const itemIds = items.map(item => item._id);
+		const todayLogCounts = await DosageLog.aggregate([
+			{ $match: { cabinetItemId: { $in: itemIds }, timestamp: { $gte: startOfTodayUTC } } },
+			{ $group: { _id: '$cabinetItemId', count: { $sum: 1 } } }
+		]);
+		const todayLogCountMap = new Map<string, number>(
+			todayLogCounts.map((r: any) => [r._id.toString(), r.count])
+		);
+
+		const nowForList = new Date();
 		const enrichedItems = items.map((item: any) => {
 			const batch = item.batchId as any;
 			const currentStreak = item.currentStreak || 0;
+
+			// Compute daily completion: has the user taken all doses scheduled for today?
+			const logsToday = todayLogCountMap.get(item._id.toString()) || 0;
+			const remindersDueToday = (item.reminderTimes || []).filter((r: any) => isOccurrenceOnDay(r, nowForList)).length;
+			const isDoseDoneToday = remindersDueToday > 0 && logsToday >= remindersDueToday;
 			
 			if (batch) {
 				const salt = item.salt as string | undefined;
@@ -347,11 +388,23 @@ export const getPersonalCabinet = async (req: Request, res: Response): Promise<v
 					...item,
 					isRecalled: batch.isRecalled,
 					liveScanCount: countsMap.get(countKey) || 0,
-					currentStreak
+					currentStreak,
+					isDoseDoneToday
 				};
 			}
-			return { ...item, currentStreak };
+			return { ...item, currentStreak, isDoseDoneToday };
 		});
+
+		// Fire-and-forget: refresh stale streaks for items whose lastStreakUpdate predates today.
+		const userTimezone = req.headers['x-timezone'] as string || 'UTC';
+		const staleItems = enrichedItems.filter((item: any) =>
+			item.reminderTimes?.length > 0 &&
+			(!item.lastStreakUpdate || new Date(item.lastStreakUpdate) < startOfTodayUTC)
+		);
+		if (staleItems.length > 0) {
+			Promise.all(staleItems.map((item: any) => refreshStreak(item._id.toString(), userTimezone)))
+				.catch((err: any) => console.error('Background streak refresh failed:', err));
+		}
 
 		res.json({ 
 			cabinet: enrichedItems,
@@ -436,6 +489,10 @@ export const addToCabinet = async (req: Request, res: Response): Promise<void> =
 			if (batch) batchId = batch._id;
 		}
 		
+		// Fetch user defaults for notifications
+		const user = await User.findById(userId);
+		const notificationOverrides = user?.notificationDefaults || {};
+
 		const newItem = new CabinetItem({
 			userId,
 			name: productData.name,
@@ -458,6 +515,7 @@ export const addToCabinet = async (req: Request, res: Response): Promise<void> =
 			notes: productData.notes,
 			reminderTimes: productData.reminderTimes || [],
 			prescriptionIds: productData.prescriptionIds || [],
+			notificationOverrides: notificationOverrides
 		});
 
 		try {
@@ -523,13 +581,15 @@ export const markDoseTaken = async (req: Request, res: Response): Promise<void> 
 		// 4. Calculate Punctuality
 		let wasPunctual = false;
 		if (item.reminderTimes && item.reminderTimes.length > 0) {
-			const now = new Date();
-			for (const reminder of item.reminderTimes) {
+			const nowForPunctuality = new Date();
+			// Only evaluate reminders that are actually due today per their frequency schedule
+			const remindersToday = item.reminderTimes.filter((r: any) => isOccurrenceOnDay(r, nowForPunctuality));
+			for (const reminder of remindersToday) {
 				const rTime = new Date(reminder.time);
 				const scheduled = new Date();
 				scheduled.setHours(rTime.getHours(), rTime.getMinutes(), 0, 0);
 				
-				const diffMins = Math.abs(now.getTime() - scheduled.getTime()) / (1000 * 60);
+				const diffMins = Math.abs(nowForPunctuality.getTime() - scheduled.getTime()) / (1000 * 60);
 				if (diffMins <= WINDOW_MINUTES) {
 					wasPunctual = true;
 					break;
@@ -561,9 +621,37 @@ export const markDoseTaken = async (req: Request, res: Response): Promise<void> 
 		}
 
 		// 6. Update Streak
-		const currentStreak = await refreshStreak(id as string);
+		const tzHeader = req.headers['x-timezone'];
+		const userTimezone = (Array.isArray(tzHeader) ? tzHeader[0] : tzHeader) || 'UTC';
+		const currentStreak = await refreshStreak(id as string, userTimezone);
 
-		// 7. Dynamic Low-Stock Alert
+		const nowForPunctuality = new Date();
+
+		// 7. Compute "all doses done today" so the UI can disable the Take Dose button
+		const startOfTodayForCheck = new Date();
+		// Use local start of day if possible for completion check
+		try {
+			const formatter = new Intl.DateTimeFormat('en-US', {
+				timeZone: userTimezone,
+				year: 'numeric', month: 'numeric', day: 'numeric',
+			});
+			const p = formatter.formatToParts(nowForPunctuality);
+			const y = p.find(x => x.type === 'year')?.value;
+			const m = p.find(x => x.type === 'month')?.value;
+			const d = p.find(x => x.type === 'day')?.value;
+			startOfTodayForCheck.setTime(new Date(`${y}-${m?.padStart(2, '0')}-${d?.padStart(2, '0')}T00:00:00Z`).getTime());
+		} catch (e) {
+			startOfTodayForCheck.setUTCHours(0, 0, 0, 0);
+		}
+
+		const logsTodayCount = await DosageLog.countDocuments({
+			cabinetItemId: item._id,
+			timestamp: { $gte: startOfTodayForCheck }
+		});
+		const remindersDueTodayCount = (item.reminderTimes || []).filter((r: any) => isOccurrenceOnDay(r, startOfTodayForCheck)).length;
+		const isDoseDoneToday = remindersDueTodayCount > 0 && logsTodayCount >= remindersDueTodayCount;
+
+		// 8. Dynamic Low-Stock Alert
 		const finalQuantity = updateResult.currentQuantity || 0;
 		const dailyRequirement = item.reminderTimes?.length || 1; 
 		const lowStockThreshold = dailyRequirement * 3;
@@ -591,6 +679,7 @@ export const markDoseTaken = async (req: Request, res: Response): Promise<void> 
 			lastDoseTaken: log.timestamp,
 			currentStreak,
 			wasPunctual: log.wasPunctual,
+			isDoseDoneToday,
 			logId: log._id
 		});
 	} catch (err) {
@@ -652,7 +741,8 @@ export const undoDose = async (req: Request, res: Response): Promise<void> => {
 		}
 		
 		// 6. Update Streak (Calculate on Write)
-		const currentStreak = await refreshStreak(id as string);
+		const userTimezone = req.headers['x-timezone'] as string || 'UTC';
+		const currentStreak = await refreshStreak(id as string, userTimezone);
 		
 		res.json({ 
 			message: 'Dose reverted successfully', 
@@ -676,16 +766,35 @@ export const updateCabinetItem = async (req: Request, res: Response): Promise<vo
 		const { id } = req.params;
 		const updates = req.body;
 
-		delete updates.userId;
-		delete updates.productId;
-		delete updates.salt;
-		delete updates.isUserAdded;
+		const item = await CabinetItem.findOne({ _id: id, userId });
 
-		const item = await CabinetItem.findOneAndUpdate(
-			{ _id: id, userId },
-			{ $set: updates },
-			{ new: true }
-		);
+		if (!item) {
+			res.status(404).json({ message: 'Cabinet item not found' });
+			return;
+		}
+
+		// Prevent modification of verified product data
+		if (!item.isUserAdded) {
+			delete updates.name;
+			delete updates.brand;
+			delete updates.expiryDate;
+			delete updates.batchNumber;
+			delete updates.batchId;
+			delete updates.productId;
+			delete updates.salt;
+			delete updates.isUserAdded;
+		} else {
+			// Even for user-added items, these should remain stable after creation
+			delete updates.productId;
+			delete updates.salt;
+			delete updates.isUserAdded;
+		}
+		
+		delete updates.userId;
+
+		// Perform update
+		Object.assign(item, updates);
+		await item.save();
 
 		if (!item) {
 			res.status(404).json({ message: 'Cabinet item not found' });

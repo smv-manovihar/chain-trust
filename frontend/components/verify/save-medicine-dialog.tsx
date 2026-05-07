@@ -28,22 +28,17 @@ import {
   Loader2,
   Package,
   Clock,
-  Pill,
-  Scale,
-  CalendarDays,
-  ListTodo,
   Stethoscope,
+  Plus,
+  X,
+  FileText,
 } from "lucide-react";
 import { addToCabinet } from "@/api/customer.api";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { PrescriptionSelector } from "@/components/prescriptions/prescription-selector";
-import { Plus, X, Hash, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 const saveMedicineSchema = z.object({
@@ -77,8 +72,7 @@ interface SaveMedicineDialogProps {
 }
 
 const SECTION_ICON_CLASSES = "h-4 w-4 text-primary shrink-0";
-const SECTION_LABEL_CLASSES =
-  "text-xs font-bold text-muted-foreground/80 flex items-center gap-2 mb-3 px-1";
+const SECTION_LABEL_CLASSES = "text-sm font-semibold flex items-center gap-2 mb-4 text-foreground/90";
 
 export function SaveMedicineDialog({
   open,
@@ -87,9 +81,17 @@ export function SaveMedicineDialog({
   qrInput,
 }: SaveMedicineDialogProps) {
   const router = useRouter();
+  const [displayProduct, setDisplayProduct] = React.useState(product);
   const [isLoading, setIsLoading] = useState(false);
-  const [isPrescriptionDialogOpen, setIsPrescriptionDialogOpen] =
-    useState(false);
+  const [isPrescriptionDialogOpen, setIsPrescriptionDialogOpen] = useState(false);
+
+  React.useEffect(() => {
+    if (open && product) {
+      setDisplayProduct(product);
+    }
+  }, [open, product]);
+
+  const [selectedDocs, setSelectedDocs] = useState<any[]>([]);
 
   const form = useForm<SaveMedicineValues>({
     resolver: zodResolver(saveMedicineSchema),
@@ -110,12 +112,12 @@ export function SaveMedicineDialog({
     setIsLoading(true);
     try {
       await addToCabinet({
-        name: product?.productName,
-        brand: product?.brand,
-        productId: product?.productId,
-        batchNumber: product?.batchNumber,
-        expiryDate: product?.expiryDate,
-        images: product?.images,
+        name: displayProduct?.productName,
+        brand: displayProduct?.brand,
+        productId: displayProduct?.productId,
+        batchNumber: displayProduct?.batchNumber,
+        expiryDate: displayProduct?.expiryDate,
+        images: displayProduct?.images,
         salt: qrInput,
         isUserAdded: false,
         currentQuantity: data.currentQuantity,
@@ -146,48 +148,40 @@ export function SaveMedicineDialog({
 
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
-      <ResponsiveDialogContent className="w-full max-w-none sm:max-w-xl bg-background/95 sm:bg-background/80 backdrop-blur-3xl border-0 sm:border border-zinc-800 p-0 overflow-hidden shadow-2xl">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
-
-        <ResponsiveDialogHeader className="p-5 sm:p-8 pb-3 relative z-auto shrink-0 border-b border-primary/5 sm:border-none mt-2 sm:mt-0">
+      <ResponsiveDialogContent className="sm:max-w-xl p-0 overflow-hidden bg-background">
+        <ResponsiveDialogHeader className="p-4 sm:p-6 pb-4 border-b">
           <div className="flex flex-col gap-1">
-            <ResponsiveDialogTitle className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
-              <BookmarkPlus className="h-6 w-6 text-primary" />
+            <ResponsiveDialogTitle className="flex items-center gap-2 text-xl">
+              <BookmarkPlus className="h-5 w-5 text-primary" />
               Save to My Medicines
             </ResponsiveDialogTitle>
-            <p className="text-sm text-muted-foreground font-medium">
-              Configure inventory and schedule for {product?.productName}
+            <p className="text-sm text-muted-foreground">
+              Configure medication and schedule for {displayProduct?.productName}
             </p>
           </div>
         </ResponsiveDialogHeader>
 
         <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="flex-1 flex flex-col min-h-0 relative z-10 w-full overflow-hidden"
-          >
-            <ResponsiveDialogBody className="px-4 sm:px-10 py-5 sm:py-6 space-y-8 pb-10 overflow-x-hidden w-full">
-              {/* Adherence & Schedule Section - NOW FIRST */}
-              <div className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+            <ResponsiveDialogBody className="p-4 sm:p-6 space-y-8">
+              
+              <div className="space-y-4">
                 <div className={SECTION_LABEL_CLASSES}>
                   <Clock className={SECTION_ICON_CLASSES} />
-                  <span>Adherence & Schedule</span>
+                  <span>Schedule & Adherence</span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="dosage"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground/60 ml-1">
-                          Take amount (e.g. 1)
-                        </FormLabel>
+                        <FormLabel>Dosage Amount</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
                             placeholder="1"
-                            className="h-11 rounded-2xl border-primary/10 bg-muted/20 font-bold"
                             {...field}
                             onChange={(e) => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}
                           />
@@ -201,36 +195,36 @@ export function SaveMedicineDialog({
                     control={form.control}
                     name="reminderTimes"
                     render={({ field }) => (
-                      <FormItem className="col-span-full space-y-3">
+                      <FormItem className="col-span-1 sm:col-span-2 space-y-3">
                         <div className="flex items-center justify-between">
-                          <Label className="text-xs font-black text-foreground/80">Reminder Times</Label>
+                          <Label>Dose Reminders</Label>
                           <Button 
                             type="button" 
                             variant="outline" 
                             size="sm" 
-                            className="rounded-full border-dashed border-primary/30 h-7 px-3 text-[10px] font-black"
+                            className="h-8"
                             onClick={() => {
                               const newTime = new Date();
                               newTime.setHours(8, 0, 0, 0);
                               field.onChange([...field.value, { time: newTime, mealContext: 'no_preference' }]);
                             }}
                           >
-                            <Plus className="h-3 w-3 mr-1" /> Add
+                            <Plus className="h-4 w-4 mr-1" /> Add Time
                           </Button>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {field.value.length === 0 && (
-                            <div className="col-span-full py-8 border-2 border-dashed border-primary/5 rounded-[2rem] flex flex-col items-center justify-center text-center bg-muted/5">
-                              <p className="text-[10px] font-bold text-muted-foreground/40 italic">Set daily reminders to never miss a dose.</p>
+                            <div className="col-span-full py-6 border border-dashed rounded-lg flex items-center justify-center bg-muted/50">
+                              <p className="text-sm text-muted-foreground">No reminders set.</p>
                             </div>
                           )}
                           
                           {field.value.map((reminder, index) => (
-                            <div key={index} className="flex gap-2 items-center bg-muted/30 p-2 rounded-2xl border border-primary/5">
+                            <div key={index} className="flex gap-2 items-center bg-muted/50 p-2 rounded-lg border">
                               <Input 
                                 type="time" 
-                                className="h-8 rounded-xl bg-background border-none font-black text-xs p-1"
+                                className="h-8 bg-background border-none shadow-none"
                                 value={format(reminder.time, "HH:mm")}
                                 onChange={(e) => {
                                   const [h, m] = e.target.value.split(':');
@@ -245,14 +239,14 @@ export function SaveMedicineDialog({
                                 type="button" 
                                 variant="ghost" 
                                 size="icon"
-                                className="h-7 w-7 rounded-full text-destructive hover:bg-destructive/10"
+                                className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
                                 onClick={() => {
                                   const newVal = [...field.value];
                                   newVal.splice(index, 1);
                                   field.onChange(newVal);
                                 }}
                               >
-                                <X className="h-3 w-3" />
+                                <X className="h-4 w-4" />
                               </Button>
                             </div>
                           ))}
@@ -263,28 +257,21 @@ export function SaveMedicineDialog({
                 </div>
               </div>
 
-              {/* Inventory Section - NOW SECOND */}
               <div className="space-y-4">
                 <div className={SECTION_LABEL_CLASSES}>
                   <Package className={SECTION_ICON_CLASSES} />
-                  <span>Physical Inventory</span>
+                  <span>Stock Management</span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="currentQuantity"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground/60 ml-1">
-                          Current Stock
-                        </FormLabel>
+                        <FormLabel>Remaining Units</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            className="h-11 rounded-2xl border-primary/10 bg-muted/20 font-black text-base"
-                            {...field}
-                          />
+                          <Input type="number" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -296,15 +283,9 @@ export function SaveMedicineDialog({
                     name="totalQuantity"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground/60 ml-1">
-                          Pack Size
-                        </FormLabel>
+                        <FormLabel>Total Pack Units</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            className="h-11 rounded-2xl border-primary/10 bg-muted/20 font-black text-base"
-                            {...field}
-                          />
+                          <Input type="number" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -315,16 +296,10 @@ export function SaveMedicineDialog({
                     control={form.control}
                     name="unit"
                     render={({ field }) => (
-                      <FormItem className="col-span-2 sm:col-span-1">
-                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground/60 ml-1">
-                          Unit
-                        </FormLabel>
+                      <FormItem>
+                        <FormLabel>Unit</FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder="Pills"
-                            className="h-11 rounded-2xl border-primary/10 bg-muted/20 font-bold"
-                            {...field}
-                          />
+                          <Input placeholder="Pills" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -333,28 +308,21 @@ export function SaveMedicineDialog({
                 </div>
               </div>
 
-              {/* Medical Context Section */}
               <div className="space-y-4">
                 <div className={SECTION_LABEL_CLASSES}>
                   <Stethoscope className={SECTION_ICON_CLASSES} />
-                  <span>Prescription & Notes</span>
+                  <span>Prescriptions & Advice</span>
                 </div>
 
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-4">
                   <FormField
                     control={form.control}
                     name="doctorName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground/60 ml-1">
-                          Prescribing Doctor
-                        </FormLabel>
+                        <FormLabel>Healthcare Provider</FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder="e.g. Dr. Jane Smith"
-                            className="h-11 rounded-2xl border-primary/10 bg-muted/20 font-semibold"
-                            {...field}
-                          />
+                          <Input placeholder="e.g. Dr. Jane Smith" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -366,37 +334,71 @@ export function SaveMedicineDialog({
                     name="prescriptionIds"
                     render={({ field }) => (
                       <FormItem>
-                        <div className="flex items-center justify-between px-1">
-                          <FormLabel className="text-[10px] font-black uppercase text-muted-foreground/60">
-                            Attached Documents
+                        <div className="flex items-center justify-between mb-2">
+                          <FormLabel className="flex items-center gap-2">
+                            Prescriptions & Records
                           </FormLabel>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setIsPrescriptionDialogOpen(true)}
-                            className="h-6 rounded-full text-[10px] font-bold text-primary"
-                          >
-                            <Plus className="h-3 w-3 mr-1" /> Browse Pool
-                          </Button>
+                          {field.value.length > 0 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsPrescriptionDialogOpen(true)}
+                              className="h-8 text-xs font-bold hover:bg-primary/5 text-primary"
+                            >
+                              <Plus className="h-3 w-3 mr-1" /> Add or Change
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="space-y-3">
+                          {field.value.length === 0 ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full h-20 border-dashed border-2 flex flex-col gap-1 rounded-2xl hover:bg-primary/5 hover:border-primary/40 transition-all"
+                              onClick={() => setIsPrescriptionDialogOpen(true)}
+                            >
+                              <div className="flex items-center gap-2 text-primary">
+                                <Plus className="h-4 w-4" />
+                                <span className="font-bold">Link Digital Prescription</span>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground font-medium">
+                                Provides verified context for your AI Health Assistant
+                              </p>
+                            </Button>
+                          ) : (
+                            <div className="p-4 rounded-2xl border bg-muted/30 flex flex-wrap gap-2">
+                              {selectedDocs.map((p: any) => (
+                                <Badge 
+                                  key={p._id} 
+                                  variant="secondary"
+                                  role="button"
+                                  onClick={() => {
+                                    const nextIds = field.value.filter((i: string) => i !== p._id);
+                                    field.onChange(nextIds);
+                                    setSelectedDocs(prev => prev.filter(d => d._id !== p._id));
+                                  }}
+                                  className="bg-background border-primary/20 text-primary px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 cursor-pointer hover:bg-destructive/5 hover:text-destructive hover:border-destructive/30 transition-all group/badge"
+                                >
+                                  <FileText className="h-3 w-3 opacity-70" />
+                                  <span className="truncate max-w-[120px]">{p.label}</span>
+                                  <X className="h-3 w-3 opacity-50 group-hover/badge:opacity-100" />
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         <PrescriptionSelector
                           open={isPrescriptionDialogOpen}
                           onOpenChange={setIsPrescriptionDialogOpen}
                           selectedIds={field.value}
-                          onChange={(ids) => field.onChange(ids)}
+                          onChange={(ids, objects) => {
+                            field.onChange(ids);
+                            setSelectedDocs(objects);
+                          }}
                         />
-
-                        {field.value.length > 0 && (
-                          <div className="p-3 rounded-2xl bg-primary/5 flex flex-wrap gap-2">
-                            {field.value.map((id: string) => (
-                              <Badge key={id} variant="secondary" className="bg-background text-[10px] font-black rounded-lg py-1">
-                                DOC: {id.slice(-4).toUpperCase()}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -407,13 +409,11 @@ export function SaveMedicineDialog({
                     name="notes"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-muted-foreground/60 ml-1">
-                          Advice / Warnings
-                        </FormLabel>
+                        <FormLabel>Storage & Instructions</FormLabel>
                         <FormControl>
                           <Textarea
                             placeholder="Store in cool place, take after breakfast..."
-                            className="min-h-[80px] rounded-2xl border-primary/10 bg-muted/20 font-medium text-sm p-4 resize-none"
+                            className="min-h-[80px] resize-none"
                             {...field}
                           />
                         </FormControl>
@@ -423,22 +423,19 @@ export function SaveMedicineDialog({
                   />
                 </div>
               </div>
+
             </ResponsiveDialogBody>
 
-            <ResponsiveDialogFooter className="p-4 pb-8 sm:p-6 sm:pt-4 shrink-0 border-t border-primary/5 bg-background/80 backdrop-blur-md">
-              <Button
-                type="submit"
-                className="w-full h-14 rounded-full shadow-xl shadow-primary/20 font-bold text-base sm:text-lg gap-3 transition-transform hover:scale-[1.02] active:scale-95"
-                disabled={isLoading}
-              >
+            <ResponsiveDialogFooter className="p-4 sm:p-6 border-t bg-muted/20">
+              <Button type="submit" className="w-full gap-2" disabled={isLoading}>
                 {isLoading ? (
                   <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     <span>Saving...</span>
                   </>
                 ) : (
                   <>
-                    <BookmarkPlus className="h-5 w-5" />
+                    <BookmarkPlus className="h-4 w-4" />
                     <span>Save to My Medicines</span>
                   </>
                 )}

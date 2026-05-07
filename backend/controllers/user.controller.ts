@@ -26,9 +26,10 @@ export const changeUserPassword = async (req: Request, res: Response): Promise<v
 			return;
 		}
 		
-		if (currentPassword) {
-			if (!user.password) {
-				res.status(400).json({ message: 'Account has no password set. Please use password reset.' });
+		// If user already has a password, currentPassword is REQUIRED
+		if (user.password) {
+			if (!currentPassword) {
+				res.status(400).json({ message: 'Current password is required to change password' });
 				return;
 			}
 			const isMatch = await compare(currentPassword, user.password);
@@ -41,10 +42,16 @@ export const changeUserPassword = async (req: Request, res: Response): Promise<v
 		const hashedPassword = await hash(newPassword, 10);
 		await User.updateOne(
 			{ _id: userId },
-			{ $set: { password: hashedPassword } },
+			{ 
+				$set: { 
+					password: hashedPassword,
+					mustChangePassword: false // Clear the flag if it was set
+				} 
+			},
 		);
-		res.json({ message: 'Password changed successfully' });
+		res.json({ message: 'Password updated successfully' });
 	} catch (err) {
+		console.error('Change password error:', err);
 		res.status(500).json({ message: 'Server error' });
 	}
 };

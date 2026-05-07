@@ -10,7 +10,7 @@ from config import get_settings
 from prompts import CUSTOMER_SYSTEM_PROMPT, MANUFACTURER_SYSTEM_PROMPT
 
 DEFAULT_OPENROUTER_MODEL = "openrouter/free"
-BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 class Agent:
@@ -52,7 +52,7 @@ class Agent:
             temperature=temperature,
             model=model_name or DEFAULT_OPENROUTER_MODEL,
             api_key=api_key,
-            base_url=BASE_URL,
+            base_url=OPENROUTER_BASE_URL,
             max_tokens=max_tokens,
             timeout=request_timeout,
         )

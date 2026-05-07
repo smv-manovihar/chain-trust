@@ -384,7 +384,7 @@ export default function CustomerSettingsPage() {
                     <div className="flex justify-end pt-6 border-t border-border mt-8">
                       <Button
                         disabled={isLoading}
-                        className="rounded-full w-full sm:w-auto px-10 h-12 shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all text-xs sm:text-[10px] font-bold"
+                        className="rounded-full w-full sm:w-auto px-10 h-12 shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all text-xs"
                       >
                         {isLoading && (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />

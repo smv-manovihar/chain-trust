@@ -13,6 +13,7 @@ import {
   BookmarkPlus,
   ChevronLeft,
   AlertTriangle,
+  CirclePlus,
 } from "lucide-react";
 import { verifyScan } from "@/api/batch.api";
 import { verifyOnBlockchain, deriveUnitHash } from "@/api/web3-client";
@@ -314,6 +315,7 @@ function VerifyContent() {
     label: string;
   } | null>(null);
   const [showImageViewer, setShowImageViewer] = useState(false);
+  const [backendUnavailable, setBackendUnavailable] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -454,6 +456,7 @@ function VerifyContent() {
         console.warn(
           "Backend metadata unavailable, relying on blockchain safety record.",
         );
+        setBackendUnavailable(true);
       }
 
       setProduct(finalProduct);
@@ -678,12 +681,13 @@ function VerifyContent() {
                     }}
                     className="rounded-full px-6 w-full sm:w-auto h-12 sm:h-10 font-bold active:scale-95 transition-all"
                   >
+                    <CirclePlus className="mr-2 h-5 w-5 sm:h-4 sm:w-4" />
                     Scan new
                   </Button>
                   {!isManufacturer && (
                     <Button
                       onClick={handleSaveToCabinet}
-                      className="rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 px-6 transition-all duration-300 w-full sm:w-auto h-12 sm:h-10 font-black active:scale-95"
+                      className="rounded-full shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 px-6 transition-all duration-300 w-full sm:w-auto h-12 sm:h-10 active:scale-95"
                     >
                       <BookmarkPlus
                         className="mr-2 h-5 w-5 sm:h-4 sm:w-4"
@@ -696,6 +700,14 @@ function VerifyContent() {
               </div>
 
               <div className="flex-1 flex flex-col gap-6 sm:gap-8 pb-12">
+                {backendUnavailable && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+                    <p className="text-sm font-medium text-amber-900">
+                      Primary database unavailable. Showing blockchain records only. High-precision scan tracking is currently offline.
+                    </p>
+                  </div>
+                )}
                 <InteractiveResultCard
                   product={product}
                   scanStats={scanStats}
@@ -932,22 +944,18 @@ function VerifyContent() {
         </AlertDialog>
       )}
 
-      {showSaveDialog && product && (
-        <SaveMedicineDialog
-          open={showSaveDialog}
-          onOpenChange={setShowSaveDialog}
-          product={product}
-          qrInput={qrInput}
-        />
-      )}
+      <SaveMedicineDialog
+        open={showSaveDialog}
+        onOpenChange={setShowSaveDialog}
+        product={product}
+        qrInput={qrInput}
+      />
 
-      {showImageViewer && selectedImage && (
-        <DocumentViewerDialog
-          open={showImageViewer}
-          onOpenChange={setShowImageViewer}
-          document={selectedImage}
-        />
-      )}
+      <DocumentViewerDialog
+        open={showImageViewer}
+        onOpenChange={setShowImageViewer}
+        document={selectedImage}
+      />
     </div>
   );
 }

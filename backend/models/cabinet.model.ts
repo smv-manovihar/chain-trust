@@ -13,6 +13,7 @@ export interface INotificationOverride {
 	medicine_expiry?: { inApp?: boolean; email?: boolean };
 	batch_recall?: { inApp?: boolean; email?: boolean };
 	dose_reminder?: { inApp?: boolean; email?: boolean; leadTimeMinutes?: number };
+	missed_dose?: { inApp?: boolean; email?: boolean };
 }
 
 export interface ICabinetItem extends Document {

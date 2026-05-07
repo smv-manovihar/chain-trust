@@ -69,13 +69,14 @@ app = FastAPI(title="ChainTrust AI Service", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        settings.FRONTEND_URL,
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://[::1]:3000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
+    allow_headers=["*"],
 )
 
 

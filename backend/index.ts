@@ -110,8 +110,8 @@ const startServer = async () => {
 	await initS3();
 	initAllJobs();
 
-	const server = app.listen(PORT, () => {
-		console.log(`Server is running on port ${PORT}`);
+	const server = app.listen(Number(PORT), '0.0.0.0', () => {
+		console.log(`Server is running on port ${PORT} (accessible at 0.0.0.0)`);
 	});
 
 	// Graceful shutdown

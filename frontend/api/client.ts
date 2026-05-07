@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000') + '/api';
 
 const client = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_URL,
   withCredentials: true,
   timeout: 50000, // 50s default timeout (Reliability FIX-003)
   headers: {
@@ -44,7 +44,7 @@ export const refreshToken = async (): Promise<string | null> => {
   isRefreshing = true;
   try {
     const response = await axios.post<RefreshResponse>(
-      `${API_BASE_URL}/auth/refresh`,
+      `${API_URL}/auth/refresh`,
       {},
       { withCredentials: true }
     );

@@ -1,5 +1,5 @@
 import { initExpiryJob } from './expiry.job.js';
-import { initReminderJob } from './reminder.job.js';
+import { initReminderJob, initMissedDoseJob } from './reminder.job.js';
 import { initReconciliationJob } from './reconciliation.job.js';
 
 /**
@@ -10,6 +10,7 @@ export const initAllJobs = () => {
     
     initExpiryJob();
     initReminderJob();
+    initMissedDoseJob();
     initReconciliationJob();
     
     console.log('[Jobs] All background tasks registered.');

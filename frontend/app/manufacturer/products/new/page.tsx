@@ -94,7 +94,7 @@ export default function NewProductWizard() {
       description: "",
       composition: "",
       unit: "pills",
-      images: [] as File[],
+      images: [] as (File | string)[],
       imageAccessLevel: "public" as
         | "public"
         | "verified_only"
@@ -186,11 +186,17 @@ export default function NewProductWizard() {
       }
 
       // Step 2: Upload images
-      let imageUrls: string[] = [];
-      if (form.images && form.images.length > 0) {
+      let finalImageUrls: string[] = [];
+      const existingUrls = (form.images || []).filter(img => typeof img === "string") as unknown as string[];
+      const newFiles = (form.images || []).filter(img => typeof img !== "string") as unknown as File[];
+
+      if (newFiles.length > 0) {
         setUploading(true);
-        imageUrls = await uploadImages(form.images);
+        const uploadedUrls = await uploadImages(newFiles);
+        finalImageUrls = [...existingUrls, ...uploadedUrls];
         setUploading(false);
+      } else {
+        finalImageUrls = existingUrls;
       }
 
       // Step 3: Finalize status
@@ -198,7 +204,7 @@ export default function NewProductWizard() {
         ...form,
         price: parseFloat(form.price) || 0,
         status: "completed",
-        images: imageUrls,
+        images: finalImageUrls,
         wizardState: {}, // Clear state on success
       });
 

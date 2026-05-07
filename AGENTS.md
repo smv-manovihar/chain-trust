@@ -271,4 +271,4 @@ Leaving tutorials out of sync with the live UI is a bug, not a backlog item.
 
 ---
 
-*Last updated: April 2026 — keep this file current with every architectural decision.*
+*Last updated: May 2026 — keep this file current with every architectural decision.*

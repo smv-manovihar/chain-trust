@@ -88,11 +88,19 @@ class ChatService:
             messages = []
 
             # Bind fresh context to the tools instance
+            user_timezone = ctx.get("timezone", "UTC")
+            local_time_str = ctx.get("current_time", datetime.now(timezone.utc).isoformat())
+
             self.tools_instance.current_route = route
             self.tools_instance.query_params = query_params
+            self.tools_instance.user_timezone = user_timezone
 
             # Formulate the situational context block
-            context_blocks = [f"<current_route>{route}</current_route>"]
+            context_blocks = [
+                f"<current_route>{route}</current_route>",
+                f"<user_local_time>{local_time_str}</user_local_time>",
+                f"<user_timezone>{user_timezone}</user_timezone>"
+            ]
             if query_params:
                 context_blocks.append(
                     f"<active_filters>\n{json.dumps(query_params, indent=2)}\n</active_filters>"
@@ -105,7 +113,7 @@ class ChatService:
             ui_context_msg = (
                 "### SESSION SITUATIONAL CONTEXT ###\n"
                 "The following block describes the user's current environment. "
-                "Use this to ground your responses. If you need more detail, use the provided tools.\n"
+                "Use this to ground your responses, especially regarding 'today' or 'now'.\n"
                 "<ui_context>\n" + "\n".join(context_blocks) + "\n</ui_context>"
             )
             messages.append(SystemMessage(content=ui_context_msg))

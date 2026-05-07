@@ -11,6 +11,7 @@ import {
 	removeFromCabinet,
 	markDoseTaken,
 	undoDose,
+	refreshStreakHandler,
 	getDosageLogs,
 	getUserPrescriptions,
 	uploadPrescription,
@@ -32,6 +33,7 @@ router.put('/:id', authenticate, updateCabinetItem);
 router.delete('/:id', authenticate, removeFromCabinet);
 router.post('/mark-taken/:id', authenticate, markDoseTaken);
 router.post('/undo-dose/:id', authenticate, undoDose);
+router.post('/refresh-streak/:id', authenticate, refreshStreakHandler);
 router.get('/logs/:id', authenticate, getDosageLogs);
 
 

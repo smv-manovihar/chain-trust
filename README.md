@@ -8,14 +8,14 @@ Chain Trust is a full-stack web application that leverages the Ethereum blockcha
 
 ## ✨ Key Features
 
-- **Instant Verification**: Universally compatible QR codes that allow any scanner to verify product authenticity, check for recalls, and view scan history via the ChainTrust platform.
-- **My Medicines**: Professional medication dashboard with precision dose tracking and automated inventory management.
-- **Intelligent AI Assistant**: A role-aware agent with deep contextual awareness of your data, providing proactive health insights and automated task execution.
-- **Precision Reminders**: High-accuracy in-app and email notifications for dosing schedules, upcoming expirations, product recalls, and low-stock alerts.
-- **Prescription Management**: Encrypted digital storage for medical prescriptions (PDF/Images) with seamless integration into your personal My Medicines list.
-- **Batch Management**: Manufacturer tools for enrolling production batches, generating cryptographic unit salts, and producing print-ready QR label sheets.
-- **Risk Analytics**: Advanced manufacturer dashboard featuring real-time scan maps, counterfeit detection, and supply chain engagement metrics.
-- **Session Control**: Enterprise-grade security with multi-device login, remote session management, and seamless Google OAuth integration.
+- **Instant Verification**: Dual-mode QR scanner (Camera/Upload) with **client-side cryptographic pre-validation** (SHA-256). Verification is blockchain-first and functions even if the database is offline.
+- **My Medicines**: Comprehensive medication dashboard with **frequency-aware adherence streaks**, dose history logging, and real-time scan count tracking to detect unit-level suspicious activity.
+- **Intelligent AI Agent**: Role-aware LangChain assistant with **situational awareness** (via `get_view_data`). It can explain UI features, search prescriptions, and manage your cabinet through natural language.
+- **Precision Reminders**: High-accuracy notification system using a **look-ahead dispatch strategy** to eliminate cron-drift. Supports granular per-channel (In-App/Email) preferences and lead-time alerts.
+- **Prescription Management**: Digital vault for medical documents with **automated OCR extraction** via Tesseract. Extracted text is indexed for full-text search by the AI agent and linked to cabinet items.
+- **Batch Enrollment**: Multi-step manufacturer wizard for registering production runs with **cryptographic salt derivation** and atomic blockchain anchoring. Includes print-ready PDF label generation.
+- **Risk Analytics**: Executive dashboard with **geographic scan mapping** (two-tier GeoIP), threat intelligence for suspicious scan clusters, and batch performance metrics.
+- **Enterprise Security**: Robust identity management with **remote session revocation**, multi-device tracking, and secure Google OAuth integration with automatic role-mapping.
 
 ---
 

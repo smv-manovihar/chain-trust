@@ -38,27 +38,31 @@ export const initExpiryJob = () => {
 					const defaults = user.notificationDefaults?.medicine_expiry;
 					
 					const notifyInApp = override?.inApp !== undefined ? override.inApp : (defaults?.inApp ?? true);
-					const notifyEmail = override?.email !== undefined ? override.email : (defaults?.email ?? true);
+					const notifyEmail = (override?.email !== undefined ? override.email : (defaults?.email ?? true)) && !!user.email;
+
+					if (!notifyInApp && !notifyEmail) continue;
+
+					// Map to Notification Model channel enum
+					const channel = notifyInApp && notifyEmail ? 'both' : notifyInApp ? 'in_app' : 'email';
 
 					const dateStr = item.expiryDate?.toISOString().split('T')[0] || 'N/A';
 
-					if (notifyInApp) {
-						await Notification.create({
-							user: user._id,
-							type: 'medicine_expiry',
-							title: 'Medicine Expiring Soon',
-							message: `${item.name} expires in ${days} days (${dateStr}).`,
-							link: `/customer/cabinet/${item._id}`,
-							metadata: {
-								cabinetItemId: item._id,
-								medicineName: item.name,
-								expiryDate: item.expiryDate
-							}
-						});
-					}
+					await Notification.create({
+						user: user._id,
+						type: 'medicine_expiry',
+						title: 'Medicine Expiring Soon',
+						message: `${item.name} expires in ${days} days (${dateStr}).`,
+						link: `/customer/cabinet/${item._id}`,
+						channel,
+						metadata: {
+							cabinetItemId: item._id,
+							medicineName: item.name,
+							expiryDate: item.expiryDate
+						}
+					});
 
-					if (notifyEmail && user.email) {
-						await sendExpiryAlert(user.email, item.name, dateStr, days);
+					if (notifyEmail) {
+						await sendExpiryAlert(user.email, item.name, dateStr, days, item._id.toString());
 					}
 				}
 			}

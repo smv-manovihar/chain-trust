@@ -1,10 +1,10 @@
 import axios from 'axios';
 import { refreshToken } from './client';
 
-const AGENT_API_BASE_URL = process.env.NEXT_PUBLIC_AGENT_API_BASE_URL || 'http://localhost:8000/api';
+const AGENT_API_URL = (process.env.NEXT_PUBLIC_AGENT_API_URL || 'http://localhost:8000') + '/api';
 
 const agentClient = axios.create({
-  baseURL: AGENT_API_BASE_URL,
+  baseURL: AGENT_API_URL,
   withCredentials: true,
   timeout: 10000, // 10s default timeout (Reliability FIX-003)
   headers: {

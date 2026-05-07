@@ -217,7 +217,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
     // Redirect to backend Google auth endpoint
     const baseUrl =
-      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
     const query = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : "";
     window.location.href = `${baseUrl}/api/auth/google${query}`;
   }, []);

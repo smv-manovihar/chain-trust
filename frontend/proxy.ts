@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000') + '/api';
 
 /**
  * Lightweight JWT expiration check (checks exp claim)
@@ -45,7 +45,7 @@ export async function proxy(request: NextRequest) {
   // 1. ATTEMPT REFRESH: If accessToken is missing or expired, but refreshToken exists
   if ((!accessToken || isTokenExpired(accessToken)) && refreshToken) {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      const response = await fetch(`${API_URL}/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -68,19 +68,28 @@ export const sendNotification = async (payload: NotificationPayload): Promise<an
 			}
 		}
 
-		// 3. Persist In-App Notification if enabled (default true)
+		// 3. Determine Channels & Preferences
 		const pref = user.notificationDefaults[payload.type as keyof typeof user.notificationDefaults] as any;
 		const shouldSendInApp = pref?.inApp ?? true;
+		const shouldSendEmail = (pref?.email ?? false) && user.isEmailVerified;
 
-		let notification = null;
-		if (shouldSendInApp) {
-			notification = await Notification.create(payload);
-			console.log(`[Notification Service] In-App created: ${payload.type} for ${user.email}`);
+		if (!shouldSendInApp && !shouldSendEmail) {
+			return null;
 		}
 
-		// 3. Trigger Email if enabled
-		const shouldSendEmail = pref?.email ?? false;
-		if (shouldSendEmail && user.isEmailVerified) {
+		// Map to Notification Model channel enum
+		const channel = shouldSendInApp && shouldSendEmail ? 'both' : shouldSendInApp ? 'in_app' : 'email';
+
+		// 4. Persist Notification (Deduplication record)
+		const notification = await Notification.create({
+			...payload,
+			channel
+		});
+
+		console.log(`[Notification Service] Created (${channel}): ${payload.type} for ${user.email}`);
+
+		// 5. Trigger Email if applicable
+		if (shouldSendEmail) {
 			dispatchEmail(user, payload);
 		}
 
@@ -119,7 +128,8 @@ async function dispatchEmail(user: any, payload: NotificationPayload) {
 					email,
 					metadata.medicineName || 'Unknown Medicine',
 					metadata.expiryDate || 'N/A',
-					metadata.daysLeft ?? 0
+					metadata.daysLeft ?? 0,
+					metadata.cabinetItemId
 				);
 				break;
 			case 'batch_recall':
@@ -127,7 +137,8 @@ async function dispatchEmail(user: any, payload: NotificationPayload) {
 					email,
 					name,
 					metadata.medicineName || 'Unknown Medicine',
-					metadata.batchNumber || 'Unknown'
+					metadata.batchNumber || 'Unknown',
+					metadata.cabinetItemId
 				);
 				break;
 			case 'batch_restored':
@@ -135,7 +146,8 @@ async function dispatchEmail(user: any, payload: NotificationPayload) {
 					email,
 					name,
 					metadata.medicineName || 'Unknown Medicine',
-					metadata.batchNumber || 'Unknown'
+					metadata.batchNumber || 'Unknown',
+					metadata.cabinetItemId
 				);
 				break;
 			case 'dose_reminder':
@@ -144,7 +156,8 @@ async function dispatchEmail(user: any, payload: NotificationPayload) {
 					metadata.medicineName || 'Unknown Medicine',
 					metadata.dosage,
 					metadata.mealContext,
-					metadata.unit
+					metadata.unit,
+					metadata.cabinetItemId
 				);
 				break;
 			case 'low_stock':
@@ -152,7 +165,8 @@ async function dispatchEmail(user: any, payload: NotificationPayload) {
 					email,
 					name,
 					metadata.medicineName || 'Unknown Medicine',
-					metadata.currentQuantity || 0
+					metadata.currentQuantity || 0,
+					metadata.cabinetItemId
 				);
 				break;
 			case 'suspicious_scan':
@@ -161,7 +175,8 @@ async function dispatchEmail(user: any, payload: NotificationPayload) {
 					name,
 					metadata.medicineName || metadata.productName || 'Product',
 					metadata.batchNumber || 'Unknown',
-					metadata.reason || 'Flagged activity'
+					metadata.reason || 'Flagged activity',
+					metadata.batchId
 				);
 				break;
 			case 'scan_milestone':
@@ -169,7 +184,8 @@ async function dispatchEmail(user: any, payload: NotificationPayload) {
 					email,
 					name,
 					metadata.batchNumber || 'Unknown',
-					metadata.scanCount || 0
+					metadata.scanCount || 0,
+					metadata.batchId
 				);
 				break;
 			case 'system':

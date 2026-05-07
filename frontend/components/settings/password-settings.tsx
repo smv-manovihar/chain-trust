@@ -24,20 +24,28 @@ import {
 import { Shield, Loader2, Lock } from "lucide-react";
 import { changePassword } from "@/api";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/auth-context";
 
-const passwordSchema = z
-  .object({
-    currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
+// Password schema is now dynamic within the component to handle hasPassword state
 
 export function PasswordSettings() {
+  const { user, refreshUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+
+  const hasPassword = user?.hasPassword ?? true;
+
+  const passwordSchema = z
+    .object({
+      currentPassword: hasPassword 
+        ? z.string().min(1, "Current password is required") 
+        : z.string().optional(),
+      newPassword: z.string().min(8, "Password must be at least 8 characters"),
+      confirmPassword: z.string(),
+    })
+    .refine((data) => data.newPassword === data.confirmPassword, {
+      message: "Passwords do not match",
+      path: ["confirmPassword"],
+    });
 
   const form = useForm<z.infer<typeof passwordSchema>>({
     resolver: zodResolver(passwordSchema),
@@ -55,14 +63,21 @@ export function PasswordSettings() {
         currentPassword: data.currentPassword,
         newPassword: data.newPassword,
       });
-      toast.success("Password Updated", {
-        description: "Your security credentials have been refreshed.",
+      toast.success(hasPassword ? "Password Updated" : "Password Set", {
+        description: hasPassword 
+          ? "Your security credentials have been refreshed."
+          : "You can now use this password to log in via email.",
       });
-      form.reset();
+      await refreshUser();
+      form.reset({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
     } catch (error: any) {
-      toast.error("Update Failed", {
+      toast.error(hasPassword ? "Update Failed" : "Setup Failed", {
         description:
-          error.response?.data?.message || "Please check your current password",
+          error.response?.data?.message || "Something went wrong. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -74,34 +89,51 @@ export function PasswordSettings() {
       <CardHeader>
         <div className="flex items-center gap-2">
           <Lock className="h-5 w-5 text-primary" />
-          <CardTitle className="text-lg font-black">Change Password</CardTitle>
+          <CardTitle className="text-lg font-black">
+            {hasPassword ? "Change Password" : "Set Account Password"}
+          </CardTitle>
         </div>
         <CardDescription>
-          Ensure your account stays secure with a strong password.
+          {hasPassword 
+            ? "Ensure your account stays secure with a strong password."
+            : "Set a password to enable traditional email login alongside your social account."}
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {!hasPassword && (
+          <div className="mb-6 p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-start gap-3">
+            <Shield className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-primary">Traditional Login Enabled</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                You're currently using a social login. Setting a password allows you to log in manually using your email address as well.
+              </p>
+            </div>
+          </div>
+        )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="currentPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs text-muted-foreground/70">
-                    Current Password
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="password"
-                      {...field}
-                      className="rounded-xl h-12 bg-muted/20"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {hasPassword && (
+              <FormField
+                control={form.control}
+                name="currentPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-muted-foreground/70">
+                      Current Password
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        {...field}
+                        className="rounded-xl h-12 bg-muted/20"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <div className="grid sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -109,7 +141,7 @@ export function PasswordSettings() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs text-muted-foreground/70">
-                      New Password
+                      {hasPassword ? "New Password" : "Create Password"}
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -128,7 +160,7 @@ export function PasswordSettings() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs text-muted-foreground/70">
-                      Confirm New Password
+                      Confirm {hasPassword ? "New" : ""} Password
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -150,7 +182,7 @@ export function PasswordSettings() {
                 className="rounded-full px-8 h-12 shadow-lg shadow-primary/20"
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Update Credentials
+                {hasPassword ? "Update Credentials" : "Save Password"}
               </Button>
             </div>
           </form>

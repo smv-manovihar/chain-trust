@@ -18,7 +18,13 @@ import {
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { getCabinet, removeFromCabinet, CabinetItem, undoDose } from "@/api";
+import {
+  getCabinet,
+  removeFromCabinet,
+  markDoseTaken,
+  CabinetItem,
+  undoDose,
+} from "@/api";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -122,7 +128,6 @@ export default function MyMedicinesPage() {
     e.preventDefault();
     e.stopPropagation();
     try {
-      const { markDoseTaken } = await import("@/api/customer.api");
       await markDoseTaken(id);
       toast.success("Dose Recorded", {
         description: `Your dose for ${name} has been marked as taken.`,
@@ -268,6 +273,9 @@ export default function MyMedicinesPage() {
                     !!med.lastDoseTaken &&
                     Date.now() - new Date(med.lastDoseTaken).getTime() <
                       5 * 60 * 1000;
+                  // isDoseDoneToday: server-computed — all scheduled doses for today are logged
+                  const isDoseDoneToday = !!med.isDoseDoneToday;
+                  const isTakeDisabled = isRecentlyTaken || isDoseDoneToday;
 
                   return (
                     <Card
@@ -297,8 +305,8 @@ export default function MyMedicinesPage() {
                       {med.currentStreak !== undefined &&
                         med.currentStreak > 0 && (
                           <div className="absolute top-4 right-4 z-20">
-                            <Badge className="rounded-full bg-orange-500/10 text-orange-600 border-orange-200 font-black px-2 py-0.5 text-[10px] sm:text-[11px] flex items-center gap-1 shadow-sm transition-transform active:scale-95 group-hover:scale-110">
-                              <Flame className="h-3 w-3 fill-current animate-pulse-fast transition-all" />
+                            <Badge className="rounded-full hover:bg-transparent bg-orange-500/20 text-orange-600 border-orange-300 font-black px-2 py-0.5 text-[10px] sm:text-[11px] flex items-center gap-1 shadow-sm transition-transform active:scale-95 group-hover:scale-110">
+                              <Flame className="h-3 w-3 fill-orange-500 animate-pulse transition-all" />
                               {med.currentStreak}
                             </Badge>
                           </div>
@@ -414,16 +422,22 @@ export default function MyMedicinesPage() {
                         )}
                         <Button
                           variant="outline"
-                          disabled={isRecentlyTaken}
+                          disabled={isTakeDisabled}
                           onClick={(e) => handleTakeDose(e, med._id, med.name)}
                           className={cn(
                             "h-[2.5rem] sm:h-11 flex-1 rounded-xl text-[11px] sm:text-xs font-black transition-all shadow-sm",
-                            isRecentlyTaken
-                              ? "bg-muted text-muted-foreground border-border/50"
-                              : "bg-primary/5 hover:bg-primary hover:text-primary-foreground border-primary/20 text-primary",
+                            isDoseDoneToday
+                              ? "bg-green-500/10 text-green-700 border-green-300/50 cursor-not-allowed"
+                              : isRecentlyTaken
+                                ? "bg-muted text-muted-foreground border-border/50"
+                                : "bg-primary/5 hover:bg-primary hover:text-primary-foreground border-primary/20 text-primary",
                           )}
                         >
-                          {isRecentlyTaken ? "Recently Taken" : "Take Dose"}
+                          {isDoseDoneToday
+                            ? "Done Today"
+                            : isRecentlyTaken
+                              ? "Recently Taken"
+                              : "Take Dose"}
                         </Button>
                         <Button
                           variant="ghost"
@@ -549,8 +563,8 @@ export default function MyMedicinesPage() {
                           <TableCell className="text-center">
                             {med.currentStreak !== undefined &&
                             med.currentStreak > 0 ? (
-                              <Badge className="rounded-full bg-orange-500/10 text-orange-600 border-orange-200 font-black px-2 py-0.5 text-[10px]">
-                                <Flame className="h-3 w-3 mr-1 fill-current" />
+                              <Badge className="rounded-full bg-orange-500/20 text-orange-600 border-orange-300 font-black px-2 py-0.5 text-[10px]">
+                                <Flame className="h-3 w-3 mr-1 fill-orange-500" />
                                 {med.currentStreak} Days
                               </Badge>
                             ) : (
@@ -594,6 +608,9 @@ export default function MyMedicinesPage() {
                                 Date.now() -
                                   new Date(med.lastDoseTaken).getTime() <
                                   5 * 60 * 1000;
+                              const isDoseDoneToday = !!med.isDoseDoneToday;
+                              const isTakeDisabled =
+                                isRecentlyTaken || isDoseDoneToday;
                               return (
                                 <div className="flex items-center justify-end gap-1 opacity-100 group-hover:opacity-100 transition-opacity">
                                   {isRecentlyTaken && (
@@ -614,18 +631,28 @@ export default function MyMedicinesPage() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    disabled={isRecentlyTaken}
+                                    disabled={isTakeDisabled}
                                     className={cn(
                                       "h-10 w-10 rounded-xl transition-all active:scale-95",
-                                      isRecentlyTaken
-                                        ? "text-muted-foreground/30"
-                                        : "hover:bg-primary/10 text-primary",
+                                      isDoseDoneToday
+                                        ? "text-green-600/50 cursor-not-allowed"
+                                        : isRecentlyTaken
+                                          ? "text-muted-foreground/30"
+                                          : "hover:bg-primary/10 text-primary",
                                     )}
                                     onClick={(e) =>
                                       handleTakeDose(e, med._id, med.name)
                                     }
-                                    title="Take Dose"
-                                    aria-label={`Take dose for ${med.name}`}
+                                    title={
+                                      isDoseDoneToday
+                                        ? "All doses taken today"
+                                        : "Take Dose"
+                                    }
+                                    aria-label={
+                                      isDoseDoneToday
+                                        ? `All doses taken today for ${med.name}`
+                                        : `Take dose for ${med.name}`
+                                    }
                                   >
                                     <Plus className="h-5 w-5" />
                                   </Button>
@@ -677,7 +704,7 @@ export default function MyMedicinesPage() {
                       <div className="flex gap-4 items-center w-full sm:w-[200px] shrink-0 relative">
                         {med.currentStreak !== undefined &&
                           med.currentStreak > 0 && (
-                            <Badge className="absolute -top-2 -right-1 rounded-full bg-orange-500 text-white border-2 border-background font-black px-1.5 py-0.5 text-[9px] shadow-lg z-20 flex items-center gap-0.5 animate-in zoom-in duration-300">
+                            <Badge className="absolute -top-2 -right-1 rounded-full bg-orange-500 text-white border-2 border-background font-black px-1.5 py-0.5 text-[9px] shadow-lg z-20 flex items-center gap-0.5 animate-pulse zoom-in duration-300">
                               <Flame className="h-2.5 w-2.5 fill-current" />
                               {med.currentStreak}
                             </Badge>
@@ -763,6 +790,9 @@ export default function MyMedicinesPage() {
                               Date.now() -
                                 new Date(med.lastDoseTaken).getTime() <
                                 5 * 60 * 1000;
+                            const isDoseDoneToday = !!med.isDoseDoneToday;
+                            const isTakeDisabled =
+                              isRecentlyTaken || isDoseDoneToday;
                             return (
                               <>
                                 {isRecentlyTaken && (
@@ -781,18 +811,24 @@ export default function MyMedicinesPage() {
                                 )}
                                 <Button
                                   variant="outline"
-                                  disabled={isRecentlyTaken}
+                                  disabled={isTakeDisabled}
                                   onClick={(e) =>
                                     handleTakeDose(e, med._id, med.name)
                                   }
                                   className={cn(
                                     "h-8 px-3 rounded-lg text-[10px] font-black transition-all",
-                                    isRecentlyTaken
-                                      ? "bg-muted text-muted-foreground border-border/50"
-                                      : "bg-primary/5 hover:bg-primary hover:text-primary-foreground border-primary/20 text-primary",
+                                    isDoseDoneToday
+                                      ? "bg-green-500/10 text-green-700 border-green-300/50 cursor-not-allowed"
+                                      : isRecentlyTaken
+                                        ? "bg-muted text-muted-foreground border-border/50"
+                                        : "bg-primary/5 hover:bg-primary hover:text-primary-foreground border-primary/20 text-primary",
                                   )}
                                 >
-                                  {isRecentlyTaken ? "Taken" : "Dose"}
+                                  {isDoseDoneToday
+                                    ? "Done"
+                                    : isRecentlyTaken
+                                      ? "Taken"
+                                      : "Dose"}
                                 </Button>
                               </>
                             );

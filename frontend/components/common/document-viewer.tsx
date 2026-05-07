@@ -3,12 +3,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { resolveMediaUrl } from "@/lib/media-url";
 import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogBody
+} from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { 
   Download, 
@@ -37,19 +37,21 @@ interface DocumentViewerDialogProps {
 }
 
 export function DocumentViewerDialog({ open, onOpenChange, document }: DocumentViewerDialogProps) {
+  const [displayDoc, setDisplayDoc] = useState(document);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) {
+    if (open && document) {
+      setDisplayDoc(document);
       setIsLoading(true);
       setError(null);
     }
   }, [open, document]);
 
-  const resolvedUrl = useMemo(() => document ? resolveMediaUrl(document.url) : "", [document]);
+  const resolvedUrl = useMemo(() => displayDoc ? resolveMediaUrl(displayDoc.url) : "", [displayDoc]);
 
-  const isPDF = document?.url?.toLowerCase().endsWith(".pdf") || document?.type === "pdf";
+  const isPDF = displayDoc?.url?.toLowerCase().endsWith(".pdf") || displayDoc?.type === "pdf";
   const isImage = !isPDF;
 
   const handleDownload = async () => {
@@ -79,92 +81,102 @@ export function DocumentViewerDialog({ open, onOpenChange, document }: DocumentV
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[90vh] sm:h-[90vh] flex flex-col p-0 overflow-hidden bg-background/95 backdrop-blur-sm border-zinc-800 gap-0">
-        <DialogHeader className="p-4 border-b border-white/5 flex flex-row items-center justify-between shrink-0 space-y-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              {isPDF ? <FileText className="h-5 w-5 text-primary" /> : <ImageIcon className="h-5 w-5 text-primary" />}
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="max-w-5xl w-full p-0 overflow-hidden flex flex-col h-[90vh] sm:h-[85vh]">
+        <ResponsiveDialogHeader className="p-4 sm:p-6 border-b shrink-0 bg-background/95 backdrop-blur-sm z-20">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2 bg-primary/10 rounded-lg shrink-0">
+                {isPDF ? <FileText className="h-5 w-5 text-primary" /> : <ImageIcon className="h-5 w-5 text-primary" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <ResponsiveDialogTitle className="text-base sm:text-lg font-semibold truncate leading-none mb-1">
+                  {document?.label || "Document Preview"}
+                </ResponsiveDialogTitle>
+                <p className="text-xs text-muted-foreground truncate">
+                  {isPDF ? "PDF Document" : "Image File"}
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <DialogTitle className="text-lg font-semibold truncate max-w-[200px] sm:max-w-md">
-                {document?.label || "Document Preview"}
-              </DialogTitle>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" tabIndex={-1} className="h-6 w-6 rounded-full hover:bg-primary/10 hover:text-primary transition-all">
-                      <Info className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="p-3 rounded-2xl bg-popover/90 backdrop-blur-md border-primary/10 shadow-xl">
-                    <p className="text-xs leading-relaxed font-medium">
-                      Viewing {isPDF ? "PDF Document" : "Image File"}. You can download or open the original file for full resolution.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
-          <DialogDescription className="sr-only">
-            Preview of {document?.label || "document"}
-          </DialogDescription>
-          <div className="flex items-center gap-2 mr-8">
-             <Button variant="outline" size="sm" onClick={handleOpenNewTab} className="gap-2 hidden sm:flex">
-                <ExternalLink className="h-4 w-4" />
-                <span>Open original</span>
-             </Button>
-             <Button variant="outline" size="sm" onClick={handleDownload} className="gap-2">
-                <Download className="h-4 w-4" />
-                <span className="hidden sm:inline">Download</span>
-             </Button>
-          </div>
-        </DialogHeader>
+            
+            <div className="flex items-center gap-2 shrink-0">
+               <TooltipProvider>
+                 <Tooltip>
+                   <TooltipTrigger asChild>
+                     <Button variant="outline" size="icon" onClick={handleOpenNewTab} className="h-9 w-9 hidden sm:flex">
+                        <ExternalLink className="h-4 w-4" />
+                        <span className="sr-only">Open original</span>
+                     </Button>
+                   </TooltipTrigger>
+                   <TooltipContent>Open original file</TooltipContent>
+                 </Tooltip>
+               </TooltipProvider>
 
-        <div className="flex-1 bg-muted/10 relative flex items-center justify-center overflow-hidden">
+               <Button variant="default" size="sm" onClick={handleDownload} className="h-9 gap-2">
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Download</span>
+               </Button>
+            </div>
+          </div>
+        </ResponsiveDialogHeader>
+
+        <div className="flex-1 relative flex items-center justify-center bg-muted/30 overflow-hidden min-h-0">
           {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm font-medium text-muted-foreground animate-pulse">Loading document...</p>
+              </div>
             </div>
           )}
 
           {error && (
-            <div className="flex flex-col items-center gap-4 text-center p-6">
-              <AlertCircle className="h-12 w-12 text-destructive opacity-50" />
-              <p className="text-sm text-muted-foreground">{error}</p>
-              <Button onClick={handleOpenNewTab}>Open in new tab</Button>
+            <div className="flex flex-col items-center gap-4 text-center p-6 max-w-md">
+              <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-destructive" />
+              </div>
+              <div className="space-y-1">
+                <p className="font-semibold">{error}</p>
+                <p className="text-sm text-muted-foreground">The preview could not be loaded directly.</p>
+              </div>
+              <Button onClick={handleOpenNewTab} variant="outline" className="mt-2 gap-2">
+                <ExternalLink className="h-4 w-4" />
+                Open securely in browser
+              </Button>
             </div>
           )}
 
-          {document && (
+          {displayDoc && !error && (
             isImage ? (
-              <img 
-                src={resolvedUrl} 
-                alt={document.label}
-                className="max-w-full max-h-full object-contain p-4"
-                onLoad={() => setIsLoading(false)}
-                onError={() => {
-                  setIsLoading(false);
-                  setError("Failed to load image preview.");
-                }}
-              />
+              <div className="w-full h-full p-2 sm:p-6 flex items-center justify-center overflow-auto">
+                <img 
+                  src={resolvedUrl} 
+                  alt={displayDoc.label}
+                  className="max-w-full max-h-full object-contain rounded-md shadow-sm"
+                  onLoad={() => setIsLoading(false)}
+                  onError={() => {
+                    setIsLoading(false);
+                    setError("Failed to load image preview.");
+                  }}
+                />
+              </div>
             ) : (
               <div className="w-full h-full relative">
                 <iframe
                   src={`${resolvedUrl}#toolbar=0&navpanes=0`}
-                  className="w-full h-full border-0 absolute inset-0 z-10"
+                  className="w-full h-full border-0 absolute inset-0 z-0 bg-background"
                   onLoad={() => setIsLoading(false)}
                   onError={() => {
                     setIsLoading(false);
                     setError("Failed to render PDF preview.");
                   }}
-                  title={document.label}
+                  title={displayDoc.label}
                 />
               </div>
             )
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

@@ -94,7 +94,7 @@ const safeFormatTime = (time: any) => {
   if (!time) return "";
   // Check if it's already HH:mm
   if (typeof time === "string" && /^\d{2}:\d{2}$/.test(time)) return time;
-  
+
   try {
     const d = new Date(time);
     if (isNaN(d.getTime())) return "";
@@ -140,6 +140,7 @@ export default function MedicineDetailPage() {
     } as any,
   });
   const [dosageLogs, setDosageLogs] = useState<any[]>([]);
+  const [isDoseDoneToday, setIsDoseDoneToday] = useState(false);
   const [isRefillDialogOpen, setIsRefillDialogOpen] = useState(false);
   const [refillValue, setRefillValue] = useState(0);
   const [isPrescriptionDialogOpen, setIsPrescriptionDialogOpen] =
@@ -409,6 +410,11 @@ export default function MedicineDetailPage() {
         currentQuantity: res.currentQuantity,
       }));
 
+      // Sync daily completion status from server
+      if (res.isDoseDoneToday !== undefined) {
+        setIsDoseDoneToday(res.isDoseDoneToday);
+      }
+
       // Refresh logs
       const logs = await getDosageLogs(id);
       setDosageLogs(logs);
@@ -444,6 +450,9 @@ export default function MedicineDetailPage() {
         ...prev,
         currentQuantity: res.currentQuantity,
       }));
+
+      // Undo means daily completion is no longer true
+      setIsDoseDoneToday(false);
 
       // Refresh logs
       const logs = await getDosageLogs(id);
@@ -517,7 +526,10 @@ export default function MedicineDetailPage() {
     target.setHours(0, 0, 0, 0);
 
     let anchor: Date;
-    if (typeof reminder.time === "string" && /^\d{2}:\d{2}$/.test(reminder.time)) {
+    if (
+      typeof reminder.time === "string" &&
+      /^\d{2}:\d{2}$/.test(reminder.time)
+    ) {
       // If it's just HH:mm, use today as the anchor date
       const [h, m] = reminder.time.split(":").map(Number);
       anchor = new Date();
@@ -525,7 +537,7 @@ export default function MedicineDetailPage() {
     } else {
       anchor = new Date(reminder.time);
     }
-    
+
     if (isNaN(anchor.getTime())) return false;
     anchor.setHours(0, 0, 0, 0);
 
@@ -943,20 +955,28 @@ export default function MedicineDetailPage() {
             {/* Primary Action Row */}
             <Button
               onClick={handleTakeDose}
-              disabled={isDoseRecentlyTaken}
+              disabled={isDoseRecentlyTaken || isDoseDoneToday}
               className={cn(
                 "w-full rounded-full shadow-lg gap-3 h-12 font-black transition-all text-sm active:scale-[0.98]",
-                isDoseRecentlyTaken
-                  ? "bg-muted text-muted-foreground border-border"
-                  : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20",
+                isDoseDoneToday
+                  ? "bg-green-500/10 text-green-700 border border-green-300/50 cursor-not-allowed shadow-none"
+                  : isDoseRecentlyTaken
+                    ? "bg-muted text-muted-foreground border-border"
+                    : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20",
               )}
             >
-              {isDoseRecentlyTaken ? (
+              {isDoseDoneToday ? (
+                <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+              ) : isDoseRecentlyTaken ? (
                 <Clock className="h-5 w-5" aria-hidden="true" />
               ) : (
                 <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
               )}
-              {isDoseRecentlyTaken ? "Dose Recorded" : "Mark as taken"}
+              {isDoseDoneToday
+                ? "All doses done today"
+                : isDoseRecentlyTaken
+                  ? "Dose Recorded"
+                  : "Mark as taken"}
             </Button>
           </div>
         }
@@ -1024,8 +1044,8 @@ export default function MedicineDetailPage() {
                   )}
                   {medicine.currentStreak !== undefined &&
                     medicine.currentStreak > 0 && (
-                      <Badge className="rounded-full bg-orange-500/10 text-orange-600 border-orange-200 font-black px-3 py-1 animate-pulse">
-                        <Flame className="h-3 w-3 mr-1.5 fill-current" />
+                      <Badge className="rounded-full bg-orange-500/20 text-orange-600 border-orange-300 hover:bg-transparent font-black px-3 py-1">
+                        <Flame className="h-3 w-3 mr-1.5 fill-orange-500" />
                         {medicine.currentStreak} Day Streak
                       </Badge>
                     )}
@@ -1581,40 +1601,57 @@ export default function MedicineDetailPage() {
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
+                                disabled={!medicine.isUserAdded}
                                 className={cn(
                                   "w-full justify-start text-left font-medium h-12 rounded-full border-border bg-muted/30 focus:ring-primary/20",
+                                  !medicine.isUserAdded &&
+                                    "opacity-80 cursor-not-allowed bg-muted/50",
                                   !formData.expiryDate &&
                                     "text-muted-foreground",
                                 )}
                               >
-                                <CalendarIcon
-                                  className="mr-2 h-4 w-4 text-primary"
-                                  aria-hidden="true"
-                                />
+                                {medicine.isUserAdded ? (
+                                  <CalendarIcon
+                                    className="mr-2 h-4 w-4 text-primary"
+                                    aria-hidden="true"
+                                  />
+                                ) : (
+                                  <ShieldCheck
+                                    className="mr-2 h-4 w-4 text-emerald-600"
+                                    aria-hidden="true"
+                                  />
+                                )}
                                 {formData.expiryDate ? (
                                   format(formData.expiryDate, "PPP")
                                 ) : (
                                   <span>Pick a date</span>
                                 )}
+                                {!medicine.isUserAdded && (
+                                  <span className="ml-auto text-[10px] font-black text-emerald-600/60 uppercase tracking-tight">
+                                    Verified
+                                  </span>
+                                )}
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent
-                              className="w-auto p-0 rounded-2xl border-border shadow-xl"
-                              align="start"
-                            >
-                              <CalendarComponent
-                                mode="single"
-                                selected={formData.expiryDate}
-                                onSelect={(date) =>
-                                  setFormData((prev) => ({
-                                    ...prev,
-                                    expiryDate: date,
-                                  }))
-                                }
-                                initialFocus
-                                className="rounded-2xl"
-                              />
-                            </PopoverContent>
+                            {medicine.isUserAdded && (
+                              <PopoverContent
+                                className="w-auto p-0 rounded-2xl border-border shadow-xl"
+                                align="start"
+                              >
+                                <CalendarComponent
+                                  mode="single"
+                                  selected={formData.expiryDate}
+                                  onSelect={(date) =>
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      expiryDate: date,
+                                    }))
+                                  }
+                                  initialFocus
+                                  className="rounded-2xl"
+                                />
+                              </PopoverContent>
+                            )}
                           </Popover>
                         </div>
 

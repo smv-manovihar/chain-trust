@@ -1,7 +1,7 @@
 // components/cabinet/upcoming-dose-carousel.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Carousel,
   CarouselContent,
@@ -16,9 +16,9 @@ import {
   Clock,
   RotateCcw,
   AlertCircle,
-  ChevronRight,
   ShieldCheck,
   CheckCircle2,
+  Info,
 } from "lucide-react";
 import { markDoseTaken, undoDose, getUpcomingDoses } from "@/api/customer.api";
 import { formatDistanceToNow, format } from "date-fns";
@@ -46,23 +46,33 @@ export function UpcomingDoseCarousel() {
     fetchUpcoming();
   }, []);
 
-  const handleTakeDose = async (cabinetItemId: string, name: string, scheduledTime: Date) => {
+  const handleTakeDose = async (
+    cabinetItemId: string,
+    name: string,
+    scheduledTime: Date,
+  ) => {
     // Unique key for this specific occurrence
     const doseKey = `${cabinetItemId}-${new Date(scheduledTime).getTime()}`;
     setActionLoading(doseKey);
-    
+
     // Find the item to potentially restore it later
-    const itemToHide = upcoming.find(u => 
-      u.cabinetItemId === cabinetItemId && 
-      new Date(u.scheduledTime).getTime() === new Date(scheduledTime).getTime()
+    const itemToHide = upcoming.find(
+      (u) =>
+        u.cabinetItemId === cabinetItemId &&
+        new Date(u.scheduledTime).getTime() ===
+          new Date(scheduledTime).getTime(),
     );
     const originalUpcoming = [...upcoming];
 
     try {
       // Optimistic UI: Hide ONLY this specific occurrence
-      setUpcoming(prev => prev.filter(u => 
-        `${u.cabinetItemId}-${new Date(u.scheduledTime).getTime()}` !== doseKey
-      ));
+      setUpcoming((prev) =>
+        prev.filter(
+          (u) =>
+            `${u.cabinetItemId}-${new Date(u.scheduledTime).getTime()}` !==
+            doseKey,
+        ),
+      );
 
       const res = await markDoseTaken(cabinetItemId);
       const isLate = !res.wasPunctual;
@@ -85,23 +95,34 @@ export function UpcomingDoseCarousel() {
     }
   };
 
-  const handleUndo = async (cabinetItemId: string, name: string, doseKey: string, restoredItem?: any) => {
+  const handleUndo = async (
+    cabinetItemId: string,
+    name: string,
+    doseKey: string,
+    restoredItem?: any,
+  ) => {
     setActionLoading(doseKey);
     try {
       await undoDose(cabinetItemId);
-      
+
       // If we have the item, put it back immediately for responsiveness
       if (restoredItem) {
-        setUpcoming(prev => {
-          const exists = prev.find(u => `${u.cabinetItemId}-${new Date(u.scheduledTime).getTime()}` === doseKey);
+        setUpcoming((prev) => {
+          const exists = prev.find(
+            (u) =>
+              `${u.cabinetItemId}-${new Date(u.scheduledTime).getTime()}` ===
+              doseKey,
+          );
           if (exists) return prev;
           const newList = [...prev, restoredItem];
-          return newList.sort((a, b) => 
-            new Date(a.scheduledTime).getTime() - new Date(b.scheduledTime).getTime()
+          return newList.sort(
+            (a, b) =>
+              new Date(a.scheduledTime).getTime() -
+              new Date(b.scheduledTime).getTime(),
           );
         });
       }
-      
+
       toast.success(`Reverted dose for ${name}`);
       await fetchUpcoming();
     } catch (err: any) {
@@ -155,7 +176,7 @@ export function UpcomingDoseCarousel() {
                   "group relative p-6 sm:p-8 rounded-[2rem] transition-all duration-300 h-full flex flex-col border",
                   dose.isMissed
                     ? "bg-destructive/5 border-destructive/30 shadow-sm"
-                    : "bg-card border-border shadow-sm hover:shadow-md",
+                    : "bg-card border-border shadow-sm hover:border-primary/30",
                 )}
               >
                 {/* Header: Status & Time */}
@@ -227,23 +248,40 @@ export function UpcomingDoseCarousel() {
 
                 {/* Footer: Actions */}
                 <div className="flex items-center gap-3 mt-auto">
-                  <Button
-                    size="lg"
-                    onClick={() =>
-                      handleTakeDose(dose.cabinetItemId, dose.name, dose.scheduledTime)
-                    }
-                    disabled={!!actionLoading}
-                    className="flex-1 h-14 rounded-xl text-base font-bold transition-all active:scale-[0.98]"
-                  >
-                    {actionLoading === `${dose.cabinetItemId}-${new Date(dose.scheduledTime).getTime()}` ? (
-                      <RotateCcw className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <>
-                        <CheckCircle2 className="mr-2 h-5 w-5" />
-                        Mark as Taken
-                      </>
-                    )}
-                  </Button>
+                  {(() => {
+                    const d = new Date(dose.scheduledTime);
+                    const isToday =
+                      d.toDateString() === new Date().toDateString();
+                    return (
+                      <Button
+                        size="lg"
+                        onClick={() =>
+                          handleTakeDose(
+                            dose.cabinetItemId,
+                            dose.name,
+                            dose.scheduledTime,
+                          )
+                        }
+                        disabled={!!actionLoading || !isToday}
+                        className="flex-1 h-14 rounded-xl text-base font-bold transition-all active:scale-[0.98]"
+                      >
+                        {actionLoading ===
+                        `${dose.cabinetItemId}-${d.getTime()}` ? (
+                          <RotateCcw className="h-5 w-5 animate-spin" />
+                        ) : !isToday ? (
+                          <>
+                            <Clock className="mr-2 h-5 w-5" />
+                            Scheduled {format(d, "MMM d")}
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="mr-2 h-5 w-5" />
+                            Mark as Taken
+                          </>
+                        )}
+                      </Button>
+                    );
+                  })()}
                   <Button
                     variant="secondary"
                     size="icon"
@@ -251,7 +289,7 @@ export function UpcomingDoseCarousel() {
                     className="h-14 w-14 rounded-xl transition-all"
                   >
                     <Link href={`/customer/cabinet/${dose.cabinetItemId}`}>
-                      <ChevronRight className="h-6 w-6" />
+                      <Info className="h-6 w-6" />
                       <span className="sr-only">View Details</span>
                     </Link>
                   </Button>

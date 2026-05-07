@@ -436,12 +436,25 @@ class Tools:
         role: str = "customer",
         current_route: str = "/",
         query_params: dict = None,
+        user_timezone: str = "UTC",
     ):
         self.user_id = user_id
         self.role = role.lower()
         self.current_route = current_route
         self.query_params = query_params or {}
+        self.user_timezone = user_timezone
         self.prescription_registry = PrescriptionRegistry(user_id)
+
+    async def _resolve_medicine_name(self, medicine_id: str) -> str:
+        """Helper to get a human-readable name for a medicine ID. FIX-009 logic."""
+        try:
+            item = await tool_store.db["cabinet_items"].find_one(
+                {"_id": tool_store._to_obj_id(medicine_id), "userId": tool_store._to_obj_id(self.user_id)},
+                {"name": 1}
+            )
+            return item.get("name") if item else f"Medication {medicine_id}"
+        except Exception:
+            return f"Medication {medicine_id}"
 
     def _normalize_route(self, route: str) -> str:
         if not route:
@@ -503,12 +516,12 @@ class Tools:
                 "past": "Removed medication.",
             },
             "mark_dose_taken": {
-                "present": "Recording dose taken...",
-                "past": "Recorded dose taken.",
+                "present": "Recording dose for {name}...",
+                "past": "Recorded dose for {name}.",
             },
             "undo_dose": {
-                "present": "Reverting last recorded dose...",
-                "past": "Last dose reverted successfully.",
+                "present": "Reverting last dose for {name}...",
+                "past": "Reverted last dose for {name}.",
             },
             "add_reminder": {
                 "present": "Setting reminder for {name}...",
@@ -600,7 +613,7 @@ class Tools:
 
             enriched_args["doc_name"] = doc_label or f"Document [{doc_id}]"
 
-        if name in ("add_reminder", "remove_reminder"):
+        if name in ("add_reminder", "remove_reminder", "mark_dose_taken", "undo_dose", "update_medicine", "remove_medicine"):
             medicine_id = args.get("medicine_id")
             resolved_name = medicine_id  # default fallback
             if medicine_id:
@@ -809,13 +822,14 @@ class Tools:
                 )
 
             rows = [
-                "| ID | Medicine | Brand | Status | Scans | Streak | Blockchain |",
-                "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+                "| ID | Medicine | Brand | Status | Scans | Streak | Done Today | Blockchain |",
+                "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
             ]
             for i in items:
                 v_label = "Yes" if i["blockchainVerified"] else "No"
+                done_label = "Yes" if i.get("isDoseDoneToday") else "-"
                 rows.append(
-                    f"| {i['id']} | {i['name']} | {i['brand']} | {i['status']} | {i['liveScanCount']} | {i.get('currentStreak', 0)}d | {v_label} |"
+                    f"| {i['id']} | {i['name']} | {i['brand']} | {i['status']} | {i['liveScanCount']} | {i.get('currentStreak', 0)}d | {done_label} | {v_label} |"
                 )
             return self._format_output(
                 "SUCCESS",
@@ -962,14 +976,25 @@ class Tools:
     async def mark_dose_taken(self, medicine_id: str) -> str:
         """Decrements med quantity and logs a dose event. **IMPORTANT:** Confirm with the user before calling this. **Use** on dose confirmation. **Do NOT use** for inventory audits."""
         try:
-            success = await tool_store.mark_dose_taken(medicine_id, self.user_id)
-            if success:
+            result = await tool_store.mark_dose_taken(medicine_id, self.user_id, self.user_timezone)
+            if result.get("success"):
+                streak = result.get("currentStreak", 0)
+                qty = result.get("currentQuantity", "?")
+                done = result.get("isDoseDoneToday", False)
+                completion_note = " All scheduled doses for today are now complete." if done else ""
                 return self._format_output(
-                    "SUCCESS", "Dose recorded. Inventory quantity decremented."
+                    "SUCCESS",
+                    f"Dose recorded. Stock remaining: {qty}.{completion_note} Streak: {streak} day(s).",
+                )
+            reason = result.get("reason", "unknown")
+            if reason == "no_stock":
+                return self._format_output(
+                    "ERROR",
+                    "Could not mark dose: medication is out of stock (currentQuantity = 0). FALLBACK: Use `update_medicine` to refill quantity first.",
                 )
             return self._format_output(
                 "ERROR",
-                "Could not mark dose. FALLBACK: Verify the medication ID is correct and there is enough stock (currentQuantity > 0). If out of stock, use `update_medicine` to refill quantity.",
+                "Could not mark dose. FALLBACK: Verify the medication ID is correct and there is enough stock. If out of stock, use `update_medicine` to refill quantity.",
             )
         except Exception as e:
             return self._format_output("ERROR", f"Action failed: {e}.")
@@ -977,7 +1002,7 @@ class Tools:
     async def undo_dose(self, medicine_id: str) -> str:
         """Reverts the last recorded dose for a medication. **IMPORTANT:** Confirm with the user before calling this. **Use** only when user explicitly asks to undo a recent dose log."""
         try:
-            success = await tool_store.undo_dose(medicine_id, self.user_id)
+            success = await tool_store.undo_dose(medicine_id, self.user_id, self.user_timezone)
             if success:
                 return self._format_output(
                     "SUCCESS", "Last dose reverted. Inventory quantity restored."
