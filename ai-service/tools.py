@@ -478,6 +478,35 @@ class Tools:
         context: dict = None,
         **kwargs,
     ) -> str:
+        # 1. Enrich args with resolved names and dynamic context first
+        enriched_args = dict(args)
+        
+        # Route awareness
+        if not enriched_args.get("route"):
+            enriched_args["route"] = self.current_route
+            
+        # Medicine name resolution
+        if name in ("add_reminder", "remove_reminder", "mark_dose_taken", "undo_dose", "update_medicine", "remove_medicine"):
+            medicine_id = args.get("medicine_id")
+            resolved_name = await self._resolve_medicine_name(medicine_id) if medicine_id else "medication"
+            enriched_args["name"] = resolved_name
+
+        # Prescription name resolution
+        if name == "read_prescription":
+            doc_id = args.get("doc_id")
+            doc_label = None
+            doc = self.prescription_registry.get_by_id(doc_id) if doc_id else None
+            if doc:
+                doc_label = doc["label"]
+            elif context:
+                active_data = context.get("active_data")
+                if isinstance(active_data, dict):
+                    prescriptions = active_data.get("recentPrescriptions", [])
+                    if isinstance(prescriptions, list) and 0 <= (doc_id - 1) < len(prescriptions):
+                        doc_label = prescriptions[doc_id - 1].get("label")
+            enriched_args["doc_name"] = doc_label or f"Document [{doc_id}]"
+
+        # 2. Define templates with placeholders
         templates = {
             "get_user_profile": {
                 "present": "Retrieving your profile...",
@@ -488,32 +517,32 @@ class Tools:
                 "past": "Listed available page guides.",
             },
             "get_page_guide": {
-                "present": "Checking the page guide...",
-                "past": "Checked the page guide.",
+                "present": "Checking the page guide for {route}..." if enriched_args.get("route") else "Checking the page guide...",
+                "past": "Checked the page guide for {route}." if enriched_args.get("route") else "Checked the page guide.",
             },
             "get_view_data": {
-                "present": "Synchronizing view data...",
-                "past": "Synchronized view data.",
+                "present": "Synchronizing data for {route}..." if enriched_args.get("route") else "Synchronizing view data...",
+                "past": "Synchronized data for {route}." if enriched_args.get("route") else "Synchronized view data.",
             },
             "list_my_medicines": {
-                "present": "Listing your medications...",
+                "present": "Listing your medications..." + (f" (sorted by {args.get('sort_by')})" if args.get("sort_by") else ""),
                 "past": "Listed your medications.",
             },
             "search_my_medicines": {
                 "present": "Searching for '{query}'...",
-                "past": "Found results for '{query}'.",
+                "past": "Searched for '{query}'.",
             },
             "add_medicine": {
                 "present": "Adding {name}...",
                 "past": "Added {name} to My Medicines.",
             },
             "update_medicine": {
-                "present": "Updating medication records...",
-                "past": "Updated medication records.",
+                "present": "Updating records for {name}...",
+                "past": "Updated records for {name}.",
             },
             "remove_medicine": {
-                "present": "Removing medication...",
-                "past": "Removed medication.",
+                "present": "Removing {name}...",
+                "past": "Removed {name} from My Medicines.",
             },
             "mark_dose_taken": {
                 "present": "Recording dose for {name}...",
@@ -524,12 +553,12 @@ class Tools:
                 "past": "Reverted last dose for {name}.",
             },
             "add_reminder": {
-                "present": "Setting reminder for {name}...",
-                "past": "Reminder added for {name}.",
+                "present": "Setting reminder for {name} at {time}...",
+                "past": "Reminder set for {name} at {time}.",
             },
             "remove_reminder": {
-                "present": "Removing reminder [{reminder_index}] from {name}...",
-                "past": "Reminder [{reminder_index}] removed from {name}.",
+                "present": "Removing reminder from {name}...",
+                "past": "Reminder removed from {name}.",
             },
             "list_prescriptions": {
                 "present": "Accessing prescriptions...",
@@ -568,11 +597,11 @@ class Tools:
                 "past": "Searched catalog for '{query}'.",
             },
             "get_scan_geography": {
-                "present": "Analyzing geography...",
+                "present": "Analyzing geography" + (f" for {args.get('product_id') or args.get('batch_number')}" if args.get('product_id') or args.get('batch_number') else "") + "...",
                 "past": "Analyzed geography data.",
             },
             "get_threat_intelligence": {
-                "present": "Checking security threats...",
+                "present": "Checking security threats" + (f" for {args.get('product_id') or args.get('batch_number')}" if args.get('product_id') or args.get('batch_number') else "") + "...",
                 "past": "Checked security threats.",
             },
             "list_notifications": {
@@ -589,45 +618,6 @@ class Tools:
             },
         }
 
-        # Enrich args with resolved names where possible
-        enriched_args = dict(args)
-        if name == "read_prescription":
-            doc_id = args.get("doc_id")
-            doc_label = None
-
-            # 1. Try registry
-            doc = self.prescription_registry.get_by_id(doc_id) if doc_id else None
-            if doc:
-                doc_label = doc["label"]
-
-            # 2. Try context fallback (if registry is not yet populated)
-            if not doc_label and context:
-                active_data = context.get("active_data")
-                if isinstance(active_data, dict):
-                    # Logic to find label by index in common summary patterns
-                    prescriptions = active_data.get("recentPrescriptions", [])
-                    if isinstance(prescriptions, list) and 0 <= (doc_id - 1) < len(
-                        prescriptions
-                    ):
-                        doc_label = prescriptions[doc_id - 1].get("label")
-
-            enriched_args["doc_name"] = doc_label or f"Document [{doc_id}]"
-
-        if name in ("add_reminder", "remove_reminder", "mark_dose_taken", "undo_dose", "update_medicine", "remove_medicine"):
-            medicine_id = args.get("medicine_id")
-            resolved_name = medicine_id  # default fallback
-            if medicine_id:
-                try:
-                    item = await tool_store.db["cabinet_items"].find_one(
-                        {"_id": tool_store._to_obj_id(medicine_id)},
-                        {"name": 1},
-                    )
-                    if item and item.get("name"):
-                        resolved_name = item["name"]
-                except Exception:
-                    pass
-            enriched_args["name"] = resolved_name or "medication"
-
         group = templates.get(
             name, {"present": f"Executing {name}...", "past": f"Executed {name}."}
         )
@@ -636,6 +626,7 @@ class Tools:
             return template.format(**enriched_args)
         except Exception:
             return template
+
 
     # --- Common Tools ---
 
@@ -946,8 +937,9 @@ class Tools:
                 medicine_id, self.user_id, remapped
             )
             if success:
+                resolved_name = await self._resolve_medicine_name(medicine_id)
                 return self._format_output(
-                    "SUCCESS", f"Medication {medicine_id} updated."
+                    "SUCCESS", f"Records for '{resolved_name}' updated."
                 )
             return self._format_output(
                 "ERROR",
@@ -962,10 +954,11 @@ class Tools:
     async def remove_medicine(self, medicine_id: str) -> str:
         """Deletes med from cabinet. **IMPORTANT:** Confirm final details with the user before calling this. **Use** for permanent removal. **Do NOT use** to hide items."""
         try:
+            resolved_name = await self._resolve_medicine_name(medicine_id)
             success = await tool_store.remove_cabinet_item(medicine_id, self.user_id)
             if success:
                 return self._format_output(
-                    "SUCCESS", f"Medication {medicine_id} permanently removed."
+                    "SUCCESS", f"Medication '{resolved_name}' permanently removed."
                 )
             return self._format_output(
                 "ERROR", f"Medication '{medicine_id}' not found. FALLBACK: Verify the ID with `list_my_medicines`."
@@ -978,13 +971,14 @@ class Tools:
         try:
             result = await tool_store.mark_dose_taken(medicine_id, self.user_id, self.user_timezone)
             if result.get("success"):
+                resolved_name = await self._resolve_medicine_name(medicine_id)
                 streak = result.get("currentStreak", 0)
                 qty = result.get("currentQuantity", "?")
                 done = result.get("isDoseDoneToday", False)
                 completion_note = " All scheduled doses for today are now complete." if done else ""
                 return self._format_output(
                     "SUCCESS",
-                    f"Dose recorded. Stock remaining: {qty}.{completion_note} Streak: {streak} day(s).",
+                    f"Dose recorded for '{resolved_name}'. Stock remaining: {qty}.{completion_note} Streak: {streak} day(s).",
                 )
             reason = result.get("reason", "unknown")
             if reason == "no_stock":
@@ -1004,8 +998,9 @@ class Tools:
         try:
             success = await tool_store.undo_dose(medicine_id, self.user_id, self.user_timezone)
             if success:
+                resolved_name = await self._resolve_medicine_name(medicine_id)
                 return self._format_output(
-                    "SUCCESS", "Last dose reverted. Inventory quantity restored."
+                    "SUCCESS", f"Last dose for '{resolved_name}' reverted. Inventory quantity restored."
                 )
             return self._format_output(
                 "ERROR",
@@ -1035,6 +1030,7 @@ class Tools:
                 interval=interval,
             )
             if success:
+                resolved_name = await self._resolve_medicine_name(medicine_id)
                 freq_label = {
                     "daily": "Daily",
                     "weekly": f"Weekly (days: {days_of_week})",
@@ -1043,7 +1039,7 @@ class Tools:
                 }.get(frequency_type, frequency_type)
                 return self._format_output(
                     "SUCCESS",
-                    f"Reminder set for {time} ({freq_label}, {meal_context.replace('_', ' ')}).",
+                    f"Reminder set for '{resolved_name}' at {time} ({freq_label}, {meal_context.replace('_', ' ')}).",
                 )
             return self._format_output(
                 "ERROR",
@@ -1059,9 +1055,10 @@ class Tools:
                 medicine_id, self.user_id, reminder_index
             )
             if success:
+                resolved_name = await self._resolve_medicine_name(medicine_id)
                 return self._format_output(
                     "SUCCESS",
-                    f"Reminder at position {reminder_index} removed successfully.",
+                    f"Reminder at position {reminder_index} for '{resolved_name}' removed successfully.",
                 )
             return self._format_output(
                 "ERROR",
@@ -1257,7 +1254,7 @@ class Tools:
                 "ERROR", f"Product ID '{product_id}' not found. FALLBACK: Run `list_products` or `search_products` to find correct SKU."
             )
         return self._format_output(
-            "SUCCESS", f"Metadata for {product_id}:", json.dumps(product, indent=2)
+            "SUCCESS", f"Metadata for '{product.get('name', product_id)}' (SKU: {product_id}):", json.dumps(product, indent=2)
         )
 
     async def get_batch_details(self, batch_number: str) -> str:
@@ -1268,7 +1265,7 @@ class Tools:
                 "ERROR", f"Batch Number '{batch_number}' not found. FALLBACK: Run `list_batches` or `search_batches` to find valid batch numbers."
             )
         return self._format_output(
-            "SUCCESS", f"Summary for Batch {batch_number}:", json.dumps(batch, indent=2)
+            "SUCCESS", f"Summary for Batch {batch_number} ({batch.get('productName', 'Unknown Product')}):", json.dumps(batch, indent=2)
         )
 
     async def list_batches(
